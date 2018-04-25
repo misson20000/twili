@@ -7,6 +7,6 @@ interface twili::ITwiliService is twili {
 }
 
 interface twili::IPipe {
-	[0] Read() -> (u64 size, array<uint8_t, 0x5> data);
+	[0] Read() -> (u64 size, array<uint8_t, 0x6> data);
 	[1] Write(array<uint8_t, 0x5> data);
 }

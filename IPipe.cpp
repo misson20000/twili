@@ -23,7 +23,6 @@ Transistor::ResultCode IPipe::Read(Transistor::IPC::OutRaw<uint64_t> size, Trans
 }
 
 Transistor::ResultCode IPipe::Write(Transistor::IPC::Buffer<uint8_t, 0x5, 0> buffer) {
-	printf("got write\n");
 	size_t written = 0;
 	while(written < buffer.size) {
 		ssize_t ret = write(fd, buffer.data + written, buffer.size - written);
