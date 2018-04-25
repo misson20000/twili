@@ -1,5 +1,6 @@
 #include<unistd.h>
 
+#include "twili.hpp"
 #include "ITwiliService.hpp"
 
 namespace twili {
@@ -15,6 +16,8 @@ Transistor::ResultCode ITwiliService::Dispatch(Transistor::IPC::Message msg, uin
 		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenStdout>::Handle(this, msg);
 	case 2:
 		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
+	case 999:
+		return Transistor::IPCServer::RequestHandler<&ITwiliService::Destroy>::Handle(this, msg);
 	}
 	return 1;
 }
@@ -47,6 +50,11 @@ Transistor::ResultCode ITwiliService::OpenStderr(Transistor::IPC::OutObject<twil
 	} else {
 		return r.error().code;
 	}
+}
+
+Transistor::ResultCode ITwiliService::Destroy() {
+	twili_state.destroy_server_flag = true;
+	return RESULT_OK;
 }
 
 }

@@ -2,6 +2,7 @@
 #include<libtransistor/cpp/svc.hpp>
 #include<libtransistor/alloc_pages.h>
 #include<libtransistor/util.h>
+#include<libtransistor/svc.h>
 
 #include<stdio.h>
 #include<errno.h>
@@ -105,7 +106,7 @@ int main(int argc, char *argv[]) {
 				.title_id = 0x0100000000000036, // creport
 				.code_addr = twili_base,
 				.code_num_pages = (twili_header->size + twili_header->bss_size + 0xFFF) / 0x1000,
-				.process_flags = 0b111, // 39-bit address space, AArch64
+				.process_flags = 0b100111, // ASLR, 39-bit address space, AArch64
 				.reslimit_h = 0,
 				.system_resource_num_pages = 0,
 				.personal_mm_heap_num_pages = 0,
@@ -158,6 +159,8 @@ int main(int argc, char *argv[]) {
 				Transistor::SVC::StartProcess(*proc, 58, 0, 0x100000));
 
 			printf("Launched\n");
+			svcSleepThread(1000000000);
+			printf("Exiting...\n");
 		} catch(Transistor::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
 		}

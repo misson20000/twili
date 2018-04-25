@@ -1,14 +1,15 @@
 typedef bool _Bool;
+#include<iostream>
+
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
 #include<libtransistor/thread.h>
 #include<libtransistor/ipc/sm.h>
 #include<libtransistor/ipc.h>
 #include<libtransistor/ipc_helpers.h>
+#include<libtransistor/loader_config.h>
 
 #include<stdio.h>
-
-#include<iostream>
 
 #include "twili.hpp"
 #include "ITwiliService.hpp"
@@ -25,12 +26,15 @@ void server_thread(void *arg) {
 }
 
 int main() {
+	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
+	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
+	
 	try {
 		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create());
 		server.CreateService<twili::ITwiliService>("twili");
 		
 		trn_thread_t thread;
-		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &server, 0x3f, -2, 1024 * 64, NULL));
+		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &server, 58, -2, 1024 * 64, NULL));
 		ResultCode::AssertOk(trn_thread_start(&thread));
 		
 		ResultCode::AssertOk(sm_init());
@@ -57,8 +61,8 @@ int main() {
 			ResultCode::AssertOk(ipc_send(pipe, &rq, &ipc_default_response_fmt));
 		}
 
-		printf("destroying server...\n");
-		twili::twili_state.destroy_server_flag = true;
+		//printf("destroying server...\n");
+		//twili::twili_state.destroy_server_flag = true;
 		
 		ResultCode::AssertOk(trn_thread_join(&thread, -1));
 		printf("server destroyed\n");

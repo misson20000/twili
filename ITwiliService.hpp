@@ -15,6 +15,7 @@ class ITwiliService : public Transistor::IPCServer::Object {
 	Transistor::ResultCode OpenStdin(Transistor::IPC::OutObject<twili::IPipe> &out);
 	Transistor::ResultCode OpenStdout(Transistor::IPC::OutObject<twili::IPipe> &out);
 	Transistor::ResultCode OpenStderr(Transistor::IPC::OutObject<twili::IPipe> &out);
+	Transistor::ResultCode Destroy();
 };
 
 }
