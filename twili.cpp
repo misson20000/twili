@@ -4,11 +4,15 @@ typedef bool _Bool;
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
 #include<libtransistor/thread.h>
+#include<libtransistor/ipc/fatal.h>
 #include<libtransistor/ipc/sm.h>
 #include<libtransistor/ipc.h>
 #include<libtransistor/ipc_helpers.h>
 #include<libtransistor/loader_config.h>
+#include<libtransistor/usb_serial.h>
+#include<libtransistor/svc.h>
 
+#include<unistd.h>
 #include<stdio.h>
 
 #include "twili.hpp"
@@ -25,11 +29,40 @@ void server_thread(void *arg) {
 	}
 }
 
+void early_write(const char *str) {
+	size_t bytes_written;
+	ResultCode::AssertOk(usb_serial_write(str, strlen(str), &bytes_written));
+}
+
 int main() {
 	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
-	
+
 	try {
+		ResultCode::AssertOk(usb_serial_init());
+		early_write("initialized USB console\n");
+		svcSleepThread(1000000000);
+
+		early_write("opening FD\n");
+		// set up serial console
+		int usb_fd = usb_serial_open_fd();
+		early_write("opened FD\n");
+		if(usb_fd < 0) {
+			early_write("bad FD, failing...\n");
+			throw new Transistor::ResultError(-usb_fd);
+		}
+		early_write("dup2 descriptors\n");
+		dup2(usb_fd, STDOUT_FILENO);
+		dup2(usb_fd, STDERR_FILENO);
+		dup2(usb_fd, STDIN_FILENO);
+		early_write("setting debug log\n");
+		dbg_set_file(fd_file_get(usb_fd));
+		early_write("set debug log\n");
+		//fd_close(usb_fd);
+		printf("usb stdout\n");
+		svcSleepThread(10000000000);
+
+		// set up service
 		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create());
 		server.CreateService<twili::ITwiliService>("twili");
 		
@@ -68,6 +101,8 @@ int main() {
 		printf("server destroyed\n");
 	} catch(Transistor::ResultError e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
+		fatal_init();
+		fatal_transition_to_fatal_error(e.code.code, 0);
 	}
 		
 	return 0;
