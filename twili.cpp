@@ -17,6 +17,7 @@ typedef bool _Bool;
 
 #include "twili.hpp"
 #include "ITwiliService.hpp"
+#include "USBBridge.hpp"
 
 using ResultCode = Transistor::ResultCode;
 
@@ -95,7 +96,8 @@ namespace twili {
 
 Twili::Twili() :
 	event_waiter(),
-	server(ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&event_waiter))) {
+	server(ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&event_waiter))),
+	usb_bridge(this) {
 	
 	server.CreateService("twili", [this](auto s) {
 			return new twili::ITwiliService(this);
