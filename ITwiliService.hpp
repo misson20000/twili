@@ -9,13 +9,15 @@ namespace twili {
 
 class ITwiliService : public Transistor::IPCServer::Object {
  public:
-	ITwiliService(Transistor::IPCServer::IPCServer *server);
+	ITwiliService(Twili *twili);
 	
 	virtual Transistor::ResultCode Dispatch(Transistor::IPC::Message msg, uint32_t request_id);
 	Transistor::ResultCode OpenStdin(Transistor::IPC::OutObject<twili::IPipe> &out);
 	Transistor::ResultCode OpenStdout(Transistor::IPC::OutObject<twili::IPipe> &out);
 	Transistor::ResultCode OpenStderr(Transistor::IPC::OutObject<twili::IPipe> &out);
 	Transistor::ResultCode Destroy();
+ private:
+	Twili *twili;
 };
 
 }

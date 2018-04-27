@@ -5,7 +5,7 @@
 
 namespace twili {
 
-ITwiliService::ITwiliService(Transistor::IPCServer::IPCServer *server) : Transistor::IPCServer::Object(server) {
+ITwiliService::ITwiliService(Twili *twili) : Transistor::IPCServer::Object(&twili->server), twili(twili) {
 }
 
 Transistor::ResultCode ITwiliService::Dispatch(Transistor::IPC::Message msg, uint32_t request_id) {
@@ -53,7 +53,7 @@ Transistor::ResultCode ITwiliService::OpenStderr(Transistor::IPC::OutObject<twil
 }
 
 Transistor::ResultCode ITwiliService::Destroy() {
-	twili_state.destroy_server_flag = true;
+	twili->destroy_flag = true;
 	return RESULT_OK;
 }
 

@@ -161,7 +161,6 @@ int main(int argc, char *argv[]) {
 				Transistor::SVC::StartProcess(*proc, 58, 0, 0x100000));
 
 			printf("Launched\n");
-			svcSleepThread(1000000000);
 			printf("Pivoting stdout/dbgout to twili...\n");
 
 			twili_pipe_t twili_out;
@@ -183,7 +182,9 @@ int main(int argc, char *argv[]) {
 			dbg_printf("Pivoted dbgout to twili!\n");
 
 			printf("Looping...\n");
-			while(1) { }
+			while(1) {
+				svcSleepThread(10000000); // yield
+			}
 		} catch(Transistor::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
 		}

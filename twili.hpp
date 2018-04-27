@@ -1,15 +1,17 @@
 #pragma once
 
 #include<libtransistor/cpp/waiter.hpp>
+#include<libtransistor/cpp/ipcserver.hpp>
 
 namespace twili {
 
-class TwiliState {
+class Twili {
  public:
-	bool destroy_server_flag;
+	Twili();
+	
+	bool destroy_flag = false;
 	Transistor::Waiter event_waiter;
+	Transistor::IPCServer::IPCServer server;
 };
-
-extern TwiliState twili_state;
 
 }

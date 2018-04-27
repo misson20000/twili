@@ -18,56 +18,39 @@ typedef bool _Bool;
 #include "twili.hpp"
 #include "ITwiliService.hpp"
 
-twili::TwiliState twili::twili_state;
-
 using ResultCode = Transistor::ResultCode;
 
 void server_thread(void *arg) {
-	Transistor::IPCServer::IPCServer *server = (Transistor::IPCServer::IPCServer*) arg;
-	while(!twili::twili_state.destroy_server_flag) {
-		ResultCode::AssertOk(twili::twili_state.event_waiter.Wait(3000000000));
+	twili::Twili *twili = (twili::Twili*) arg;
+	while(!twili->destroy_flag) {
+		ResultCode::AssertOk(twili->event_waiter.Wait(3000000000));
 	}
-}
-
-void early_write(const char *str) {
-	size_t bytes_written;
-	ResultCode::AssertOk(usb_serial_write(str, strlen(str), &bytes_written));
+	printf("twili server thread terminating\n");
 }
 
 int main() {
 	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
-
+	
 	try {
 		ResultCode::AssertOk(usb_serial_init());
-		early_write("initialized USB console\n");
-		svcSleepThread(1000000000);
 
-		early_write("opening FD\n");
 		// set up serial console
 		int usb_fd = usb_serial_open_fd();
-		early_write("opened FD\n");
 		if(usb_fd < 0) {
-			early_write("bad FD, failing...\n");
 			throw new Transistor::ResultError(-usb_fd);
 		}
-		early_write("dup2 descriptors\n");
 		dup2(usb_fd, STDOUT_FILENO);
 		dup2(usb_fd, STDERR_FILENO);
 		dup2(usb_fd, STDIN_FILENO);
-		early_write("setting debug log\n");
 		dbg_set_file(fd_file_get(usb_fd));
-		early_write("set debug log\n");
-		//fd_close(usb_fd);
-		printf("usb stdout\n");
-		svcSleepThread(10000000000);
+		printf("brought up USB serial\n");
 
-		// set up service
-		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&twili::twili_state.event_waiter));
-		server.CreateService<twili::ITwiliService>("twili");
+		// initialize twili
+		twili::Twili twili;
 		
 		trn_thread_t thread;
-		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &server, 58, -2, 1024 * 64, NULL));
+		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &twili, 58, -2, 1024 * 64, NULL));
 		ResultCode::AssertOk(trn_thread_start(&thread));
 		
 		ResultCode::AssertOk(sm_init());
@@ -104,6 +87,20 @@ int main() {
 		fatal_init();
 		fatal_transition_to_fatal_error(e.code.code, 0);
 	}
-		
+	
 	return 0;
+}
+
+namespace twili {
+
+Twili::Twili() :
+	event_waiter(),
+	server(ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&event_waiter))) {
+	
+	server.CreateService("twili", [this](auto s) {
+			return new twili::ITwiliService(this);
+		});
+	printf("initialized Twili\n");
+}
+
 }
