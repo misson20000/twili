@@ -17,6 +17,7 @@ typedef bool _Bool;
 
 #include "twili.hpp"
 #include "ITwiliService.hpp"
+#include "terminal.hpp"
 
 twili::TwiliState twili::twili_state;
 
@@ -60,7 +61,12 @@ int main() {
 		early_write("set debug log\n");
 		//fd_close(usb_fd);
 		printf("usb stdout\n");
-		svcSleepThread(10000000000);
+
+		printf("make terminal...\n");
+		twili::terminal::Terminal *t = new twili::terminal::Terminal();
+		printf("stdout to terminal...\n");
+		dup2(t->MakeFD(), STDOUT_FILENO);
+		printf("terminal output\n");
 
 		// set up service
 		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create());

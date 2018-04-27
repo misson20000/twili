@@ -1,4 +1,5 @@
-OBJECTS := twili.o ITwiliService.o IPipe.o
+RESOURCES := terminus-114n.psf
+OBJECTS := twili.o ITwiliService.o IPipe.o libtmt/tmt.o libpsf/libpsf.o terminal.o twili.squashfs.o
 LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o
 
 TWILI_CXX_FLAGS := -Werror-return-type
@@ -37,6 +38,10 @@ build/%.o: %.cpp
 build/%.squashfs.o: build/%.squashfs
 	mkdir -p $(@D)
 	$(LD) -s -r -b binary -m aarch64elf -T $(LIBTRANSISTOR_HOME)/fs.T -o $@ $<
+
+build/twili.squashfs: $(RESOURCES)
+	mkdir -p $(@D)
+	mksquashfs $^ $@ -comp xz -nopad -noappend
 
 build/twili_launcher.squashfs: build/twili.nro
 	mkdir -p $(@D)
