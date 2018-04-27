@@ -25,7 +25,7 @@ using ResultCode = Transistor::ResultCode;
 void server_thread(void *arg) {
 	Transistor::IPCServer::IPCServer *server = (Transistor::IPCServer::IPCServer*) arg;
 	while(!twili::twili_state.destroy_server_flag) {
-		server->Process(3000000000);
+		ResultCode::AssertOk(twili::twili_state.event_waiter.Wait(3000000000));
 	}
 }
 
@@ -63,7 +63,7 @@ int main() {
 		svcSleepThread(10000000000);
 
 		// set up service
-		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create());
+		Transistor::IPCServer::IPCServer server = ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&twili::twili_state.event_waiter));
 		server.CreateService<twili::ITwiliService>("twili");
 		
 		trn_thread_t thread;
