@@ -35,6 +35,7 @@ struct TwiliUSB<'a> {
 
 enum TwiliUSBCommandId {
     RUN = 10,
+    REBOOT = 11,
 }
 
 impl<'a> TwiliUSB<'a> {
@@ -101,6 +102,15 @@ fn main() {
             twili_usb.write(header.get_ref(), std::time::Duration::new(20, 0)).expect("failed to write transaction header");
             twili_usb.write(content_buf.as_slice(), std::time::Duration::new(20, 0)).expect("failed to write program");
         },
+        "reboot" => {
+            if matches.free.len() != 1 {
+                panic!("usage: twib reboot");
+            }
+            let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
+            header.write_u64::<LittleEndian>(TwiliUSBCommandId::REBOOT as u64);
+            header.write_u64::<LittleEndian>(0 as u64);
+            twili_usb.write(header.get_ref(), std::time::Duration::new(20, 0)).expect("failed to write transaction header");            
+        }
         _ => panic!("unknown operation: {:?}", matches.free[0])
     }
 

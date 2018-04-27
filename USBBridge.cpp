@@ -62,7 +62,7 @@ USBBridge::USBBridge(Twili *twili) :
 		interface->GetEndpoint(endpoint_out_descriptor));
 	ResultCode::AssertOk(interface->Enable());
 
-	incoming_buffer = alloc_pages(TRANSFER_BUFFER_SIZE, TRANSFER_BUFFER_SIZE, nullptr);
+	incoming_buffer = (uint8_t*) alloc_pages(TRANSFER_BUFFER_SIZE, TRANSFER_BUFFER_SIZE, nullptr);
 	if(incoming_buffer == NULL) {
 		throw new ResultError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 	}
@@ -72,7 +72,7 @@ USBBridge::USBBridge(Twili *twili) :
 		throw new ResultError(r.error());
 	}
 
-	outgoing_buffer = alloc_pages(TRANSFER_BUFFER_SIZE, TRANSFER_BUFFER_SIZE, nullptr);
+	outgoing_buffer = (uint8_t*) alloc_pages(TRANSFER_BUFFER_SIZE, TRANSFER_BUFFER_SIZE, nullptr);
 	if(outgoing_buffer == NULL) {
 		svcSetMemoryAttribute(incoming_buffer, TRANSFER_BUFFER_SIZE, 0x0, 0x0);
 		free_pages(incoming_buffer);
@@ -149,16 +149,13 @@ void USBBridge::USBTransactionCompleted() {
 		break;
 	}
 	case State::WAITING_ON_PAYLOAD: {
-		printf("was waiting for payload... target size 0x%lx, have 0x%lx, incoming 0x%x\n", current_header.payload_size, payload_read, entry->transferred_size);
-		if(payload_read + entry->transferred_size > current_header.payload_size) {
+		if(current_payload.size() + entry->transferred_size > current_header.payload_size) {
 			printf("overshot payload size\n");
 			state = State::INVALID;
 			return;
 		}
-		memcpy(current_payload + payload_read, incoming_buffer, entry->transferred_size);
-		payload_read+= entry->transferred_size;
-		if(payload_read < current_header.payload_size) {
-			printf("need to keep reading\n");
+		std::copy(incoming_buffer, incoming_buffer + entry->transferred_size, current_payload.insert(current_payload.end(), entry->transferred_size, 0));
+		if(current_payload.size() < current_header.payload_size) {
 			ContinueReadingPayload();
 		} else {
 			printf("got entire payload\n");
@@ -196,15 +193,15 @@ void USBBridge::BeginReadHeader() {
 
 void USBBridge::BeginReadPayload() {
 	state = State::WAITING_ON_PAYLOAD;
-	current_payload = new uint8_t[current_header.payload_size];
-	payload_read = 0;
+	current_payload.clear();
+	current_payload.reserve(current_header.payload_size);
 	ContinueReadingPayload();
 }
 
 void USBBridge::ContinueReadingPayload() {
 	size_t size = TRANSFER_BUFFER_SIZE;
-	if(current_header.payload_size - payload_read < size) {
-		size = current_header.payload_size - payload_read;
+	if(current_header.payload_size - current_payload.size() < size) {
+		size = current_header.payload_size - current_payload.size();
 	}
 	recv_urb_id = ResultCode::AssertOk(endpoint_out->PostBufferAsync(incoming_buffer, size));
 }
@@ -212,6 +209,8 @@ void USBBridge::ContinueReadingPayload() {
 bool USBBridge::ValidateCommandHeader() {
 	switch((CommandID) current_header.command_id) {
 	case CommandID::RUN:
+		return true; // any payload size is ok
+	case CommandID::REBOOT:
 		return true; // any payload size is ok
 	default:
 		return false;
@@ -222,10 +221,9 @@ bool USBBridge::ValidateCommandHeader() {
 bool USBBridge::ProcessCommand() {
 	switch((CommandID) current_header.command_id) {
 	case CommandID::RUN:
-		printf("processing RUN command\n");
-		hexdump(current_payload, 0x60);
-		delete[] current_payload;
-		return true;
+		return twili->Run(current_payload);
+	case CommandID::REBOOT:
+		return twili->Reboot();
 	}
 	return false;
 }

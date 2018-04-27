@@ -6,6 +6,7 @@ typedef bool _Bool;
 #include<libtransistor/thread.h>
 #include<libtransistor/ipc/fatal.h>
 #include<libtransistor/ipc/sm.h>
+#include<libtransistor/ipc/bpc.h>
 #include<libtransistor/ipc.h>
 #include<libtransistor/ipc_helpers.h>
 #include<libtransistor/loader_config.h>
@@ -16,6 +17,7 @@ typedef bool _Bool;
 #include<stdio.h>
 
 #include "twili.hpp"
+#include "process_creation.hpp"
 #include "ITwiliService.hpp"
 #include "USBBridge.hpp"
 
@@ -25,6 +27,9 @@ void server_thread(void *arg) {
 	twili::Twili *twili = (twili::Twili*) arg;
 	while(!twili->destroy_flag) {
 		ResultCode::AssertOk(twili->event_waiter.Wait(3000000000));
+		twili->monitored_processes.remove_if([](const auto &proc) {
+				return proc.destroy_flag;
+			});
 	}
 	printf("twili server thread terminating\n");
 }
@@ -103,6 +108,20 @@ Twili::Twili() :
 			return new twili::ITwiliService(this);
 		});
 	printf("initialized Twili\n");
+}
+
+bool Twili::Reboot() {
+	ResultCode::AssertOk(bpc_init());
+	ResultCode::AssertOk(bpc_reboot_system());
+	return true;
+}
+
+bool Twili::Run(std::vector<uint8_t> nro) {
+	monitored_processes.emplace_back(
+		this,
+		ResultCode::AssertOk(twili::process_creation::CreateProcessFromNRO(nro, "twili_child"))
+	).Launch();
+	return true;
 }
 
 }

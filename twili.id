@@ -1,12 +1,19 @@
 interface twili::ITwiliService is twili {
-	[0] OpenStdin() -> twili::IPipe;
-	[1] OpenStdout() -> twili::IPipe;
-	[2] OpenStderr() -> twili::IPipe;
-
+	[0] OpenStdin() -> object<twili::IPipe>;
+	[1] OpenStdout() -> object<twili::IPipe>;
+	[2] OpenStderr() -> object<twili::IPipe>;
+	[10] EmulateHBL(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
+	[11] GetHBLEmulation() -> object<twili::IHBLEmulation>;
+	
 	[999] Destroy();
 }
 
 interface twili::IPipe {
 	[0] Read() -> (u64 size, array<uint8_t, 0x6> data);
 	[1] Write(array<uint8_t, 0x5> data);
+}
+
+interface twili::IHBLEmulation {
+	[0] GetTargetNROLoadAddress() -> u64;
+	[1] SetNextNRO(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
 }

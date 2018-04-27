@@ -3,6 +3,8 @@
 #include<libtransistor/cpp/waiter.hpp>
 #include<libtransistor/cpp/ipc/usb_ds.hpp>
 
+#include<vector>
+
 namespace twili {
 
 class Twili;
@@ -18,6 +20,7 @@ class USBBridge {
 
 	enum class CommandID : uint64_t {
 		RUN = 10,
+		REBOOT = 11,
 	};
 	
 	struct CommandHeader {
@@ -34,8 +37,8 @@ class USBBridge {
 	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_in;
 	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_out;
 
-	void *incoming_buffer = nullptr; // remember, these are from the perspective of the host!
-	void *outgoing_buffer = nullptr;
+	uint8_t *incoming_buffer = nullptr; // remember, these are from the perspective of the host!
+	uint8_t *outgoing_buffer = nullptr;
 
 	Transistor::IPC::USB::DS::DS ds;
 	Transistor::KEvent usb_state_change_event;
@@ -49,8 +52,7 @@ class USBBridge {
 	
 	State state = State::INVALID;
 	CommandHeader current_header;
-	uint8_t *current_payload;
-	size_t payload_read;
+	std::vector<uint8_t> current_payload;
 	uint32_t recv_urb_id;
 
 	std::shared_ptr<Transistor::WaitHandle> endpoint_out_completion_wait;

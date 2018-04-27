@@ -1,5 +1,5 @@
-OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o
-LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o
+OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o
+LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o
 
 TWILI_CXX_FLAGS := -Werror-return-type
 
