@@ -14,7 +14,8 @@ class MonitoredProcess {
 	MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KProcess> proc);
 	
 	void Launch();
-
+	void GenerateCrashReport();
+	
 	bool destroy_flag = false;
 	
 	~MonitoredProcess();
