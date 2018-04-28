@@ -3,6 +3,7 @@
 #include<libtransistor/util.h>
 #include<libtransistor/svc.h>
 #include<libtransistor/ipc/twili.h>
+#include<libtransistor/ipc/fatal.h>
 
 #include<unistd.h>
 #include<stdio.h>
@@ -113,6 +114,8 @@ int main(int argc, char *argv[]) {
 			}
 		} catch(Transistor::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
+			fatal_init();
+			fatal_transition_to_fatal_error(e.code.code, 0);
 		}
 	} else {
 		return 1;
