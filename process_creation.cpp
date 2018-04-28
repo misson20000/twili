@@ -58,7 +58,7 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(s
 			.title_id = 0x0100000000000036, // creport
 			.code_addr = nro_base,
 			.code_num_pages = (nro_header->size + nro_header->bss_size + 0xFFF) / 0x1000,
-			.process_flags = 0b100111, // ASLR, 39-bit address space, AArch64
+			.process_flags = 0b110111, // ASLR, 39-bit address space, AArch64, bit4 (?)
 			.reslimit_h = 0,
 			.system_resource_num_pages = 0,
 			.personal_mm_heap_num_pages = 0,
