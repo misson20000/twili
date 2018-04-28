@@ -38,7 +38,7 @@ struct ProcessInfo {
 	uint32_t personal_mm_heap_num_pages;
 };
 
-Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(std::vector<uint8_t> nro_image, const char *name) {
+Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(std::vector<uint8_t> nro_image, const char *name, std::vector<uint32_t> caps) {
 	try {
 		if(nro_image.size() < sizeof(NroHeader)) {
 			return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
@@ -66,25 +66,11 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(s
 		strncpy((char*) process_info.name, name, sizeof(process_info).name-1);
 		process_info.name[sizeof(process_info).name-1] = 0;
 		
-		uint32_t caps[] = {
-			0b00011111111111111111111111101111, // SVC grants
-			0b00111111111111111111111111101111,
-			0b01011111111111111111111111101111,
-			0b01100000000000001111111111101111,
-			0b10011111100000000000000000001111,
-			0b10100000000000000000111111101111,
-			0b00000010000000000111001110110111, // KernelFlags
-			0b00000000000000000101111111111111, // ApplicationType
-			0b00000000000110000011111111111111, // KernelReleaseVersion
-			0b00000010000000000111111111111111, // HandleTableSize
-			0b00000000000000001111111111111111, // DebugFlags
-		};
-		
 		// create process
 		printf("Making process\n");
 		auto proc = std::make_shared<Transistor::KProcess>(
 			std::move(Transistor::ResultCode::AssertOk(
-									Transistor::SVC::CreateProcess(&process_info, (void*) caps, ARRAY_LENGTH(caps)))));
+									Transistor::SVC::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
 		printf("Made process 0x%x\n", proc->handle);
 		
 		// load NRO

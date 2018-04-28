@@ -8,7 +8,7 @@
 namespace twili {
 namespace process_creation {
 
-Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(std::vector<uint8_t> nro, const char *name);
+Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(std::vector<uint8_t> nro, const char *name, std::vector<uint32_t> caps);
 
 }
 }
