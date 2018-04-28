@@ -145,7 +145,15 @@ void USBBridge::USBTransactionCompleted() {
 			state = State::INVALID;
 			return;
 		}
-		BeginReadPayload();
+		if(current_header.payload_size > 0) {
+			BeginReadPayload();
+		} else {
+			if(!ProcessCommand()) {
+				printf("failed to process command\n");
+				state = State::INVALID;
+				return;
+			}
+		}
 		break;
 	}
 	case State::WAITING_ON_PAYLOAD: {
