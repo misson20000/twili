@@ -1,9 +1,11 @@
 extern crate libusb;
 extern crate getopts;
 extern crate byteorder;
+extern crate rand;
 
-use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian, LittleEndian};
+use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
 use std::io::Read;
+use std::io::Write;
 
 fn find_twili_device<'a>(context: &'a libusb::Context) -> libusb::Result<libusb::Device<'a>> {
     for mut device in try!(context.devices()).iter() {
@@ -29,30 +31,65 @@ fn find_twili_interface_descriptor<'a>(config: &'a libusb::ConfigDescriptor) -> 
 
 struct TwiliUSB<'a> {
     handle: libusb::DeviceHandle<'a>,
-    endpoint_out: libusb::EndpointDescriptor<'a>,
-    endpoint_in: libusb::EndpointDescriptor<'a>,
+    endpoint_meta_out: libusb::EndpointDescriptor<'a>,
+    endpoint_data_out: libusb::EndpointDescriptor<'a>,
+    endpoint_meta_in: libusb::EndpointDescriptor<'a>,
+    endpoint_data_in: libusb::EndpointDescriptor<'a>,
 }
 
 enum TwiliUSBCommandId {
     RUN = 10,
     REBOOT = 11,
+    COREDUMP = 12,
 }
 
 impl<'a> TwiliUSB<'a> {
-    fn write(&mut self, buf: &[u8], timeout: std::time::Duration) -> libusb::Result<usize> {
-        println!("writing {:?} bytes", buf.len());
-        self.handle.write_bulk(self.endpoint_out.address(), buf, timeout)
-    }
-    fn read(&mut self, buf: &mut [u8], timeout: std::time::Duration) -> libusb::Result<usize> {
-        self.handle.read_bulk(self.endpoint_in.address(), buf, timeout)
+    fn transact(&mut self, command_id: TwiliUSBCommandId, content_buf: &[u8], timeout: std::time::Duration) -> libusb::Result<(u32, std::vec::Vec<u8>)> {
+        let tag:u32 = rand::random();
+        { // request
+            let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
+            header.write_u32::<LittleEndian>(command_id as u32).unwrap();
+            header.write_u32::<LittleEndian>(tag).unwrap();
+            header.write_u64::<LittleEndian>(content_buf.len() as u64).unwrap();
+            try!(self.handle.write_bulk(self.endpoint_meta_out.address(), header.get_ref(), timeout));
+            let mut bytes_written:usize = 0;
+            while bytes_written < content_buf.len() {
+                bytes_written+= try!(self.handle.write_bulk(self.endpoint_data_out.address(), &content_buf[bytes_written..], timeout));
+                println!("bytes_written: {:?}", bytes_written);
+            }
+        }
+        { // response
+            let mut header_vec:Vec<u8> = Vec::new();
+            header_vec.resize(16, 0);
+            println!("awaiting response header");
+            try!(self.handle.read_bulk(self.endpoint_meta_in.address(), header_vec.as_mut_slice(), timeout));
+            let mut header_cursor:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(header_vec);
+            let result_code = header_cursor.read_u32::<LittleEndian>().unwrap();
+            let in_tag = header_cursor.read_u32::<LittleEndian>().unwrap();
+            let response_size = header_cursor.read_u64::<LittleEndian>().unwrap() as usize;
+            assert_eq!(in_tag, tag);
+            println!("response size: {:?}", response_size);
+            let mut response:Vec<u8> = Vec::new();
+            if response_size > 0 {
+                response.resize(response_size, 0);
+                let mut bytes_read:usize = 0;
+                while bytes_read < response_size {
+                    let region:&mut [u8] = &mut response[bytes_read..];
+                    println!("try to read {:?}", region.len());
+                    bytes_read+= try!(self.handle.read_bulk(self.endpoint_data_in.address(), region, timeout));
+                    println!("have {:?}/{:?} bytes", bytes_read, response_size);
+                    std::thread::sleep(std::time::Duration::new(1, 0));
+                }
+            }
+            Ok((result_code, response))
+        }
     }
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let program = args[0].clone();
 
-    let mut opts = getopts::Options::new();
+    let opts = getopts::Options::new();
     let matches = opts.parse(&args[1..]).unwrap();
     if matches.free.len() < 1 {
         panic!("usage: twib <operation> args...");
@@ -64,18 +101,23 @@ fn main() {
     let twili_interface_descriptor = find_twili_interface_descriptor(&twili_config).expect("could not find Twili interface");
     
     let mut endp_iter = twili_interface_descriptor.endpoint_descriptors();
-    let endp_out = endp_iter.next().unwrap();
-    let endp_in = endp_iter.next().unwrap();
+    let endp_meta_out = endp_iter.next().unwrap();
+    let endp_data_out = endp_iter.next().unwrap();
+    let endp_meta_in = endp_iter.next().unwrap();
+    let endp_data_in = endp_iter.next().unwrap();
     assert!(endp_iter.next().is_none());
     
-    assert_eq!(endp_in.direction(), libusb::Direction::In);
-    assert_eq!(endp_out.direction(), libusb::Direction::Out);
-    assert_eq!(endp_in.transfer_type(), libusb::TransferType::Bulk);
-    assert_eq!(endp_out.transfer_type(), libusb::TransferType::Bulk);
+
+    assert_eq!(endp_meta_out.direction(), libusb::Direction::Out);
+    assert_eq!(endp_data_out.direction(), libusb::Direction::Out);
+    assert_eq!(endp_meta_in.direction(), libusb::Direction::In);
+    assert_eq!(endp_data_in.direction(), libusb::Direction::In);
+    assert_eq!(endp_meta_out.transfer_type(), libusb::TransferType::Bulk);
+    assert_eq!(endp_meta_out.transfer_type(), libusb::TransferType::Bulk);
+    assert_eq!(endp_meta_in.transfer_type(), libusb::TransferType::Bulk);
+    assert_eq!(endp_meta_in.transfer_type(), libusb::TransferType::Bulk);
     
     println!("found Twili endpoints!");
-    println!("  in: {:?}", endp_in);
-    println!("  out: {:?}", endp_out);
     
     let mut twili_handle = twili_device.open().unwrap();
     if twili_handle.kernel_driver_active(twili_interface_descriptor.interface_number()).unwrap() {
@@ -85,32 +127,41 @@ fn main() {
     twili_handle.claim_interface(twili_interface_descriptor.interface_number()).unwrap();
     println!("claimed Twili interface");
     
-    let mut twili_usb = TwiliUSB { handle: twili_handle, endpoint_out: endp_out, endpoint_in: endp_in };
+    let mut twili_usb = TwiliUSB { handle: twili_handle,
+                                   endpoint_meta_out: endp_meta_out,
+                                   endpoint_data_out: endp_data_out,
+                                   endpoint_meta_in: endp_meta_in,
+                                   endpoint_data_in: endp_data_in };
+    
     match matches.free[0].as_ref() {
         "run" => {
             if matches.free.len() != 2 {
                 panic!("usage: twib run <file>");
             }
             let mut content_buf:Vec<u8> = Vec::new();
-            let size = {
+            {
                 let mut f = std::fs::File::open(&matches.free[1]).expect("file not found");
-                f.read_to_end(&mut content_buf).expect("failed to read from file")
-            };
-            let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
-            header.write_u64::<LittleEndian>(TwiliUSBCommandId::RUN as u64);
-            header.write_u64::<LittleEndian>(size as u64);
-            twili_usb.write(header.get_ref(), std::time::Duration::new(20, 0)).expect("failed to write transaction header");
-            twili_usb.write(content_buf.as_slice(), std::time::Duration::new(20, 0)).expect("failed to write program");
+                f.read_to_end(&mut content_buf).expect("failed to read from file");
+            }
+            println!("returned {:?}", twili_usb.transact(TwiliUSBCommandId::RUN, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap().0);
         },
         "reboot" => {
             if matches.free.len() != 1 {
                 panic!("usage: twib reboot");
             }
-            let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
-            header.write_u64::<LittleEndian>(TwiliUSBCommandId::REBOOT as u64);
-            header.write_u64::<LittleEndian>(0 as u64);
-            twili_usb.write(header.get_ref(), std::time::Duration::new(20, 0)).expect("failed to write transaction header");            
-        }
+            println!("returned {:?}", twili_usb.transact(TwiliUSBCommandId::REBOOT, &[0], std::time::Duration::new(20, 0)).unwrap().0);
+        },
+        "coredump" => {
+            if matches.free.len() != 2 {
+                panic!("usage: twib coredump <file>");
+            }
+            let mut f = std::fs::File::create(&matches.free[1]).expect("could not create file");
+            let r = twili_usb.transact(TwiliUSBCommandId::COREDUMP, &[], std::time::Duration::new(20, 0)).unwrap();
+            if r.0 != 0 {
+                panic!("  got back code {:?}", r.0);
+            }
+            f.write_all(r.1.as_slice()).unwrap();
+        },
         _ => panic!("unknown operation: {:?}", matches.free[0])
     }
 

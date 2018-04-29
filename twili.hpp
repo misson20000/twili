@@ -14,8 +14,9 @@ class Twili {
 	Twili();
 
 	// bridge commands
-	bool Reboot();
-	bool Run(std::vector<uint8_t> nro);
+	Transistor::Result<std::nullopt_t> Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
+	Transistor::Result<std::nullopt_t> Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer);
+	Transistor::Result<std::nullopt_t> CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
 	
 	bool destroy_flag = false;
 	Transistor::Waiter event_waiter;

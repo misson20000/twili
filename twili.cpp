@@ -20,6 +20,7 @@ typedef bool _Bool;
 #include "process_creation.hpp"
 #include "ITwiliService.hpp"
 #include "USBBridge.hpp"
+#include "err.hpp"
 
 using ResultCode = Transistor::ResultCode;
 
@@ -110,13 +111,13 @@ Twili::Twili() :
 	printf("initialized Twili\n");
 }
 
-bool Twili::Reboot() {
+Transistor::Result<std::nullopt_t> Twili::Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
 	ResultCode::AssertOk(bpc_init());
 	ResultCode::AssertOk(bpc_reboot_system());
-	return true;
+	return std::nullopt;
 }
 
-bool Twili::Run(std::vector<uint8_t> nro) {
+Transistor::Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer) {
 	std::vector<uint32_t> caps = {
 		0b00011111111111111111111111101111, // SVC grants
 		0b00111111111111111111111111101111,
@@ -131,11 +132,21 @@ bool Twili::Run(std::vector<uint8_t> nro) {
 		0b00000000000000101111111111111111, // DebugFlags (can be debugged)
 	};
 
-	monitored_processes.emplace_back(
-		this,
-		ResultCode::AssertOk(twili::process_creation::CreateProcessFromNRO(nro, "twili_child", caps))
-	).Launch();
-	return true;
+	auto proc = twili::process_creation::CreateProcessFromNRO(nro, "twili_child", caps);
+	if(!proc) {
+		return tl::make_unexpected(proc.error());
+	}
+	monitored_processes.emplace_back(this, *proc).Launch();
+	return std::nullopt;
+}
+
+Transistor::Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+	for(auto i = monitored_processes.begin(); i != monitored_processes.end(); i++) {
+		if(i->crashed) {
+			return i->CoreDump(writer);
+		}
+	}
+	return tl::make_unexpected(TWILI_ERR_NO_CRASHED_PROCESSES);
 }
 
 }

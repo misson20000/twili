@@ -7,3 +7,4 @@ authors = ["misson20000 <xenotoad@xenotoad.net>"]
 libusb = "0.3"
 getopts = "0.2"
 byteorder = "1"
+rand = "0.4"
