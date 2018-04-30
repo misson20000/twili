@@ -1,4 +1,5 @@
 #include<libtransistor/cpp/svc.hpp>
+#include<libtransistor/util.h>
 
 #include "ELFCrashReport.hpp"
 #include "USBBridge.hpp"
@@ -30,7 +31,19 @@ void ELFCrashReport::AddNote(std::string name, uint32_t type, std::vector<uint8_
 	notes.push_back({static_cast<uint32_t>(name.length()), static_cast<uint32_t>(desc.size()), type, name_vec, desc_vec});
 }
 
+void ELFCrashReport::AddThread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint) {
+	threads.emplace(std::make_pair(thread_id, Thread(thread_id, tls_pointer, entrypoint)));
+}
+
+ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
+	return &threads.find(thread_id)->second;
+}
+
 Transistor::Result<std::nullopt_t> ELFCrashReport::Generate(Transistor::KDebug &debug, twili::usb::USBBridge::USBResponseWriter &r) {
+	for(auto i = threads.begin(); i != threads.end(); i++) {
+		AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, i->second.GeneratePRSTATUS(debug));
+	}
+	
 	size_t total_size = 0;
 	total_size+= sizeof(ELF::Elf64_Ehdr);
 	for(auto i = vmas.begin(); i != vmas.end(); i++) {
@@ -131,6 +144,34 @@ Transistor::Result<std::nullopt_t> ELFCrashReport::Generate(Transistor::KDebug &
 	}
 	r.Write(phdrs);
 	return std::nullopt;
+}
+
+ELFCrashReport::Thread::Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint) :
+	thread_id(thread_id),
+	tls_pointer(tls_pointer),
+	entrypoint(entrypoint) {
+}
+
+ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(Transistor::KDebug &debug) {
+	ELF::Note::elf_prstatus prstatus = {
+		.pr_info = {
+			.si_signo = 0,
+			.si_code = 0,
+			.si_errno = 0,
+		},
+		.pr_cursig = signo,
+		.pr_sigpend = 0,
+		.pr_sighold = 0,
+		.pr_pid = (uint32_t) thread_id,
+		.pr_ppid = 0,
+		.pr_pgrp = 0,
+		.pr_sid = 0,
+		.times = {0},
+		.pr_reg = {0}
+	};
+	thread_context_t context = ResultCode::AssertOk(Transistor::SVC::GetDebugThreadContext(debug, thread_id, 15)); // where does this 15 number come from?
+	memcpy(prstatus.pr_reg, context.regs, sizeof(prstatus.pr_reg));
+	return prstatus;
 }
 
 }

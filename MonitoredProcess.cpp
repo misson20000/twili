@@ -71,6 +71,7 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 			ResultCode::AssertOk(
 				Transistor::SVC::GetProcessId(proc->handle))));
 	printf("  opened debug: 0x%x\n", debug.handle);
+
 	while(1) {
 		auto r = Transistor::SVC::GetDebugEvent(debug);
 		if(!r) {
@@ -85,7 +86,7 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 		printf("  Event (type=0x%x [%s])\n", r->event_type, types[r->event_type]);
 		printf("    Flags: 0x%x\n", r->flags);
 		printf("    Thread id: 0x%lx\n", r->thread_id);
-		
+
 		switch(r->event_type) {
 		case DEBUG_EVENT_ATTACH_PROCESS: {
 			printf("    AttachProcess:\n");
@@ -114,27 +115,7 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 			printf("      Thread ID: 0x%lx\n", r->attach_thread.thread_id);
 			printf("      TLS Pointer: 0x%lx\n", r->attach_thread.tls_pointer);
 			printf("      Entrypoint: 0x%lx\n", r->attach_thread.entrypoint);
-			ELF::Note::elf_prstatus prstatus = {
-				.pr_info = {
-					.si_signo = 0,
-					.si_code = 0,
-					.si_errno = 0,
-				},
-				.pr_cursig = 0,
-				.pr_sigpend = 0,
-				.pr_sighold = 0,
-				.pr_pid = (uint32_t) r->attach_thread.thread_id,
-				.pr_ppid = 0,
-				.pr_pgrp = 0,
-				.pr_sid = 0,
-				.times = {0},
-				.pr_reg = {0}
-			};
-			report.AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, prstatus);
-			
-			// FPREGSET
-			// X86_XSTATE
-			// SIGINFO
+			report.AddThread(r->attach_thread.thread_id, r->attach_thread.tls_pointer, r->attach_thread.entrypoint);
 			break; }
 		case DEBUG_EVENT_UNKNOWN:
 			printf("    Unknown:\n");
@@ -157,14 +138,18 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 				"BAD_SVC_ID"};
 			printf("      Type: 0x%lx [%s]\n", r->exception.exception_type, exception_types[r->exception.exception_type]);
 			printf("      Fault Register: 0x%lx\n", r->exception.fault_register);
+
+			int signal;
 			switch(r->exception.exception_type) {
 			case DEBUG_EXCEPTION_UNDEFINED_INSTRUCTION:
 				printf("      Undefined Instruction:\n");
 				printf("        Opcode: 0x%x\n", r->exception.undefined_instruction.opcode);
+				signal = SIGILL;
 				break;
 			case DEBUG_EXCEPTION_BREAKPOINT:
 				printf("      Breakpoint:\n");
 				printf("        Is Watchpoint: 0x%x\n", r->exception.breakpoint.is_watchpoint);
+				signal = SIGTRAP;
 				break;
 			case DEBUG_EXCEPTION_USER_BREAK:
 				printf("      User Break:\n");
@@ -172,15 +157,33 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 							 r->exception.user_break.info0,
 							 r->exception.user_break.info1,
 							 r->exception.user_break.info2);
+				signal = SIGTRAP;
 				break;
 			case DEBUG_EXCEPTION_BAD_SVC_ID:
 				printf("      Bad SVC ID:\n");
 				printf("        SVC ID: 0x%x\n", r->exception.bad_svc_id.svc_id);
+				signal = SIGILL;
+				break;
+			case DEBUG_EXCEPTION_INSTRUCTION_ABORT:
+			case DEBUG_EXCEPTION_DATA_ABORT_MISC:
+				signal = SIGSEGV;
+				break;
+			case DEBUG_EXCEPTION_PC_SP_ALIGNMENT_FAULT:
+				signal = SIGBUS;
+				break;
+			case DEBUG_EXCEPTION_DEBUGGER_ATTACHED:
+			case DEBUG_EXCEPTION_DEBUGGER_BREAK:
+				signal = SIGTRAP;
 				break;
 			default:
 				printf("      Unknown Exception:\n");
 				hexdump(&r->exception.bad_svc_id.svc_id, 0x40);
 				break;
+			}
+
+			if(r->thread_id != 0) {
+				printf("Assigning signal %d to thread...\n", signal);
+				report.GetThread(r->thread_id)->signo = signal;
 			}
 			break; }
 		default:
