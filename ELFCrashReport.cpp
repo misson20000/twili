@@ -74,13 +74,11 @@ Transistor::Result<std::nullopt_t> ELFCrashReport::Generate(Transistor::KDebug &
 	// write VMAs
 	std::vector<uint8_t> transfer_buffer(r.GetMaxTransferSize(), 0);
 	for(auto i = vmas.begin(); i != vmas.end(); i++) {
-		printf("[ELFCR] Write VMA [0x%x, +0x%x]\n", i->virtual_addr, i->size);
 		for(size_t offset = 0; offset < i->size; offset+= transfer_buffer.size()) {
 			size_t size = transfer_buffer.size();
 			if(size > i->size - offset) {
 				size = i->size - offset;
 			}
-			printf("[ELFCR]   Write subregion [0x%x, +0x%x]\n", offset, size);
 			ResultCode::AssertOk(Transistor::SVC::ReadDebugProcessMemory(transfer_buffer.data(), debug, i->virtual_addr + offset, size));
 			r.Write(transfer_buffer.data(), size);
 		}

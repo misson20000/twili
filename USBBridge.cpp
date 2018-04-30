@@ -120,7 +120,6 @@ Transistor::Result<std::nullopt_t> USBBridge::PostBufferSync(std::shared_ptr<Tra
 		printf("[USBB] URB status %d\n", entry->urb_status);
 		throw new ResultError(TWILI_ERR_USB_TRANSFER);
 	}
-	printf("[USBB] transferred 0x%lx out of 0x%lx\n", entry->transferred_size, entry->requested_size);
 	if(entry->transferred_size < size) {
 		printf("[USBB] didn't send all bytes, posting again...\n");
 		return PostBufferSync(endpoint, buffer + entry->transferred_size, size - entry->transferred_size);
@@ -278,7 +277,6 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t 
 	if(has_begun) {
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
-	printf("[USBRW] BeginOk(0x%x)\n", payload_size);
 	TransactionHeader hdr;
 	hdr.result_code = 0;
 	hdr.tag = tag;
@@ -289,9 +287,7 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t 
 	
 	memcpy(bridge->response_meta_buffer.data, &hdr, sizeof(hdr));
 	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_meta, bridge->response_meta_buffer.data, sizeof(hdr));
-	printf("[USBRW] Posted header\n");
 	if(!r) {
-		printf("[USBRW]    err 0x%x\n", r.error().code);
 		has_errored = true;
 	}
 	return r;
@@ -301,7 +297,6 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(Resu
 	if(has_begun) {
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
-	printf("[USBRW] BeginError(0x%x, 0x%x)\n", code.code, payload_size);
 	TransactionHeader hdr;
 	hdr.result_code = code.code;
 	hdr.tag = tag;
@@ -325,11 +320,9 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(uint8_t *
 		data+= max_size;
 		size-= max_size;
 	}
-	printf("[USBRespW] writing 0x%x bytes\n", size);
 	memcpy(bridge->response_data_buffer.data, data, size);
 	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_data, bridge->response_data_buffer.data, size);
 	if(r) {
-		printf("[USBRespW]   done\n");
 		transferred_size+= size;
 	} else {
 		has_errored = true;
