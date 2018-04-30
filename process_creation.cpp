@@ -52,14 +52,48 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(s
 		}
 		
 		const uint64_t nro_base = 0x7100000000;
+
+		Transistor::KResourceLimit resource_limit =
+			Transistor::ResultCode::AssertOk(
+				Transistor::SVC::CreateResourceLimit());
+
+		Transistor::ResultCode::AssertOk(               // raise memory limit to 256MiB,
+			Transistor::SVC::SetResourceLimitLimitValue(  // since the default limit of 6MiB
+				resource_limit,                             // is too low for my tastes.
+				Transistor::SVC::LimitableResource::Memory,
+				1 * 256 * 1024 * 1024));
+
+		Transistor::ResultCode::AssertOk(
+			Transistor::SVC::SetResourceLimitLimitValue(
+				resource_limit,
+				Transistor::SVC::LimitableResource::Threads,
+				256));
+
+		Transistor::ResultCode::AssertOk(
+			Transistor::SVC::SetResourceLimitLimitValue(
+				resource_limit,
+				Transistor::SVC::LimitableResource::Events,
+				256));
+
+		Transistor::ResultCode::AssertOk(
+			Transistor::SVC::SetResourceLimitLimitValue(
+				resource_limit,
+				Transistor::SVC::LimitableResource::TransferMemories,
+				256));
 		
+		Transistor::ResultCode::AssertOk(
+			Transistor::SVC::SetResourceLimitLimitValue(
+				resource_limit,
+				Transistor::SVC::LimitableResource::Sessions,
+				256));
+
 		ProcessInfo process_info = {
 			.process_category = 0,
 			.title_id = 0x0100000000000036, // creport
 			.code_addr = nro_base,
 			.code_num_pages = (nro_header->size + nro_header->bss_size + 0xFFF) / 0x1000,
 			.process_flags = 0b110111, // ASLR, 39-bit address space, AArch64, bit4 (?)
-			.reslimit_h = 0,
+			.reslimit_h = resource_limit.handle,
 			.system_resource_num_pages = 0,
 			.personal_mm_heap_num_pages = 0,
 		};
