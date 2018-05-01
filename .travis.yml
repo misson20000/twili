@@ -1,0 +1,34 @@
+addons:
+  apt:
+    packages:
+    - libusb-1.0.0
+    - libusb-1.0.0-dev
+    - python3-pip
+matrix:
+  include:
+  - os: linux
+    language: cpp
+    env: NAME="twili"
+    install: "./.travis/twili_install.sh"
+    script: make LIBTRANSISTOR_HOME=$PWD/libtransistor/ BUILD_PFS0=$PWD/build_pfs0
+    before_deploy: "./.travis/twili_before_deploy.sh"
+  - os: linux
+    language: rust
+    env: NAME="twib_linux"
+    script: "./.travis/twib.sh"
+    before_deploy: "./.travis/twib_before_deploy.sh"
+  - os: osx
+    language: rust
+    env: NAME="twib_osx"
+    script: "./.travis/twib.sh"
+    before_deploy: "./.travis/twib_before_deploy.sh"
+deploy:
+  - provider: releases
+    skip-cleanup: true
+    api_key: $GITHUB_TOKEN
+    draft: true
+    tag_name: $TRAVIS_TAG
+    file_glob: true
+    file: deploy/*
+    on:
+      tags: true
