@@ -159,7 +159,7 @@ ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(Transistor::KDe
 			.si_code = 0,
 			.si_errno = 0,
 		},
-		.pr_cursig = signo,
+		.pr_cursig = (int16_t) signo,
 		.pr_sigpend = 0,
 		.pr_sighold = 0,
 		.pr_pid = (uint32_t) thread_id,
