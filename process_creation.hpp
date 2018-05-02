@@ -24,11 +24,11 @@ class ProcessBuilder {
 	ProcessBuilder(const char *name, std::vector<uint32_t> caps);
 
 	// returns load address
-	Transistor::Result<uint64_t> AppendSegment(Segment &&seg);
+	trn::Result<uint64_t> AppendSegment(Segment &&seg);
 	// returns load address
-	Transistor::Result<uint64_t> AppendNRO(std::vector<uint8_t> nro);
+	trn::Result<uint64_t> AppendNRO(std::vector<uint8_t> nro);
 	
-	Transistor::Result<std::shared_ptr<Transistor::KProcess>> Build();
+	trn::Result<std::shared_ptr<trn::KProcess>> Build();
  private:
 	const char *name;
 	std::vector<uint32_t> caps;

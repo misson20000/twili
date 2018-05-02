@@ -36,22 +36,22 @@ int main(int argc, char *argv[]) {
 			};
 
 			twili::process_creation::ProcessBuilder builder("twili", caps);
-			Transistor::ResultCode::AssertOk(builder.AppendNRO(twili_image));
-			auto proc = Transistor::ResultCode::AssertOk(builder.Build());
+			trn::ResultCode::AssertOk(builder.AppendNRO(twili_image));
+			auto proc = trn::ResultCode::AssertOk(builder.Build());
 			
 			// launch Twili
 			printf("Launching...\n");
-			Transistor::ResultCode::AssertOk(
-				Transistor::SVC::StartProcess(*proc, 58, 0, 0x100000));
+			trn::ResultCode::AssertOk(
+				trn::svc::StartProcess(*proc, 58, 0, 0x100000));
 
 			printf("Launched\n");
 			printf("Pivoting stdout/dbgout to twili...\n");
 
 			twili_pipe_t twili_out;
-			Transistor::ResultCode::AssertOk(twili_init());
-			Transistor::ResultCode::AssertOk(twili_open_stdout(&twili_out));
+			trn::ResultCode::AssertOk(twili_init());
+			trn::ResultCode::AssertOk(twili_open_stdout(&twili_out));
 			printf("Initialized Twili, opened stdout\n");
-			Transistor::ResultCode::AssertOk(twili_pipe_write(&twili_out, "hello, from the launcher!\n", sizeof("hello, from the launcher!\n")));
+			trn::ResultCode::AssertOk(twili_pipe_write(&twili_out, "hello, from the launcher!\n", sizeof("hello, from the launcher!\n")));
 			
 			int fd = twili_pipe_fd(&twili_out);
 			printf("Made FD %d\n", fd);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 			while(1) {
 				svcSleepThread(10000000); // yield
 			}
-		} catch(Transistor::ResultError e) {
+		} catch(trn::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
 			fatal_init();
 			fatal_transition_to_fatal_error(e.code.code, 0);

@@ -47,7 +47,7 @@ ProcessBuilder::ProcessBuilder(const char *name, std::vector<uint32_t> caps) :
 	
 }
 
-Transistor::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
+trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	if((seg.virt_length & 0xFFF) != 0) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
 	}
@@ -60,7 +60,7 @@ Transistor::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	return seg.load_addr;
 }
 
-Transistor::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro) {
+trn::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro) {
 	if(nro.size() < sizeof(NroHeader)) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
@@ -72,7 +72,7 @@ Transistor::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro)
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
 	uint64_t base;
-	Transistor::Result<uint64_t> r;
+	trn::Result<uint64_t> r;
 
 	r = AppendSegment(Segment(nro, nro_header->segments[0].file_offset, nro_header->segments[0].size, nro_header->segments[0].size, 5)); // .text is RX
 	if(!r) { return r; }
@@ -84,40 +84,40 @@ Transistor::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro)
 	return base;
 }
 
-Transistor::Result<std::shared_ptr<Transistor::KProcess>> ProcessBuilder::Build() {
+trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
 	try {
-		Transistor::KResourceLimit resource_limit =
-			Transistor::ResultCode::AssertOk(
-				Transistor::SVC::CreateResourceLimit());
+		trn::KResourceLimit resource_limit =
+			trn::ResultCode::AssertOk(
+				trn::svc::CreateResourceLimit());
 
-		Transistor::ResultCode::AssertOk(               // raise memory limit to 256MiB,
-			Transistor::SVC::SetResourceLimitLimitValue(  // since the default limit of 6MiB
+		trn::ResultCode::AssertOk(               // raise memory limit to 256MiB,
+			trn::svc::SetResourceLimitLimitValue(  // since the default limit of 6MiB
 				resource_limit,                             // is too low for my tastes.
-				Transistor::SVC::LimitableResource::Memory,
+				trn::svc::LimitableResource::Memory,
 				1 * 256 * 1024 * 1024));
 
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetResourceLimitLimitValue(
+		trn::ResultCode::AssertOk(
+			trn::svc::SetResourceLimitLimitValue(
 				resource_limit,
-				Transistor::SVC::LimitableResource::Threads,
+				trn::svc::LimitableResource::Threads,
 				256));
 
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetResourceLimitLimitValue(
+		trn::ResultCode::AssertOk(
+			trn::svc::SetResourceLimitLimitValue(
 				resource_limit,
-				Transistor::SVC::LimitableResource::Events,
+				trn::svc::LimitableResource::Events,
 				256));
 
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetResourceLimitLimitValue(
+		trn::ResultCode::AssertOk(
+			trn::svc::SetResourceLimitLimitValue(
 				resource_limit,
-				Transistor::SVC::LimitableResource::TransferMemories,
+				trn::svc::LimitableResource::TransferMemories,
 				256));
 		
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetResourceLimitLimitValue(
+		trn::ResultCode::AssertOk(
+			trn::svc::SetResourceLimitLimitValue(
 				resource_limit,
-				Transistor::SVC::LimitableResource::Sessions,
+				trn::svc::LimitableResource::Sessions,
 				256));
 
 		ProcessInfo process_info = {
@@ -135,16 +135,16 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> ProcessBuilder::Build(
 		
 		// create process
 		printf("Making process\n");
-		auto proc = std::make_shared<Transistor::KProcess>(
-			std::move(Transistor::ResultCode::AssertOk(
-									Transistor::SVC::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
+		auto proc = std::make_shared<trn::KProcess>(
+			std::move(trn::ResultCode::AssertOk(
+									trn::svc::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
 		printf("Made process 0x%x\n", proc->handle);
 		
 		// load segments
 		{
-			std::shared_ptr<Transistor::SVC::MemoryMapping> map =
-				Transistor::ResultCode::AssertOk(
-					Transistor::SVC::MapProcessMemory(proc, load_base, total_size));
+			std::shared_ptr<trn::svc::MemoryMapping> map =
+				trn::ResultCode::AssertOk(
+					trn::svc::MapProcessMemory(proc, load_base, total_size));
 			printf("Mapped at %p\n", map->Base());
 			for(auto i = segments.begin(); i != segments.end(); i++) {
 				memcpy(map->Base() + (i->load_addr - load_base), i->data.data() + i->data_offset, i->data_length);
@@ -154,12 +154,12 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> ProcessBuilder::Build(
 		
 		printf("Reprotecting...\n");
 		for(auto i = segments.begin(); i != segments.end(); i++) {
-			Transistor::ResultCode::AssertOk(
-				Transistor::SVC::SetProcessMemoryPermission(*proc, i->load_addr, i->virt_length, i->permissions));
+			trn::ResultCode::AssertOk(
+				trn::svc::SetProcessMemoryPermission(*proc, i->load_addr, i->virt_length, i->permissions));
 		}
 
 		return proc;
-	} catch(Transistor::ResultError e) {
+	} catch(trn::ResultError e) {
 		return tl::make_unexpected(e.code);
 	}
 }

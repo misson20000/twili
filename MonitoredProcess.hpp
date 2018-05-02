@@ -14,12 +14,12 @@ class Twili;
 
 class MonitoredProcess {
  public:
-	MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KProcess> proc, uint64_t target_entry);
+	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
 	
 	void Launch();
-	Transistor::Result<std::nullopt_t> CoreDump(usb::USBBridge::USBResponseWriter &r);
+	trn::Result<std::nullopt_t> CoreDump(usb::USBBridge::USBResponseWriter &r);
 
-	std::shared_ptr<Transistor::KProcess> proc;
+	std::shared_ptr<trn::KProcess> proc;
 	const uint64_t target_entry;
 	const uint64_t pid;
 	bool destroy_flag = false;
@@ -28,7 +28,7 @@ class MonitoredProcess {
 	~MonitoredProcess();
  private:
 	Twili *twili;
-	std::shared_ptr<Transistor::WaitHandle> wait;
+	std::shared_ptr<trn::WaitHandle> wait;
 };
 
 }

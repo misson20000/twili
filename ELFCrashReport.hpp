@@ -34,7 +34,7 @@ class ELFCrashReport {
 		Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint);
 		
 		int signo = 0;
-		ELF::Note::elf_prstatus GeneratePRSTATUS(Transistor::KDebug &debug);
+		ELF::Note::elf_prstatus GeneratePRSTATUS(trn::KDebug &debug);
 	 private:
 		uint64_t thread_id;
 		uint64_t tls_pointer;
@@ -55,7 +55,7 @@ class ELFCrashReport {
 		AddNote(name, type, bytes);
 	}
 	
-	Transistor::Result<std::nullopt_t> Generate(Transistor::KDebug &debug, usb::USBBridge::USBResponseWriter &writer);
+	trn::Result<std::nullopt_t> Generate(trn::KDebug &debug, usb::USBBridge::USBResponseWriter &writer);
 	void AddNote(std::string name, uint32_t type, std::vector<uint8_t> desc);
 	
  private:

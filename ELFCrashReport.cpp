@@ -7,7 +7,7 @@
 #include<vector>
 #include<string>
 
-using Transistor::ResultCode;
+using trn::ResultCode;
 
 namespace twili {
 
@@ -39,7 +39,7 @@ ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
 	return &threads.find(thread_id)->second;
 }
 
-Transistor::Result<std::nullopt_t> ELFCrashReport::Generate(Transistor::KDebug &debug, twili::usb::USBBridge::USBResponseWriter &r) {
+trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::USBResponseWriter &r) {
 	for(auto i = threads.begin(); i != threads.end(); i++) {
 		AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, i->second.GeneratePRSTATUS(debug));
 	}
@@ -92,7 +92,7 @@ Transistor::Result<std::nullopt_t> ELFCrashReport::Generate(Transistor::KDebug &
 			if(size > i->size - offset) {
 				size = i->size - offset;
 			}
-			ResultCode::AssertOk(Transistor::SVC::ReadDebugProcessMemory(transfer_buffer.data(), debug, i->virtual_addr + offset, size));
+			ResultCode::AssertOk(trn::svc::ReadDebugProcessMemory(transfer_buffer.data(), debug, i->virtual_addr + offset, size));
 			r.Write(transfer_buffer.data(), size);
 		}
 	}
@@ -152,7 +152,7 @@ ELFCrashReport::Thread::Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_
 	entrypoint(entrypoint) {
 }
 
-ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(Transistor::KDebug &debug) {
+ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(trn::KDebug &debug) {
 	ELF::Note::elf_prstatus prstatus = {
 		.pr_info = {
 			.si_signo = 0,
@@ -169,7 +169,7 @@ ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(Transistor::KDe
 		.times = {0},
 		.pr_reg = {0}
 	};
-	thread_context_t context = ResultCode::AssertOk(Transistor::SVC::GetDebugThreadContext(debug, thread_id, 15)); // where does this 15 number come from?
+	thread_context_t context = ResultCode::AssertOk(trn::svc::GetDebugThreadContext(debug, thread_id, 15)); // where does this 15 number come from?
 	memcpy(prstatus.pr_reg, context.regs, sizeof(prstatus.pr_reg));
 	return prstatus;
 }

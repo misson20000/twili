@@ -23,9 +23,9 @@ typedef bool _Bool;
 #include "USBBridge.hpp"
 #include "err.hpp"
 
-using ResultCode = Transistor::ResultCode;
+using ResultCode = trn::ResultCode;
 template<typename T>
-using Result = Transistor::Result<T>;
+using Result = trn::Result<T>;
 
 void server_thread(void *arg) {
 	twili::Twili *twili = (twili::Twili*) arg;
@@ -48,7 +48,7 @@ int main() {
 		// set up serial console
 		int usb_fd = usb_serial_open_fd();
 		if(usb_fd < 0) {
-			throw Transistor::ResultError(-usb_fd);
+			throw trn::ResultError(-usb_fd);
 		}
 		dup2(usb_fd, STDOUT_FILENO);
 		dup2(usb_fd, STDERR_FILENO);
@@ -92,7 +92,7 @@ int main() {
 		
 		ResultCode::AssertOk(trn_thread_join(&thread, -1));
 		printf("server destroyed\n");
-	} catch(Transistor::ResultError e) {
+	} catch(trn::ResultError e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
 		fatal_init();
 		fatal_transition_to_fatal_error(e.code.code, 0);
@@ -105,7 +105,7 @@ namespace twili {
 
 Twili::Twili() :
 	event_waiter(),
-	server(ResultCode::AssertOk(Transistor::IPCServer::IPCServer::Create(&event_waiter))),
+	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
 	usb_bridge(this) {
 	
 	server.CreateService("twili", [this](auto s) {
@@ -114,7 +114,7 @@ Twili::Twili() :
 
 	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
 	if(!hbabi_shim_nro) {
-		throw Transistor::ResultError(TWILI_ERR_IO_ERROR);
+		throw trn::ResultError(TWILI_ERR_IO_ERROR);
 	}
 	this->hbabi_shim_nro = *hbabi_shim_nro;
 	

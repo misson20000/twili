@@ -23,39 +23,39 @@ uint64_t reg_backups[13];
 uint64_t target_thunk(result_t (*entry)(loader_config_entry_t*, thread_h), loader_config_entry_t *config, thread_h thrd);
 }
 
-using namespace Transistor;
+using namespace trn;
 
-static void substitute_handle(IPCClient::ClientObject &shimservice, handle_t *handle) {
+static void substitute_handle(ipc::client::Object &shimservice, handle_t *handle) {
 	ResultCode::AssertOk(
 		shimservice.SendSyncRequest<3>(
-			IPC::InRaw(*(uint32_t*) handle),
-			IPC::OutHandle<handle_t, IPC::copy>(*handle)));
+			ipc::InRaw(*(uint32_t*) handle),
+			ipc::OutHandle<handle_t, ipc::copy>(*handle)));
 }
 
 int main(int argc, char *argv[]) {
 	try {
 		twili_pipe_t twili_out;
-		Transistor::ResultCode::AssertOk(twili_init());
-		Transistor::ResultCode::AssertOk(twili_open_stdout(&twili_out));
+		trn::ResultCode::AssertOk(twili_init());
+		trn::ResultCode::AssertOk(twili_open_stdout(&twili_out));
 		int fd = twili_pipe_fd(&twili_out);
 		dup2(fd, STDOUT_FILENO);
 		close(fd);
 
 		ResultCode::AssertOk(sm_init()); // make sure there's a reference by the time we reach sm_force_finalize()
 		
-		IPCClient::ClientObject shimservice;
+		ipc::client::Object shimservice;
 	
 		{
-			IPC::SM sm = ResultCode::AssertOk(IPC::SM::Initialize());
-			IPCClient::ClientObject itwiliservice = 
+			service::SM sm = ResultCode::AssertOk(service::SM::Initialize());
+			ipc::client::Object itwiliservice = 
 				ResultCode::AssertOk(sm.GetService("twili"));
 			
 			printf("got its: 0x%x\n", itwiliservice.object.session);
 			
 			ResultCode::AssertOk(
 				itwiliservice.SendSyncRequest<3>(
-					IPC::Pid(),
-					IPC::OutObject<IPCClient::ClientObject>(shimservice)));
+					ipc::Pid(),
+					ipc::OutObject<ipc::client::Object>(shimservice)));
 			
 			printf("got shim: 0x%x\n", shimservice.object.session);
 		} // at this point we no longer need SM or ITwiliService
@@ -64,13 +64,13 @@ int main(int argc, char *argv[]) {
 		uint32_t num_loader_config_entries;
 		ResultCode::AssertOk( // GetLoaderConfigEntryCount()
 			shimservice.SendSyncRequest<1>(
-				IPC::OutRaw(num_loader_config_entries)));
+				ipc::OutRaw(num_loader_config_entries)));
 		std::vector<loader_config_entry_t> entries(num_loader_config_entries, loader_config_entry_t {});
 		
 		entries.resize(num_loader_config_entries);
 		ResultCode::AssertOk( // GetLoaderConfigEntries()
 			shimservice.SendSyncRequest<2>(
-				IPC::Buffer<loader_config_entry_t, 0x6>(entries)));
+				ipc::Buffer<loader_config_entry_t, 0x6>(entries)));
 
 		// Translate handles from Twili.
 		// Twili can't inject handles into our process, so
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
 		handle_t process_handle;
 		ResultCode::AssertOk( // GetProcessHandle
 			shimservice.SendSyncRequest<0>(
-				IPC::OutHandle<handle_t, IPC::copy>(process_handle)));
+				ipc::OutHandle<handle_t, ipc::copy>(process_handle)));
 		entries.push_back(loader_config_entry_t {
 				.key = LCONFIG_KEY_PROCESS_HANDLE,
 				.flags = 0,
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
 		uint64_t target_entry_addr;
 		ResultCode::AssertOk( // GetTargetEntryPoint()
 			shimservice.SendSyncRequest<5>(
-				IPC::OutRaw<uint64_t>(target_entry_addr)));
+				ipc::OutRaw<uint64_t>(target_entry_addr)));
 
 		printf("determined target entry point to be 0x%lx\n", target_entry_addr);
 		
@@ -157,13 +157,13 @@ int main(int argc, char *argv[]) {
 		
 		ResultCode::AssertOk(
 			shimservice.SendSyncRequest<4>( // SetNextLoadPath
-				IPC::Buffer<uint8_t, 0x5>(next_load_path, sizeof(next_load_path)),
-				IPC::Buffer<uint8_t, 0x5>(next_load_argv, sizeof(next_load_argv))));
+				ipc::Buffer<uint8_t, 0x5>(next_load_path, sizeof(next_load_path)),
+				ipc::Buffer<uint8_t, 0x5>(next_load_argv, sizeof(next_load_argv))));
 
 		ResultCode::AssertOk(
 			shimservice.SendSyncRequest<6>( // SetExitCode
-				IPC::InRaw<uint32_t>(ret)));
-	} catch(Transistor::ResultError &e) {
+				ipc::InRaw<uint32_t>(ret)));
+	} catch(trn::ResultError &e) {
 		// crash and generate core dump
 		svcBreak(0, 0, 0);
 	}

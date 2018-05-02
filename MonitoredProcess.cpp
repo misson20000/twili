@@ -7,26 +7,26 @@
 
 namespace twili {
 
-using Transistor::ResultCode;
+using trn::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KProcess> proc, uint64_t target_entry) :
+MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry) :
 	twili(twili),
 	proc(proc),
 	target_entry(target_entry),
-	pid(ResultCode::AssertOk(Transistor::SVC::GetProcessId(proc->handle))) {
+	pid(ResultCode::AssertOk(trn::svc::GetProcessId(proc->handle))) {
 
 	printf("created monitored process: 0x%x, pid 0x%x\n", proc->handle, pid);
 	wait = twili->event_waiter.Add(*proc, [this]() {
 			printf("monitored process (0x%x) signalled\n", this->proc->handle);
 			this->proc->ResetSignal();
-			auto state = (Transistor::SVC::ProcessState) ResultCode::AssertOk(Transistor::SVC::GetProcessInfo(*this->proc, 0));
+			auto state = (trn::svc::ProcessState) ResultCode::AssertOk(trn::svc::GetProcessInfo(*this->proc, 0));
 			printf("  state: 0x%lx\n", state);
-			if(state == Transistor::SVC::ProcessState::CRASHED) {
+			if(state == trn::svc::ProcessState::CRASHED) {
 				printf("monitored process (0x%x) crashed\n", this->proc->handle);
 				printf("ready to generate crash report\n");
 				crashed = true;
 			}
-			if(state == Transistor::SVC::ProcessState::EXITED) {
+			if(state == trn::svc::ProcessState::EXITED) {
 				printf("monitored process (0x%x) exited\n", this->proc->handle);
 				destroy_flag = true;
 			}
@@ -36,8 +36,8 @@ MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KPr
 
 void MonitoredProcess::Launch() {
 	printf("launching monitored process: 0x%x\n", proc->handle);
-	Transistor::ResultCode::AssertOk(
-		Transistor::SVC::StartProcess(*proc, 58, 0, 0x100000));
+	trn::ResultCode::AssertOk(
+		trn::svc::StartProcess(*proc, 58, 0, 0x100000));
 }
 
 class CrashReportException {
@@ -63,24 +63,24 @@ class CrashReportThread {
 	uint64_t entrypoint;
 };
 
-Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::USBResponseWriter &writer) {
+trn::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::USBResponseWriter &writer) {
 	ELFCrashReport report;
 	
 	printf("generating crash report...\n");
 	
-	Transistor::KDebug debug = ResultCode::AssertOk(
-		Transistor::SVC::DebugActiveProcess(
+	trn::KDebug debug = ResultCode::AssertOk(
+		trn::svc::DebugActiveProcess(
 			ResultCode::AssertOk(
-				Transistor::SVC::GetProcessId(proc->handle))));
+				trn::svc::GetProcessId(proc->handle))));
 	printf("  opened debug: 0x%x\n", debug.handle);
 
 	while(1) {
-		auto r = Transistor::SVC::GetDebugEvent(debug);
+		auto r = trn::svc::GetDebugEvent(debug);
 		if(!r) {
 			if(r.error().code == 0x8c01) {
 				break;
 			} else {
-				throw new Transistor::ResultError(r.error());
+				throw new trn::ResultError(r.error());
 			}
 		}
 
@@ -199,7 +199,7 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 	uint64_t vaddr = 0;
 	do {
 		std::tuple<memory_info_t, uint32_t> r = ResultCode::AssertOk(
-			Transistor::SVC::QueryDebugProcessMemory(debug, vaddr));
+			trn::svc::QueryDebugProcessMemory(debug, vaddr));
 		memory_info_t mi = std::get<0>(r);
 
 		if(mi.permission & 1) {
@@ -215,7 +215,7 @@ Transistor::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::US
 	} while(vaddr > 0);
 
 	auto r = report.Generate(debug, writer);
-	Transistor::SVC::TerminateProcess(*this->proc);
+	trn::svc::TerminateProcess(*this->proc);
 	return r;
 }
 

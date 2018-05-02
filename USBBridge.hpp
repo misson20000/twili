@@ -39,8 +39,8 @@ class USBBridge {
 	 private:
 		USBBridge *bridge;
 		
-		std::shared_ptr<Transistor::WaitHandle> meta_completion_wait;
-		std::shared_ptr<Transistor::WaitHandle> data_completion_wait;
+		std::shared_ptr<trn::WaitHandle> meta_completion_wait;
+		std::shared_ptr<trn::WaitHandle> data_completion_wait;
 		
 		uint32_t meta_urb_id;
 		uint32_t data_urb_id;
@@ -57,7 +57,7 @@ class USBBridge {
 	};
 	class USBResponseWriter;
 
-	using RequestHandler = std::function<Transistor::Result<std::nullopt_t>(std::vector<uint8_t>, USBResponseWriter&)>;
+	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, USBResponseWriter&)>;
 	
 	enum class CommandID : uint32_t {
 		RUN = 10,
@@ -68,18 +68,18 @@ class USBBridge {
 	USBBridge(Twili *twili);
 	~USBBridge();
 	
-	static usb_ds_report_entry_t *FindReport(std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint, usb_ds_report_t &buffer, uint32_t urb_id);
-	static Transistor::Result<std::nullopt_t> PostBufferSync(std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint, uint8_t *buffer, size_t size);
+	static usb_ds_report_entry_t *FindReport(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, usb_ds_report_t &buffer, uint32_t urb_id);
+	static trn::Result<std::nullopt_t> PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size);
 
 	void AddRequestHandler(CommandID id, RequestHandler handler);
 	
  private:
 	Twili *twili;
-	std::shared_ptr<Transistor::IPC::USB::DS::Interface> interface;
-	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_response_meta;
-	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_request_meta;
-	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_response_data;
-	std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint_request_data;
+	std::shared_ptr<trn::service::usb::ds::Interface> interface;
+	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_response_meta;
+	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_request_meta;
+	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_response_data;
+	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_request_data;
 	std::map<uint64_t, RequestHandler> request_handlers;
 	
 	USBRequestReader request_reader;
@@ -88,8 +88,8 @@ class USBBridge {
 	USBBuffer request_data_buffer;
 	USBBuffer response_data_buffer;
 
-	Transistor::IPC::USB::DS::DS ds;
-	Transistor::KEvent usb_state_change_event;
+	trn::service::usb::ds::DS ds;
+	trn::KEvent usb_state_change_event;
 	
 	bool USBStateChangeCallback();
 };
@@ -101,18 +101,18 @@ class USBBridge::USBResponseWriter {
 	
 	size_t GetMaxTransferSize();
 	bool HasBegun();
-	Transistor::Result<std::nullopt_t> BeginOk(size_t payload_size);
-	Transistor::Result<std::nullopt_t> BeginError(Transistor::ResultCode code, size_t payload_size);
-	Transistor::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
+	trn::Result<std::nullopt_t> BeginOk(size_t payload_size);
+	trn::Result<std::nullopt_t> BeginError(trn::ResultCode code, size_t payload_size);
+	trn::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
 	
 	template<typename T>
-	Transistor::Result<std::nullopt_t> Write(std::vector<T> data) {
+	trn::Result<std::nullopt_t> Write(std::vector<T> data) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		return Write((uint8_t*) data.data(), data.size() * sizeof(T));
 	}
 	
 	template<typename T>
-	Transistor::Result<std::nullopt_t> Write(T data) {
+	trn::Result<std::nullopt_t> Write(T data) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		return Write((uint8_t*) &data, sizeof(data));
 	}

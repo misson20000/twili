@@ -6,26 +6,26 @@
 
 namespace twili {
 
-ITwiliService::ITwiliService(Twili *twili) : Transistor::IPCServer::Object(&twili->server), twili(twili) {
+ITwiliService::ITwiliService(Twili *twili) : trn::ipc::server::Object(&twili->server), twili(twili) {
 }
 
-Transistor::ResultCode ITwiliService::Dispatch(Transistor::IPC::Message msg, uint32_t request_id) {
+trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_id) {
 	switch(request_id) {
 	case 0:
-		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenStdin>::Handle(this, msg);
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStdin>::Handle(this, msg);
 	case 1:
-		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenStdout>::Handle(this, msg);
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStdout>::Handle(this, msg);
 	case 2:
-		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
 	case 3:
-		return Transistor::IPCServer::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
 	case 999:
-		return Transistor::IPCServer::RequestHandler<&ITwiliService::Destroy>::Handle(this, msg);
+		return trn::ipc::server::RequestHandler<&ITwiliService::Destroy>::Handle(this, msg);
 	}
 	return 1;
 }
 
-Transistor::ResultCode ITwiliService::OpenStdin(Transistor::IPC::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStdin(trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDIN_FILENO);
 	if(r) {
 		val.value = r.value();
@@ -35,7 +35,7 @@ Transistor::ResultCode ITwiliService::OpenStdin(Transistor::IPC::OutObject<twili
 	}
 }
 
-Transistor::ResultCode ITwiliService::OpenStdout(Transistor::IPC::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStdout(trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDOUT_FILENO);
 	if(r) {
 		val.value = r.value();
@@ -45,7 +45,7 @@ Transistor::ResultCode ITwiliService::OpenStdout(Transistor::IPC::OutObject<twil
 	}
 }
 
-Transistor::ResultCode ITwiliService::OpenStderr(Transistor::IPC::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStderr(trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDERR_FILENO);
 	if(r) {
 		val.value = r.value();
@@ -55,7 +55,7 @@ Transistor::ResultCode ITwiliService::OpenStderr(Transistor::IPC::OutObject<twil
 	}
 }
 
-Transistor::ResultCode ITwiliService::OpenHBABIShim(Transistor::IPC::Pid pid, Transistor::IPC::OutObject<twili::IHBABIShim> &out) {
+trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::Pid pid, trn::ipc::OutObject<twili::IHBABIShim> &out) {
 	printf("opening HBABI shim for pid 0x%x\n", pid.value);
 	auto i = std::find_if(
 		twili->monitored_processes.begin(),
@@ -76,7 +76,7 @@ Transistor::ResultCode ITwiliService::OpenHBABIShim(Transistor::IPC::Pid pid, Tr
 	}
 }
 
-Transistor::ResultCode ITwiliService::Destroy() {
+trn::ResultCode ITwiliService::Destroy() {
 	twili->destroy_flag = true;
 	return RESULT_OK;
 }

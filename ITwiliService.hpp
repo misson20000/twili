@@ -8,16 +8,16 @@
 
 namespace twili {
 
-class ITwiliService : public Transistor::IPCServer::Object {
+class ITwiliService : public trn::ipc::server::Object {
  public:
 	ITwiliService(Twili *twili);
 	
-	virtual Transistor::ResultCode Dispatch(Transistor::IPC::Message msg, uint32_t request_id);
-	Transistor::ResultCode OpenStdin(Transistor::IPC::OutObject<twili::IPipe> &out);
-	Transistor::ResultCode OpenStdout(Transistor::IPC::OutObject<twili::IPipe> &out);
-	Transistor::ResultCode OpenStderr(Transistor::IPC::OutObject<twili::IPipe> &out);
-	Transistor::ResultCode OpenHBABIShim(Transistor::IPC::Pid pid, Transistor::IPC::OutObject<twili::IHBABIShim> &out);
-	Transistor::ResultCode Destroy();
+	virtual trn::ResultCode Dispatch(trn::ipc::Message msg, uint32_t request_id);
+	trn::ResultCode OpenStdin(trn::ipc::OutObject<twili::IPipe> &out);
+	trn::ResultCode OpenStdout(trn::ipc::OutObject<twili::IPipe> &out);
+	trn::ResultCode OpenStderr(trn::ipc::OutObject<twili::IPipe> &out);
+	trn::ResultCode OpenHBABIShim(trn::ipc::Pid pid, trn::ipc::OutObject<twili::IHBABIShim> &out);
+	trn::ResultCode Destroy();
  private:
 	Twili *twili;
 };

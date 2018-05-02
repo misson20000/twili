@@ -45,14 +45,14 @@ static usb_interface_descriptor_t interface_descriptor = {
 	.iInterface = 0x00
 };
 
-using Transistor::ResultCode;
-using Transistor::ResultError;
+using trn::ResultCode;
+using trn::ResultError;
 
 static const size_t TRANSFER_BUFFER_SIZE = 0x8000;
 
 USBBridge::USBBridge(Twili *twili) :
 	twili(twili),
-	ds(ResultCode::AssertOk(Transistor::IPC::USB::DS::DS::Initialize(2))),
+	ds(ResultCode::AssertOk(trn::service::usb::ds::DS::Initialize(2))),
 	usb_state_change_event(ResultCode::AssertOk(ds.GetStateChangeEvent())),
 	request_reader(this),
 	request_meta_buffer(0x1000),
@@ -85,7 +85,7 @@ USBBridge::USBBridge(Twili *twili) :
 	request_reader.Begin();
 }
 
-usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint, usb_ds_report_t &report, uint32_t urb_id) {
+usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, usb_ds_report_t &report, uint32_t urb_id) {
 	report = ResultCode::AssertOk(endpoint->GetReportData());
 	usb_ds_report_entry_t *entry = nullptr;
 	for(uint32_t i = 0; i < report.entry_count; i++) {
@@ -96,7 +96,7 @@ usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<Transistor::IPC::US
 	throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 }
 
-Transistor::Result<std::nullopt_t> USBBridge::PostBufferSync(std::shared_ptr<Transistor::IPC::USB::DS::Endpoint> endpoint, uint8_t *buffer, size_t size) {
+trn::Result<std::nullopt_t> USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size) {
 	auto urb_id = endpoint->PostBufferAsync(buffer, size);
 	if(!urb_id) {
 		printf("[USBB] failed to post buffer async\n");
@@ -129,7 +129,7 @@ Transistor::Result<std::nullopt_t> USBBridge::PostBufferSync(std::shared_ptr<Tra
 
 bool USBBridge::USBStateChangeCallback() {
 	//printf("USB state change signalled\n");
-	if(ResultCode::AssertOk(ds.GetState()) == Transistor::IPC::USB::DS::State::INITIALIZED) {
+	if(ResultCode::AssertOk(ds.GetState()) == trn::service::usb::ds::State::INITIALIZED) {
 		printf("finished USB bringup\n");
 		return false;
 	} else {
@@ -244,10 +244,10 @@ void USBBridge::USBRequestReader::ProcessCommand() {
 		response.BeginError(TWILI_ERR_BAD_REQUEST, 0);
 		return;
 	}
-	Transistor::Result<std::nullopt_t> r = std::nullopt;
+	trn::Result<std::nullopt_t> r = std::nullopt;
 	try {
 		r = (*i).second(current_payload, response);
-	} catch(Transistor::ResultError *e) {
+	} catch(trn::ResultError *e) {
 		r = tl::make_unexpected(e->code);
 	}
 	if(!response.HasBegun()) {
@@ -273,7 +273,7 @@ bool USBBridge::USBResponseWriter::HasBegun() {
 	return has_begun;
 }
 
-Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t payload_size) {
+trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t payload_size) {
 	if(has_begun) {
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
@@ -293,7 +293,7 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t 
 	return r;
 }
 
-Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(ResultCode code, size_t payload_size) {
+trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(ResultCode code, size_t payload_size) {
 	if(has_begun) {
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
@@ -313,7 +313,7 @@ Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(Resu
 	return r;
 }
 
-Transistor::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(uint8_t *data, size_t size) {
+trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(uint8_t *data, size_t size) {
 	auto max_size = bridge->response_data_buffer.size;
 	while(size > max_size) {
 		Write(data, max_size);
