@@ -23,6 +23,8 @@ class Twili {
 	Transistor::IPCServer::IPCServer server;
 	twili::usb::USBBridge usb_bridge;
 	std::list<twili::MonitoredProcess> monitored_processes;
+ private:
+	std::vector<uint8_t> hbabi_shim_nro;
 };
 
 }

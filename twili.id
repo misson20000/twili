@@ -2,8 +2,7 @@ interface twili::ITwiliService is twili {
 	[0] OpenStdin() -> object<twili::IPipe>;
 	[1] OpenStdout() -> object<twili::IPipe>;
 	[2] OpenStderr() -> object<twili::IPipe>;
-	[10] EmulateHBL(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
-	[11] GetHBLEmulation() -> object<twili::IHBLEmulation>;
+	[3] OpenHBABIShim(pid) -> object<twili::IHBABIShim>;
 	
 	[999] Destroy();
 }
@@ -13,7 +12,18 @@ interface twili::IPipe {
 	[1] Write(array<uint8_t, 0x5> data);
 }
 
-interface twili::IHBLEmulation {
-	[0] GetTargetNROLoadAddress() -> u64;
-	[1] SetNextNRO(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
+interface twili::IHBABIShim {
+	[0] GetProcessHandle() -> KHandle<process>;
+	# this does not include the terminating EndOfList entry
+	[1] GetLoaderConfigEntryCount() -> u32;
+	# entries that require a handle will have placeholders
+	# where the handles should be. use IChildService#2 to
+	# get the actual handles.
+	# this is not a stateful call; it will always start
+	# filling the given array from the first key onwards.
+	[2] GetLoaderConfigEntries() -> array<loader_config_entry_t, 0x6>;
+	[3] GetLoaderConfigHandle(u32 placeholder) -> KHandle;
+	[4] SetNextLoadPath(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
+	[5] GetTargetEntryPoint() -> u64;
+	[6] SetExitCode(u32);
 }

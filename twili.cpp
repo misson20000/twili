@@ -16,6 +16,7 @@ typedef bool _Bool;
 #include<unistd.h>
 #include<stdio.h>
 
+#include "util.hpp"
 #include "twili.hpp"
 #include "process_creation.hpp"
 #include "ITwiliService.hpp"
@@ -23,6 +24,8 @@ typedef bool _Bool;
 #include "err.hpp"
 
 using ResultCode = Transistor::ResultCode;
+template<typename T>
+using Result = Transistor::Result<T>;
 
 void server_thread(void *arg) {
 	twili::Twili *twili = (twili::Twili*) arg;
@@ -45,7 +48,7 @@ int main() {
 		// set up serial console
 		int usb_fd = usb_serial_open_fd();
 		if(usb_fd < 0) {
-			throw new Transistor::ResultError(-usb_fd);
+			throw Transistor::ResultError(-usb_fd);
 		}
 		dup2(usb_fd, STDOUT_FILENO);
 		dup2(usb_fd, STDERR_FILENO);
@@ -108,16 +111,23 @@ Twili::Twili() :
 	server.CreateService("twili", [this](auto s) {
 			return new twili::ITwiliService(this);
 		});
+
+	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
+	if(!hbabi_shim_nro) {
+		throw Transistor::ResultError(TWILI_ERR_IO_ERROR);
+	}
+	this->hbabi_shim_nro = *hbabi_shim_nro;
+	
 	printf("initialized Twili\n");
 }
 
-Transistor::Result<std::nullopt_t> Twili::Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+Result<std::nullopt_t> Twili::Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
 	ResultCode::AssertOk(bpc_init());
 	ResultCode::AssertOk(bpc_reboot_system());
 	return std::nullopt;
 }
 
-Transistor::Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer) {
+Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer) {
 	std::vector<uint32_t> caps = {
 		0b00011111111111111111111111101111, // SVC grants
 		0b00111111111111111111111111101111,
@@ -132,15 +142,20 @@ Transistor::Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USB
 		0b00000000000000101111111111111111, // DebugFlags (can be debugged)
 	};
 
-	auto proc = twili::process_creation::CreateProcessFromNRO(nro, "twili_child", caps);
-	if(!proc) {
-		return tl::make_unexpected(proc.error());
-	}
-	monitored_processes.emplace_back(this, *proc).Launch();
+	twili::process_creation::ProcessBuilder builder("twili_child", caps);
+	Result<uint64_t>   shim_addr = builder.AppendNRO(hbabi_shim_nro);
+	if(!  shim_addr) { return tl::make_unexpected(  shim_addr.error()); }
+	Result<uint64_t> target_addr = builder.AppendNRO(nro);
+	if(!target_addr) { return tl::make_unexpected(target_addr.error()); }
+	
+	auto proc = builder.Build();
+	if(!proc) { return tl::make_unexpected(proc.error()); }
+	
+	monitored_processes.emplace_back(this, *proc, *target_addr).Launch();
 	return std::nullopt;
 }
 
-Transistor::Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
 	for(auto i = monitored_processes.begin(); i != monitored_processes.end(); i++) {
 		if(i->crashed) {
 			return i->CoreDump(writer);

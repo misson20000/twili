@@ -9,11 +9,13 @@ namespace twili {
 
 using Transistor::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KProcess> proc) :
+MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<Transistor::KProcess> proc, uint64_t target_entry) :
 	twili(twili),
-	proc(proc) {
+	proc(proc),
+	target_entry(target_entry),
+	pid(ResultCode::AssertOk(Transistor::SVC::GetProcessId(proc->handle))) {
 
-	printf("created monitored process: 0x%x\n", proc->handle);
+	printf("created monitored process: 0x%x, pid 0x%x\n", proc->handle, pid);
 	wait = twili->event_waiter.Add(*proc, [this]() {
 			printf("monitored process (0x%x) signalled\n", this->proc->handle);
 			this->proc->ResetSignal();

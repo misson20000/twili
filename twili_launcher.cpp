@@ -4,63 +4,19 @@
 #include<libtransistor/svc.h>
 #include<libtransistor/ipc/twili.h>
 #include<libtransistor/ipc/fatal.h>
+#include<libtransistor/runtime_config.h>
 
 #include<unistd.h>
 #include<stdio.h>
 #include<errno.h>
 
-#include<optional>
-#include<vector>
-
 #include "process_creation.hpp"
-
-std::optional<std::vector<uint8_t>> ReadTwili() {
-	FILE *twili_f = fopen("/squash/twili.nro", "rb");
-	if(twili_f == NULL) {
-		printf("Failed to open /squash/twili.nro\n");
-		return std::nullopt;
-	}
-
-	if(fseek(twili_f, 0, SEEK_END) != 0) {
-		printf("Failed to SEEK_END\n");
-		fclose(twili_f);
-		return std::nullopt;
-	}
-
-	ssize_t twili_size = ftell(twili_f);
-	if(twili_size == -1) {
-		printf("Failed to ftell\n");
-		fclose(twili_f);
-		return std::nullopt;
-	}
-
-	if(fseek(twili_f, 0, SEEK_SET) != 0) {
-		printf("Failed to SEEK_SET\n");
-		fclose(twili_f);
-		return std::nullopt;
-	}
-
-	std::vector<uint8_t> twili_buffer(twili_size, 0);
-
-	ssize_t total_read = 0;
-	while(total_read < twili_size) {
-		size_t r = fread(twili_buffer.data() + total_read, 1, twili_size - total_read, twili_f);
-		if(r == 0) {
-			printf("Failed to read Twili (read 0x%lx/0x%lx bytes): %d\n", total_read, twili_size, errno);
-			fclose(twili_f);
-			return std::nullopt;
-		}
-		total_read+= r;
-	}
-	fclose(twili_f);
-
-	return twili_buffer;
-}
+#include "util.hpp"
 
 int main(int argc, char *argv[]) {
 	printf("===TWILI LAUNCHER===\n");
 
-	if(auto twili_result = ReadTwili()) {
+	if(auto twili_result = twili::util::ReadFile("/squash/twili.nro")) {
 		auto twili_image = *twili_result;
 		printf("Read Twili (0x%lx bytes)\n", twili_image.size());
 
@@ -78,9 +34,10 @@ int main(int argc, char *argv[]) {
 				0b00000010000000000111111111111111, // HandleTableSize
 				0b00000000000001001111111111111111, // DebugFlags (can debug others)
 			};
-			
-			auto proc = Transistor::ResultCode::AssertOk(
-				twili::process_creation::CreateProcessFromNRO(twili_image, "twili", caps));
+
+			twili::process_creation::ProcessBuilder builder("twili", caps);
+			Transistor::ResultCode::AssertOk(builder.AppendNRO(twili_image));
+			auto proc = Transistor::ResultCode::AssertOk(builder.Build());
 			
 			// launch Twili
 			printf("Launching...\n");

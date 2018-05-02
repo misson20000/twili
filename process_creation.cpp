@@ -38,21 +38,54 @@ struct ProcessInfo {
 	uint32_t personal_mm_heap_num_pages;
 };
 
-Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(std::vector<uint8_t> nro_image, const char *name, std::vector<uint32_t> caps) {
-	try {
-		if(nro_image.size() < sizeof(NroHeader)) {
-			return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
-		}
-		NroHeader *nro_header = (NroHeader*) nro_image.data();
-		if(nro_header->magic != 0x304f524e) {
-			return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
-		}
-		if(nro_image.size() < nro_header->size) {
-			return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
-		}
-		
-		const uint64_t nro_base = 0x7100000000;
+ProcessBuilder::Segment::Segment(std::vector<uint8_t> data, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
+	data(data), data_offset(data_offset), data_length(data_length), virt_length(virt_length), permissions(permissions) {
+}
 
+ProcessBuilder::ProcessBuilder(const char *name, std::vector<uint32_t> caps) :
+	name(name), caps(caps) {
+	
+}
+
+Transistor::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
+	if((seg.virt_length & 0xFFF) != 0) {
+		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
+	}
+	if(seg.data.size() < seg.data_offset + seg.data_length) {
+		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
+	}
+	seg.load_addr = load_base + total_size;
+	total_size+= seg.virt_length;
+	segments.push_back(seg);
+	return seg.load_addr;
+}
+
+Transistor::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro) {
+	if(nro.size() < sizeof(NroHeader)) {
+		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
+	}
+	NroHeader *nro_header = (NroHeader*) nro.data();
+	if(nro_header->magic != 0x304f524e) {
+		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
+	}
+	if(nro.size() < nro_header->size) {
+		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
+	}
+	uint64_t base;
+	Transistor::Result<uint64_t> r;
+
+	r = AppendSegment(Segment(nro, nro_header->segments[0].file_offset, nro_header->segments[0].size, nro_header->segments[0].size, 5)); // .text is RX
+	if(!r) { return r; }
+	if(r) { base = *r; }
+	r = AppendSegment(Segment(nro, nro_header->segments[1].file_offset, nro_header->segments[1].size, nro_header->segments[1].size, 1)); // .rodata is R
+	if(!r) { return r; }
+	r = AppendSegment(Segment(nro, nro_header->segments[2].file_offset, nro_header->segments[2].size, nro_header->segments[2].size + nro_header->bss_size, 3)); // .data + .bss is RW
+	if(!r) { return r; }
+	return base;
+}
+
+Transistor::Result<std::shared_ptr<Transistor::KProcess>> ProcessBuilder::Build() {
+	try {
 		Transistor::KResourceLimit resource_limit =
 			Transistor::ResultCode::AssertOk(
 				Transistor::SVC::CreateResourceLimit());
@@ -90,8 +123,8 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(s
 		ProcessInfo process_info = {
 			.process_category = 0,
 			.title_id = 0x0100000000000036, // creport
-			.code_addr = nro_base,
-			.code_num_pages = (nro_header->size + nro_header->bss_size + 0xFFF) / 0x1000,
+			.code_addr = load_base,
+			.code_num_pages = (uint32_t) ((total_size + 0xFFF) / 0x1000),
 			.process_flags = 0b110111, // ASLR, 39-bit address space, AArch64, bit4 (?)
 			.reslimit_h = resource_limit.handle,
 			.system_resource_num_pages = 0,
@@ -107,24 +140,23 @@ Transistor::Result<std::shared_ptr<Transistor::KProcess>> CreateProcessFromNRO(s
 									Transistor::SVC::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
 		printf("Made process 0x%x\n", proc->handle);
 		
-		// load NRO
+		// load segments
 		{
 			std::shared_ptr<Transistor::SVC::MemoryMapping> map =
 				Transistor::ResultCode::AssertOk(
-					Transistor::SVC::MapProcessMemory(proc, nro_base, nro_header->size + nro_header->bss_size));
+					Transistor::SVC::MapProcessMemory(proc, load_base, total_size));
 			printf("Mapped at %p\n", map->Base());
-			
-			memcpy(map->Base(), nro_image.data(), nro_image.size());
-			printf("Copied NRO\n");
+			for(auto i = segments.begin(); i != segments.end(); i++) {
+				memcpy(map->Base() + (i->load_addr - load_base), i->data.data() + i->data_offset, i->data_length);
+			}
+			printf("Copied segments\n");
 		} // let map go out of scope
 		
 		printf("Reprotecting...\n");
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetProcessMemoryPermission(*proc, nro_base + nro_header->segments[0].file_offset, nro_header->segments[0].size, 5)); // .text is RX
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetProcessMemoryPermission(*proc, nro_base + nro_header->segments[1].file_offset, nro_header->segments[1].size, 1)); // .rodata is R
-		Transistor::ResultCode::AssertOk(
-			Transistor::SVC::SetProcessMemoryPermission(*proc, nro_base + nro_header->segments[2].file_offset, nro_header->segments[2].size + nro_header->bss_size, 3)); // .data + .bss is RW
+		for(auto i = segments.begin(); i != segments.end(); i++) {
+			Transistor::ResultCode::AssertOk(
+				Transistor::SVC::SetProcessMemoryPermission(*proc, i->load_addr, i->virt_length, i->permissions));
+		}
 
 		return proc;
 	} catch(Transistor::ResultError e) {
