@@ -55,7 +55,7 @@ trn::ResultCode ITwiliService::OpenStderr(trn::ipc::OutObject<twili::IPipe> &val
 	}
 }
 
-trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::Pid pid, trn::ipc::OutObject<twili::IHBABIShim> &out) {
+trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IHBABIShim> &out) {
 	printf("opening HBABI shim for pid 0x%x\n", pid.value);
 	auto i = std::find_if(
 		twili->monitored_processes.begin(),

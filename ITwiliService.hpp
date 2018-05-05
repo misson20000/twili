@@ -16,7 +16,7 @@ class ITwiliService : public trn::ipc::server::Object {
 	trn::ResultCode OpenStdin(trn::ipc::OutObject<twili::IPipe> &out);
 	trn::ResultCode OpenStdout(trn::ipc::OutObject<twili::IPipe> &out);
 	trn::ResultCode OpenStderr(trn::ipc::OutObject<twili::IPipe> &out);
-	trn::ResultCode OpenHBABIShim(trn::ipc::Pid pid, trn::ipc::OutObject<twili::IHBABIShim> &out);
+	trn::ResultCode OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IHBABIShim> &out);
 	trn::ResultCode Destroy();
  private:
 	Twili *twili;

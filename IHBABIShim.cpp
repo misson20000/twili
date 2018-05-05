@@ -7,6 +7,18 @@ namespace twili {
 
 IHBABIShim::IHBABIShim(trn::ipc::server::IPCServer *server, MonitoredProcess *process) : trn::ipc::server::Object(server), process(process) {
 	printf("opened HBABI shim for 0x%x\n", process->proc->handle);
+	entries.push_back({
+		.key = LCONFIG_KEY_TWILI_PRESENT,
+		.flags = 0,
+	});
+	entries.push_back({
+		.key = LCONFIG_KEY_SYSCALL_AVAILABLE_HINT,
+		.flags = 0,
+		.syscall_available_hint = {
+			0xffffffffffffffff,
+			0xffffffffffffffff
+		}
+	});
 }
 
 trn::ResultCode IHBABIShim::Dispatch(trn::ipc::Message msg, uint32_t request_id) {
@@ -40,7 +52,11 @@ trn::ResultCode IHBABIShim::GetLoaderConfigEntryCount(trn::ipc::OutRaw<uint32_t>
 }
 
 trn::ResultCode IHBABIShim::GetLoaderConfigEntries(trn::ipc::Buffer<loader_config_entry_t, 0x6, 0> buffer) {
-	std::copy(entries.begin(), entries.begin() + (buffer.size / sizeof(loader_config_entry_t)), buffer.data);
+	size_t count = buffer.size / sizeof(loader_config_entry_t);
+	if(count > entries.size()) {
+		count = entries.size();
+	}
+	std::copy_n(entries.begin(), count, buffer.data);
 	return RESULT_OK;
 }
 

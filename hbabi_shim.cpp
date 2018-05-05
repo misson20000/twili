@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 			
 			ResultCode::AssertOk(
 				itwiliservice.SendSyncRequest<3>(
-					ipc::Pid(),
+					ipc::InPid(),
 					ipc::OutObject<ipc::client::Object>(shimservice)));
 			
 			printf("got shim: 0x%x\n", shimservice.object.session);
@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
 				ipc::OutRaw(num_loader_config_entries)));
 		std::vector<loader_config_entry_t> entries(num_loader_config_entries, loader_config_entry_t {});
 		
-		entries.resize(num_loader_config_entries);
 		ResultCode::AssertOk( // GetLoaderConfigEntries()
 			shimservice.SendSyncRequest<2>(
 				ipc::Buffer<loader_config_entry_t, 0x6>(entries)));
