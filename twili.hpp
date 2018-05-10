@@ -17,7 +17,10 @@ class Twili {
 	trn::Result<std::nullopt_t> Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
 	trn::Result<std::nullopt_t> Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer);
 	trn::Result<std::nullopt_t> CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
-	
+   trn::Result<std::nullopt_t> Terminate(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
+   
+   std::optional<twili::MonitoredProcess*> FindMonitoredProcess(uint64_t pid);
+   
 	bool destroy_flag = false;
 	trn::Waiter event_waiter;
 	trn::ipc::server::IPCServer server;

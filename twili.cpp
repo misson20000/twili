@@ -128,7 +128,10 @@ Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBR
 	auto proc = builder.Build();
 	if(!proc) { return tl::make_unexpected(proc.error()); }
 	
-	monitored_processes.emplace_back(this, *proc, *target_addr).Launch();
+	auto mon = monitored_processes.emplace_back(this, *proc, *target_addr);
+   mon.Launch();
+   writer.BeginOk(sizeof(uint64_t));
+   writer.Write<uint64_t>(mon.pid);
 	return std::nullopt;
 }
 
@@ -139,6 +142,32 @@ Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBri
 		}
 	}
 	return tl::make_unexpected(TWILI_ERR_NO_CRASHED_PROCESSES);
+}
+
+Result<std::nullopt_t> Twili::Terminate(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+   if(payload.size() != sizeof(uint64_t)) {
+      return tl::make_unexpected(TWILI_ERR_BAD_REQUEST);
+   }
+   uint64_t pid = *((uint64_t*) payload.data());
+   auto proc = FindMonitoredProcess(pid);
+   if(!proc) {
+      return tl::make_unexpected(TWILI_ERR_UNRECOGNIZED_PID);
+   } else {
+      return (*proc)->Terminate();
+   }
+}
+
+std::optional<twili::MonitoredProcess*> Twili::FindMonitoredProcess(uint64_t pid) {
+   auto i = std::find_if(monitored_processes.begin(),
+                         monitored_processes.end(),
+                         [pid](auto const &proc) {
+                            return proc.pid == pid;
+                         });
+   if(i == monitored_processes.end()) {
+      return {};
+   } else {
+      return &(*i);
+   }
 }
 
 }

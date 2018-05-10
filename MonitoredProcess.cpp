@@ -215,8 +215,12 @@ trn::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::USBRespon
 	} while(vaddr > 0);
 
 	auto r = report.Generate(debug, writer);
-	trn::svc::TerminateProcess(*this->proc);
+   Terminate();
 	return r;
+}
+
+trn::Result<std::nullopt_t> MonitoredProcess::Terminate() {
+   return trn::svc::TerminateProcess(*this->proc);
 }
 
 MonitoredProcess::~MonitoredProcess() {

@@ -63,6 +63,7 @@ class USBBridge {
 		RUN = 10,
 		REBOOT = 11,
 		COREDUMP = 12,
+      TERMINATE = 13,
 	};
 	
 	USBBridge(Twili *twili);

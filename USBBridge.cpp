@@ -75,6 +75,7 @@ USBBridge::USBBridge(Twili *twili) :
 	AddRequestHandler(CommandID::RUN, std::bind(&Twili::Run, twili, std::placeholders::_1, std::placeholders::_2));
 	AddRequestHandler(CommandID::REBOOT, std::bind(&Twili::Reboot, twili, std::placeholders::_1, std::placeholders::_2));
 	AddRequestHandler(CommandID::COREDUMP, std::bind(&Twili::CoreDump, twili, std::placeholders::_1, std::placeholders::_2));
+   AddRequestHandler(CommandID::TERMINATE, std::bind(&Twili::Terminate, twili, std::placeholders::_1, std::placeholders::_2));
 	
 	// wait for USB to come up
 	while(USBStateChangeCallback()) {

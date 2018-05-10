@@ -42,6 +42,7 @@ enum TwiliUSBCommandId {
     RUN = 10,
     REBOOT = 11,
     COREDUMP = 12,
+    TERMINATE = 13,
 }
 
 #[derive(Debug)]
@@ -272,7 +273,9 @@ fn main() {
                 let mut f = std::fs::File::open(&matches.free[1]).expect("file not found");
                 f.read_to_end(&mut content_buf).expect("failed to read from file");
             }
-            twili_usb.transact(TwiliUSBCommandId::RUN, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap();
+            let r = twili_usb.transact(TwiliUSBCommandId::RUN, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap();
+            let mut cursor:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(r);
+            println!("PID: {:?}", cursor.read_u64::<LittleEndian>().unwrap());
         },
         "reboot" => {
             if matches.free.len() != 1 {
@@ -288,6 +291,14 @@ fn main() {
             f.write_all(
                 twili_usb.transact(TwiliUSBCommandId::COREDUMP, &[], std::time::Duration::new(20, 0))
                     .unwrap().as_slice()).unwrap();
+        },
+        "terminate" => {
+            if matches.free.len() != 2 {
+                panic!("usage: twib terminate <pid>");
+            }
+            let mut curs:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
+            curs.write_u64::<LittleEndian>(matches.free[1].parse::<u64>().unwrap()).unwrap();
+            twili_usb.transact(TwiliUSBCommandId::TERMINATE, curs.get_ref(), std::time::Duration::new(20, 0)).unwrap();
         },
         _ => panic!("unknown operation: {:?}", matches.free[0])
     }

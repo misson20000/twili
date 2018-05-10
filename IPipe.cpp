@@ -4,7 +4,10 @@
 
 namespace twili {
 
-IPipe::IPipe(trn::ipc::server::IPCServer *server, int fd) : trn::ipc::server::Object(server), fd(fd) {
+IPipe::IPipe(trn::ipc::server::IPCServer *server, int fd, MonitoredProcess *proc) :
+   trn::ipc::server::Object(server),
+   fd(fd),
+   proc(proc) {
 }
 
 trn::ResultCode IPipe::Dispatch(trn::ipc::Message msg, uint32_t request_id) {

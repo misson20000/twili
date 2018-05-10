@@ -18,7 +18,8 @@ class MonitoredProcess {
 	
 	void Launch();
 	trn::Result<std::nullopt_t> CoreDump(usb::USBBridge::USBResponseWriter &r);
-
+   trn::Result<std::nullopt_t> Terminate();
+   
 	std::shared_ptr<trn::KProcess> proc;
 	const uint64_t target_entry;
 	const uint64_t pid;
