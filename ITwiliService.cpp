@@ -25,7 +25,7 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 	return 1;
 }
 
-trn::ResultCode ITwiliService::OpenStdin(trn::ipc::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStdin(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDIN_FILENO);
 	if(r) {
 		val.value = r.value();
@@ -35,7 +35,7 @@ trn::ResultCode ITwiliService::OpenStdin(trn::ipc::OutObject<twili::IPipe> &val)
 	}
 }
 
-trn::ResultCode ITwiliService::OpenStdout(trn::ipc::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStdout(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDOUT_FILENO);
 	if(r) {
 		val.value = r.value();
@@ -45,7 +45,7 @@ trn::ResultCode ITwiliService::OpenStdout(trn::ipc::OutObject<twili::IPipe> &val
 	}
 }
 
-trn::ResultCode ITwiliService::OpenStderr(trn::ipc::OutObject<twili::IPipe> &val) {
+trn::ResultCode ITwiliService::OpenStderr(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
 	auto r = server->CreateObject<twili::IPipe>(this, STDERR_FILENO);
 	if(r) {
 		val.value = r.value();

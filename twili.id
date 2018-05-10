@@ -1,7 +1,7 @@
 interface twili::ITwiliService is twili {
-	[0] OpenStdin() -> object<twili::IPipe>;
-	[1] OpenStdout() -> object<twili::IPipe>;
-	[2] OpenStderr() -> object<twili::IPipe>;
+	[0] OpenStdin(pid) -> object<twili::IPipe>;
+	[1] OpenStdout(pid) -> object<twili::IPipe>;
+	[2] OpenStderr(pid) -> object<twili::IPipe>;
 	[3] OpenHBABIShim(pid) -> object<twili::IHBABIShim>;
 	
 	[999] Destroy();
