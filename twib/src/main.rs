@@ -74,11 +74,14 @@ impl<'a> TwiliUSB<'a> {
                 response.resize(response_size, 0);
                 let mut bytes_read:usize = 0;
                 while bytes_read < response_size {
-                    let region:&mut [u8] = &mut response[bytes_read..];
-                    println!("try to read {:?}", region.len());
+                    let max_transfer_size = 0x80000;
+                    let region:&mut [u8] = if response_size - bytes_read > max_transfer_size {
+                        &mut response[bytes_read..(bytes_read + max_transfer_size)]
+                    } else {
+                        &mut response[bytes_read..]
+                    };
                     bytes_read+= try!(self.handle.read_bulk(self.endpoint_data_in.address(), region, timeout));
                     println!("have {:?}/{:?} bytes", bytes_read, response_size);
-                    std::thread::sleep(std::time::Duration::new(1, 0));
                 }
             }
             Ok((result_code, response))
