@@ -6,6 +6,7 @@ extern crate rand;
 use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
 use std::io::Read;
 use std::io::Write;
+use std::error::Error;
 
 fn find_twili_device<'a>(context: &'a libusb::Context) -> libusb::Result<libusb::Device<'a>> {
     for mut device in try!(context.devices()).iter() {
@@ -43,14 +44,135 @@ enum TwiliUSBCommandId {
     COREDUMP = 12,
 }
 
+#[derive(Debug)]
+enum TwiliError {
+    InvalidNro,
+    NoCrashedProcesses,
+    ResponseSizeMismatch,
+    FatalUsbTransfer,
+    UsbTransfer,
+    BadRequest,
+    UnrecognizedPid,
+    UnrecognizedHandlePlaceholder,
+    InvalidSegment,
+    IoError,
+
+    Unknown,
+}
+
+impl std::error::Error for TwiliError {
+    fn description(&self) -> &str {
+        match *self {
+            TwiliError::InvalidNro => "invalid nro",
+            TwiliError::NoCrashedProcesses => "no crashed processes",
+            TwiliError::ResponseSizeMismatch => "response size mismatch",
+            TwiliError::FatalUsbTransfer => "fatal USB transfer error",
+            TwiliError::UsbTransfer => "USB transfer error",
+            TwiliError::BadRequest => "bad request",
+            TwiliError::UnrecognizedPid => "unrecognized pid",
+            TwiliError::UnrecognizedHandlePlaceholder => "unrecognized handle placeholder",
+            TwiliError::InvalidSegment => "invalid segment",
+            TwiliError::IoError => "IO error",
+            
+            TwiliError::Unknown => "unknown",
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        None
+    }
+}
+
+impl std::fmt::Display for TwiliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(self.description())
+    }
+}
+
+impl TwiliError {
+    fn from_code(code:u32) -> TwiliError {
+        if (code & 0x1FF) != 0xEF {
+            return TwiliError::Unknown;
+        }
+        match code >> 9 {
+            1 => TwiliError::InvalidNro,
+            2 => TwiliError::NoCrashedProcesses,
+            3 => TwiliError::ResponseSizeMismatch,
+            4 => TwiliError::FatalUsbTransfer,
+            5 => TwiliError::UsbTransfer,
+            6 => TwiliError::BadRequest,
+            7 => TwiliError::UnrecognizedPid,
+            8 => TwiliError::UnrecognizedHandlePlaceholder,
+            9 => TwiliError::InvalidSegment,
+            10 => TwiliError::IoError,
+            _ => TwiliError::Unknown
+        }
+    }
+
+}
+
+#[derive(Debug)]
+enum BridgeError {
+    Usb(libusb::Error),
+    Remote(TwiliError),
+    Io(std::io::Error),
+}
+
+impl std::error::Error for BridgeError {
+    fn description(&self) -> &str {
+        match *self {
+            BridgeError::Usb(ref err) => err.description(),
+            BridgeError::Remote(ref err) => err.description(),
+            BridgeError::Io(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            BridgeError::Usb(ref err) => Some(err),
+            BridgeError::Remote(ref err) => Some(err),
+            BridgeError::Io(ref err) => Some(err),
+        }
+    }
+}
+
+impl std::fmt::Display for BridgeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.cause() {
+            Some(ref err) => err.fmt(f),
+            None => write!(f, "unknown bridge error")
+        }
+    }
+}
+
+impl std::convert::From<libusb::Error> for BridgeError {
+    fn from(err: libusb::Error) -> BridgeError {
+        BridgeError::Usb(err)
+    }
+}
+
+impl std::convert::From<TwiliError> for BridgeError {
+    fn from(err: TwiliError) -> BridgeError {
+        BridgeError::Remote(err)
+    }
+}
+
+impl std::convert::From<std::io::Error> for BridgeError {
+    fn from(err: std::io::Error) -> BridgeError {
+        BridgeError::Io(err)
+    }
+}
+
+type BridgeResult<T> = Result<T, BridgeError>;
+
 impl<'a> TwiliUSB<'a> {
-    fn transact(&mut self, command_id: TwiliUSBCommandId, content_buf: &[u8], timeout: std::time::Duration) -> libusb::Result<(u32, std::vec::Vec<u8>)> {
+    fn transact(&mut self, command_id: TwiliUSBCommandId, content_buf: &[u8], timeout: std::time::Duration) -> BridgeResult<std::vec::Vec<u8>> {
         let tag:u32 = rand::random();
         { // request
             let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
-            header.write_u32::<LittleEndian>(command_id as u32).unwrap();
-            header.write_u32::<LittleEndian>(tag).unwrap();
-            header.write_u64::<LittleEndian>(content_buf.len() as u64).unwrap();
+            try!(header.write_u32::<LittleEndian>(command_id as u32));
+            try!(header.write_u32::<LittleEndian>(tag));
+            try!(header.write_u64::<LittleEndian>(content_buf.len() as u64));
             try!(self.handle.write_bulk(self.endpoint_meta_out.address(), header.get_ref(), timeout));
             let mut bytes_written:usize = 0;
             while bytes_written < content_buf.len() {
@@ -64,9 +186,9 @@ impl<'a> TwiliUSB<'a> {
             println!("awaiting response header");
             try!(self.handle.read_bulk(self.endpoint_meta_in.address(), header_vec.as_mut_slice(), timeout));
             let mut header_cursor:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(header_vec);
-            let result_code = header_cursor.read_u32::<LittleEndian>().unwrap();
-            let in_tag = header_cursor.read_u32::<LittleEndian>().unwrap();
-            let response_size = header_cursor.read_u64::<LittleEndian>().unwrap() as usize;
+            let result_code = try!(header_cursor.read_u32::<LittleEndian>());
+            let in_tag = try!(header_cursor.read_u32::<LittleEndian>());
+            let response_size = try!(header_cursor.read_u64::<LittleEndian>()) as usize;
             assert_eq!(in_tag, tag);
             println!("response size: {:?}", response_size);
             let mut response:Vec<u8> = Vec::new();
@@ -84,7 +206,11 @@ impl<'a> TwiliUSB<'a> {
                     println!("have {:?}/{:?} bytes", bytes_read, response_size);
                 }
             }
-            Ok((result_code, response))
+            if result_code != 0 {
+                Err(BridgeError::from(TwiliError::from_code(result_code)))
+            } else {
+                Ok(response)
+            }
         }
     }
 }
@@ -146,24 +272,22 @@ fn main() {
                 let mut f = std::fs::File::open(&matches.free[1]).expect("file not found");
                 f.read_to_end(&mut content_buf).expect("failed to read from file");
             }
-            println!("returned {:?}", twili_usb.transact(TwiliUSBCommandId::RUN, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap().0);
+            twili_usb.transact(TwiliUSBCommandId::RUN, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap();
         },
         "reboot" => {
             if matches.free.len() != 1 {
                 panic!("usage: twib reboot");
             }
-            println!("returned {:?}", twili_usb.transact(TwiliUSBCommandId::REBOOT, &[0], std::time::Duration::new(20, 0)).unwrap().0);
+            twili_usb.transact(TwiliUSBCommandId::REBOOT, &[0], std::time::Duration::new(20, 0)).unwrap();
         },
         "coredump" => {
             if matches.free.len() != 2 {
                 panic!("usage: twib coredump <file>");
             }
             let mut f = std::fs::File::create(&matches.free[1]).expect("could not create file");
-            let r = twili_usb.transact(TwiliUSBCommandId::COREDUMP, &[], std::time::Duration::new(20, 0)).unwrap();
-            if r.0 != 0 {
-                panic!("  got back code {:?}", r.0);
-            }
-            f.write_all(r.1.as_slice()).unwrap();
+            f.write_all(
+                twili_usb.transact(TwiliUSBCommandId::COREDUMP, &[], std::time::Duration::new(20, 0))
+                    .unwrap().as_slice()).unwrap();
         },
         _ => panic!("unknown operation: {:?}", matches.free[0])
     }
