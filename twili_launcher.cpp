@@ -45,27 +45,6 @@ int main(int argc, char *argv[]) {
 				trn::svc::StartProcess(*proc, 58, 0, 0x100000));
 
 			printf("Launched\n");
-			printf("Pivoting stdout/dbgout to twili...\n");
-
-			twili_pipe_t twili_out;
-			trn::ResultCode::AssertOk(twili_init());
-			trn::ResultCode::AssertOk(twili_open_stdout(&twili_out));
-			printf("Initialized Twili, opened stdout\n");
-			trn::ResultCode::AssertOk(twili_pipe_write(&twili_out, "hello, from the launcher!\n", sizeof("hello, from the launcher!\n")));
-			
-			int fd = twili_pipe_fd(&twili_out);
-			printf("Made FD %d\n", fd);
-			dup2(fd, STDOUT_FILENO);
-			printf("Pivoted stdout, pivoting dbgout...\n");
-			dbg_set_file(fd_file_get(fd));
-			printf("Pivoted dbgout\n");
-			dbg_printf("Dbgout\n");
-			fd_close(fd);
-			
-			printf("Pivoted stdout to twili!\n");
-			dbg_printf("Pivoted dbgout to twili!\n");
-
-			printf("Looping...\n");
 			while(1) {
 				svcSleepThread(10000000); // yield
 			}

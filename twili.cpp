@@ -67,29 +67,6 @@ int main() {
 		ipc_object_t sess;
 		ResultCode::AssertOk(sm_get_service(&sess, "twili"));
 
-		ipc_object_t pipe;
-		{
-			ipc_request_t rq = ipc_default_request;
-			rq.request_id = 1;
-			ipc_response_fmt_t rs = ipc_default_response_fmt;
-			rs.num_objects = 1;
-			rs.objects = &pipe;
-			ResultCode::AssertOk(ipc_send(sess, &rq, &rs));
-		}
-
-		{
-			ipc_request_t rq = ipc_default_request;
-			rq.request_id = 1;
-			ipc_buffer_t buffers[] = {
-				ipc_buffer_from_string("hello, world, over twili IPC!\n", 0x5)
-			};
-			ipc_msg_set_buffers(rq, buffers, buffer_ptrs);
-			ResultCode::AssertOk(ipc_send(pipe, &rq, &ipc_default_response_fmt));
-		}
-
-		//printf("destroying server...\n");
-		//twili::twili_state.destroy_server_flag = true;
-		
 		ResultCode::AssertOk(trn_thread_join(&thread, -1));
 		printf("server destroyed\n");
 	} catch(trn::ResultError e) {
