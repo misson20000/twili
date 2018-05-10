@@ -104,8 +104,7 @@ trn::Result<std::nullopt_t> USBBridge::PostBufferSync(std::shared_ptr<trn::servi
 	}
 	auto r = endpoint->completion_event.WaitSignal(30000000000);
 	if(!r) {
-		printf("[USBB] failed to wait on completion event\n");
-		//return tl::make_unexpected(r.error());
+		return tl::make_unexpected(r.error());
 	} else {
 		r = endpoint->completion_event.ResetSignal();
 		if(!r) {
