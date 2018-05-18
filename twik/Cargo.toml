@@ -1,0 +1,7 @@
+[package]
+name = "twik"
+version = "0.1.0"
+authors = ["misson20000 <xenotoad@xenotoad.net>"]
+
+[dependencies]
+libusb = "0.3"
