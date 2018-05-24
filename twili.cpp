@@ -22,6 +22,7 @@ typedef bool _Bool;
 #include "ITwiliService.hpp"
 #include "USBBridge.hpp"
 #include "err.hpp"
+#include "terminal.hpp"
 
 using ResultCode = trn::ResultCode;
 template<typename T>
@@ -58,6 +59,12 @@ int main() {
 
 		// initialize twili
 		twili::Twili twili;
+
+		printf("make terminal...\n");
+		twili::terminal::Terminal *t = new twili::terminal::Terminal();
+		printf("stdout to terminal...\n");
+		dup2(t->MakeFD(), STDOUT_FILENO);
+		printf("terminal output\n");
 		
 		trn_thread_t thread;
 		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &twili, 58, -2, 1024 * 64, NULL));

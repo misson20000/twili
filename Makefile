@@ -1,4 +1,5 @@
-OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o
+RESOURCES := terminus-114n.psf
+OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o libtmt/tmt.o libpsf/libpsf.o terminal.o
 LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o util.o
 HBABI_SHIM_OBJECTS := hbabi_shim.o
 
@@ -39,7 +40,7 @@ build/%.squashfs.o: build/%.squashfs
 	mkdir -p $(@D)
 	$(LD) -s -r -b binary -m aarch64elf -T $(LIBTRANSISTOR_HOME)/fs.T -o $@ $<
 
-build/twili.squashfs: build/hbabi_shim.nro
+build/twili.squashfs: build/hbabi_shim.nro $(RESOURCES)
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
 

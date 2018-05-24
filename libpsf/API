@@ -1,0 +1,132 @@
+libpsf v2 API
+
+
+Constants:
+
+All defined constants are mainly used internally.
+PSF_TYPE_1
+PSF_TYPE_2
+PSF_TYPE_UNKNOWN
+PSF2_HAS_UNICODE_TABLE
+PSF_MODE_512
+PSF_MODE_HAS_TAB
+PSF_MODE_HAS_SEQ
+PSF_MODE_MAX
+
+
+
+Structures:
+
+struct psf_font
+Structure used for storing PSF font information. Its has several members
+described as follows:
+
+	void *psf_fd;
+This is the file handle used for opening and reading the font file. You 
+should (probably) not use this in your programs because it may not be 
+what you expect depending on how libpsf is built.
+
+	char psf_type;
+This will be one of PSF_TYPE_1, PSF_TYPE_2, or PSF_TYPE_UNKNOWN after 
+the PSF font header has been read using psf_read_header, depending on
+which type of PSF file is opened.
+
+	unsigned char psf_magic[2];
+Stores magic bytes used internally to differntiate between PSF_TYPE_1 
+and PSF_TYPE_2.
+
+	char psf_mode;
+Flags, can be any combination of PSF_MODE_512, PSF_MODE_HAS_TAB, 
+PSF_MODE_HAS_SEQ, or PSF_MODE_MAX. Only set if PSF_TYPE_1
+
+	char psf_charsize;
+Size of PSF character if PSF_TYPE_1
+
+	unsigned char psf2_magic[4];
+Stores magic bytes used internally to differntiate between PSF_TYPE_1 
+and PSF_TYPE_2.
+
+	int	psf2_version;
+Minor version of PSF, should always be 0.
+
+	int	psf2_headersize;
+Size in bytes of header
+
+	int	psf2_flags;
+Flags, can be either PSF2_HAS_UNICODE_TABLE or 0. Only set if PSF_TYPE_2
+
+	int	psf2_length;
+Total number of chars if PSF_TYPE_2
+
+	int	psf2_charsize;
+Total size of each glyph in PSF_TYPE_2 font in bytes.
+
+	int	psf2_width,psf2_height;
+Total width and height of each glyph in PSF_TYPE_2 font.
+
+
+
+Functions:
+
+void psf_open(struct psf_font *font, char *fname);
+
+This function opens fname for reading.
+It takes two arguments which are a pointer to a psf_font structure, and 
+the file name and path of the font to open.
+
+
+void psf_read_header(struct psf_font *font)
+
+This function reads the PSF header of the currently open font and stores the
+information. This function must be called before attempting to read glyphs from
+the font.
+
+
+int psf_get_glyph_size(struct psf_font *font)
+
+This function returns the glyph size in bytes of the specified PSF font.
+This function cannot be called before psf_read_header has been called for the 
+specified psf_font.
+
+
+int psf_get_glyph_height(struct psf_font *font)
+
+This function returns the glyph height in bits of the specified PSF font.
+This function cannot be called before psf_read_header has been called for the 
+specified psf_font.
+
+
+int psf_get_glyph_width(struct psf_font *font)
+
+This function returns the glyph width in bits of the specified PSF font.
+This function cannot be called before psf_read_header has been called for the 
+specified psf_font.
+
+
+int psf_get_glyph_total(struct psf_font *font)
+
+This function returns the number of glyphs in the specified PSF font.
+This function cannot be called before psf_read_header has been called for the 
+specified psf_font.
+
+
+void psf_read_glyph(struct psf_font *font, void *mem, int size, int fill, int clear)
+
+This function reads one glyph from the font file and stores the character in
+the memory location pointed to by mem.
+This function takes five arguments.
+The first is a pointer to a psf_font structure (which has already be filled by 
+psf_read_header)
+The second is a pointer to a block of memory which has already been allocated and
+will store the glyph read from the file.
+The third is the bytes per pixel of the surface pointed to by mem (output pixel
+format).
+The fourth is the value to use for solid pixels.
+The fifth is the value to use for empty pixels.
+
+
+void psf_close_font()
+
+This function closes the specified PSF font. Closing a font will not destroy data
+read from the font, nor the contents of the psf_font structure. It only closes the 
+file descriptor.
