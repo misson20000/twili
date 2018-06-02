@@ -168,6 +168,7 @@ type BridgeResult<T> = Result<T, BridgeError>;
 
 impl<'a> TwiliUSB<'a> {
     fn transact(&mut self, command_id: TwiliUSBCommandId, content_buf: &[u8], timeout: std::time::Duration) -> BridgeResult<std::vec::Vec<u8>> {
+        let max_transfer_size = 0x80000;
         let tag:u32 = rand::random();
         { // request
             let mut header:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
@@ -177,7 +178,12 @@ impl<'a> TwiliUSB<'a> {
             try!(self.handle.write_bulk(self.endpoint_meta_out.address(), header.get_ref(), timeout));
             let mut bytes_written:usize = 0;
             while bytes_written < content_buf.len() {
-                bytes_written+= try!(self.handle.write_bulk(self.endpoint_data_out.address(), &content_buf[bytes_written..], timeout));
+                let region:&[u8] = if content_buf.len() - bytes_written > max_transfer_size {
+                    &content_buf[bytes_written..(bytes_written + max_transfer_size)]
+                } else {
+                    &content_buf[bytes_written..]
+                };
+                bytes_written+= try!(self.handle.write_bulk(self.endpoint_data_out.address(), region, timeout));
                 println!("bytes_written: {:?}", bytes_written);
             }
         }
@@ -197,7 +203,6 @@ impl<'a> TwiliUSB<'a> {
                 response.resize(response_size, 0);
                 let mut bytes_read:usize = 0;
                 while bytes_read < response_size {
-                    let max_transfer_size = 0x80000;
                     let region:&mut [u8] = if response_size - bytes_read > max_transfer_size {
                         &mut response[bytes_read..(bytes_read + max_transfer_size)]
                     } else {
