@@ -58,12 +58,16 @@ class USBBridge {
 	class USBResponseWriter;
 
 	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, USBResponseWriter&)>;
-	
+
+	static const uint32_t PROTOCOL_VERSION = 1;
 	enum class CommandID : uint32_t {
 		RUN = 10,
 		REBOOT = 11,
 		COREDUMP = 12,
-      TERMINATE = 13,
+		TERMINATE = 13,
+		LIST_PROCESSES = 14,
+		UPGRADE_TWILI = 15,
+		IDENTIFY = 16,
 	};
 	
 	USBBridge(Twili *twili);
@@ -105,6 +109,7 @@ class USBBridge::USBResponseWriter {
 	trn::Result<std::nullopt_t> BeginOk(size_t payload_size);
 	trn::Result<std::nullopt_t> BeginError(trn::ResultCode code, size_t payload_size);
 	trn::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
+	trn::Result<std::nullopt_t> Write(std::string str);
 	
 	template<typename T>
 	trn::Result<std::nullopt_t> Write(std::vector<T> data) {

@@ -2,11 +2,14 @@ extern crate libusb;
 extern crate getopts;
 extern crate byteorder;
 extern crate rand;
+extern crate prettytable;
+extern crate rmpv;
 
 use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
 use std::io::Read;
 use std::io::Write;
 use std::error::Error;
+use prettytable::*;
 
 fn find_twili_device<'a>(context: &'a libusb::Context) -> libusb::Result<libusb::Device<'a>> {
     for mut device in try!(context.devices()).iter() {
@@ -43,6 +46,9 @@ enum TwiliUSBCommandId {
     REBOOT = 11,
     COREDUMP = 12,
     TERMINATE = 13,
+    LIST_PROCESSES = 14,
+    UPGRADE_TWILI = 15,
+    IDENTIFY = 16,
 }
 
 #[derive(Debug)]
@@ -58,7 +64,7 @@ enum TwiliError {
     InvalidSegment,
     IoError,
 
-    Unknown,
+    Unknown(u32),
 }
 
 impl std::error::Error for TwiliError {
@@ -75,7 +81,7 @@ impl std::error::Error for TwiliError {
             TwiliError::InvalidSegment => "invalid segment",
             TwiliError::IoError => "IO error",
             
-            TwiliError::Unknown => "unknown",
+            TwiliError::Unknown(rc) => "unknown",
         }
     }
 
@@ -93,7 +99,7 @@ impl std::fmt::Display for TwiliError {
 impl TwiliError {
     fn from_code(code:u32) -> TwiliError {
         if (code & 0x1FF) != 0xEF {
-            return TwiliError::Unknown;
+            return TwiliError::Unknown(code);
         }
         match code >> 9 {
             1 => TwiliError::InvalidNro,
@@ -106,7 +112,7 @@ impl TwiliError {
             8 => TwiliError::UnrecognizedHandlePlaceholder,
             9 => TwiliError::InvalidSegment,
             10 => TwiliError::IoError,
-            _ => TwiliError::Unknown
+            _ => TwiliError::Unknown(code)
         }
     }
 
@@ -304,6 +310,58 @@ fn main() {
             let mut curs:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(Vec::new());
             curs.write_u64::<LittleEndian>(matches.free[1].parse::<u64>().unwrap()).unwrap();
             twili_usb.transact(TwiliUSBCommandId::TERMINATE, curs.get_ref(), std::time::Duration::new(20, 0)).unwrap();
+        },
+        "ps" => {
+            if matches.free.len() != 1 {
+                panic!("usage: twib ps");
+            }
+            let response = twili_usb.transact(TwiliUSBCommandId::LIST_PROCESSES, &Vec::new(), std::time::Duration::new(20, 0)).unwrap();
+            let num_reports = response.len() / 40;
+            let mut rcurs:std::io::Cursor<Vec<u8>> = std::io::Cursor::new(response);
+
+            let mut table = prettytable::Table::new();
+
+            table.add_row(row!["PID", "Debug Result", "TID", "Name", "MMU Flags"]);
+            
+            for _ in 0..num_reports {
+                let process_id = rcurs.read_u64::<LittleEndian>().unwrap();
+                let result = rcurs.read_u32::<LittleEndian>().unwrap();
+                rcurs.read_u32::<LittleEndian>().unwrap(); // alignment
+                let title_id = rcurs.read_u64::<LittleEndian>().unwrap();
+                let mut process_name:[u8; 12] = [0; 12];
+                rcurs.read_exact(&mut process_name).unwrap();
+                let mmu_flags = rcurs.read_u32::<LittleEndian>().unwrap();
+
+                table.add_row(row![format!("{}", process_id),
+                                   format!("0x{:x}", result),
+                                   format!("0x{:x}", title_id),
+                                   String::from_utf8_lossy(&process_name),
+                                   format!("0x{:x}", mmu_flags)]);
+            }
+
+            table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+            table.printstd();
+        },
+        "upgrade-twili" => {
+            if matches.free.len() != 2 {
+                panic!("usage: twib upgrade-twili <twili_launcher.nsp>");
+            }
+            let mut content_buf:Vec<u8> = Vec::new();
+            {
+                let mut f = std::fs::File::open(&matches.free[1]).expect("file not found");
+                f.read_to_end(&mut content_buf).expect("failed to read from file");
+            }
+            twili_usb.transact(TwiliUSBCommandId::UPGRADE_TWILI, content_buf.as_slice(), std::time::Duration::new(20, 0)).unwrap();
+        },
+        "identify" => {
+            if matches.free.len() != 1 {
+                panic!("usage: twib identify");
+            }
+            let response = twili_usb.transact(TwiliUSBCommandId::IDENTIFY, &Vec::new(), std::time::Duration::new(20, 0)).unwrap();
+            let v = rmpv::decode::value::read_value(&mut std::io::Cursor::new(response)).unwrap();
+            for &(ref k, ref v) in v.as_map().unwrap() {
+                println!("{} -> {:?}", k.as_str().unwrap(), v);
+            }
         },
         _ => panic!("unknown operation: {:?}", matches.free[0])
     }

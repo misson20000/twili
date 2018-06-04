@@ -1,0 +1,3 @@
+[submodule "msgpack11"]
+	path = msgpack11
+	url = git@github.com:ar90n/msgpack11.git

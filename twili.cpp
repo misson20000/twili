@@ -3,7 +3,11 @@ typedef bool _Bool;
 
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
+#include<libtransistor/cpp/svc.hpp>
 #include<libtransistor/thread.h>
+#include<libtransistor/ipc/fs/ifilesystem.h>
+#include<libtransistor/ipc/fs/ifile.h>
+#include<libtransistor/ipc/fs.h>
 #include<libtransistor/ipc/fatal.h>
 #include<libtransistor/ipc/sm.h>
 #include<libtransistor/ipc/bpc.h>
@@ -23,6 +27,8 @@ typedef bool _Bool;
 #include "USBBridge.hpp"
 #include "err.hpp"
 
+#include "msgpack11/msgpack11.hpp"
+
 using ResultCode = trn::ResultCode;
 template<typename T>
 using Result = trn::Result<T>;
@@ -34,6 +40,11 @@ void server_thread(void *arg) {
 		twili->monitored_processes.remove_if([](const auto &proc) {
 				return proc.destroy_flag;
 			});
+	}
+	printf("twili terminating...\n");
+	printf("terminating monitored processes...\n");
+	for(twili::MonitoredProcess &proc : twili->monitored_processes) {
+		proc.Terminate();
 	}
 	printf("twili server thread terminating\n");
 }
@@ -68,7 +79,7 @@ int main() {
 		ResultCode::AssertOk(sm_get_service(&sess, "twili"));
 
 		ResultCode::AssertOk(trn_thread_join(&thread, -1));
-		printf("server destroyed\n");
+		printf("server thread terminated\n");
 	} catch(trn::ResultError e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
 		fatal_init();
@@ -155,6 +166,133 @@ Result<std::nullopt_t> Twili::Terminate(std::vector<uint8_t> payload, usb::USBBr
    } else {
       return (*proc)->Terminate();
    }
+}
+
+Result<std::nullopt_t> Twili::ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+	uint64_t pids[256];
+	uint32_t num_pids;
+	auto r = ResultCode::ExpectOk(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
+	if(!r) {
+		return r;
+	}
+
+	struct ProcessReport {
+		uint64_t process_id;
+		uint32_t result;
+		uint64_t title_id;
+		char process_name[12];
+		uint32_t mmu_flags;
+	};
+
+	{
+		auto r = writer.BeginOk(sizeof(ProcessReport) * num_pids);
+		if(!r) {
+			return r;
+		}
+	}
+
+	uint64_t my_pid;
+	auto pr = trn::svc::GetProcessId(0xffff8001);
+	if(!pr) { return tl::make_unexpected(r.error()); }
+	my_pid = *pr;
+	
+	for(uint32_t i = 0; i < num_pids; i++) {
+		struct ProcessReport preport;
+		preport.process_id = pids[i];
+		preport.result = RESULT_OK;
+		preport.title_id = 0;
+		memset(preport.process_name, 0, sizeof(preport.process_name));
+		preport.mmu_flags = 0;
+		if(pids[i] == my_pid) {
+			preport.result = TWILI_ERR_WONT_DEBUG_SELF;
+		} else {
+			auto dr = trn::svc::DebugActiveProcess(pids[i]);
+			if(!dr) {
+				preport.result = dr.error().code;
+			} else {
+				trn::KDebug debug = std::move(*dr);
+				auto er = trn::svc::GetDebugEvent(debug);
+				while(er) {
+					if(er->event_type == DEBUG_EVENT_ATTACH_PROCESS) {
+						preport.title_id = er->attach_process.title_id;
+						memcpy(preport.process_name, er->attach_process.process_name, 12);
+						preport.mmu_flags = er->attach_process.mmu_flags;
+					}
+					er = trn::svc::GetDebugEvent(debug);
+				}
+				if(er.error().code != 0x8c01) {
+					preport.result = er.error().code;
+				}
+			}
+		}
+		auto r = writer.Write(preport);
+		if(!r) {
+			return r;
+		}
+	}
+
+	return std::nullopt;
+}
+
+Result<std::nullopt_t> Twili::Identify(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+	msgpack11::MsgPack ident = msgpack11::MsgPack::object {
+		{"service", "twili"},
+		{"protocol", twili::usb::USBBridge::PROTOCOL_VERSION},
+		{"foo", "bar"}
+	};
+	std::string ser = ident.dump();
+	auto r = writer.BeginOk(ser.size());
+	if(!r) { return r; }
+	return writer.Write(ser);
+}
+
+Result<std::nullopt_t> Twili::UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+	printf("upgrading twili...\n");
+	ifilesystem_t user_ifs;
+	auto r = ResultCode::ExpectOk(fsp_srv_open_bis_filesystem(&user_ifs, 30, ""));
+	if(!r) { return r; }
+	printf("opened bis@User filesystem\n");
+
+	uint8_t path[0x301];
+	strcpy((char*) path, "/twili_launcher.nsp");
+	
+	ifilesystem_delete_file(user_ifs, path); // allow failure
+	printf("deleted existing %s\n", path);
+	r = ResultCode::ExpectOk(
+		ifilesystem_create_file(user_ifs, 0, payload.size(), path));
+	if(!r) { ipc_close(user_ifs); return r; }
+	printf("created new %s\n", path);
+	
+	ifile_t file;
+	r = ResultCode::ExpectOk(
+		ifilesystem_open_file(user_ifs, &file, 6, path));
+	if(!r) { ipc_close(user_ifs); return r; }
+
+	printf("writing new Twili launcher...\n");
+	r = ResultCode::ExpectOk(
+		ifile_write(file, 0, 0, payload.size(), (int8_t*) payload.data(), payload.size()));
+	if(!r) {
+		ipc_close(file);
+		ipc_close(user_ifs);
+		return r;
+	}
+	printf("wrote new Twili launcher\n");
+
+	r = ResultCode::ExpectOk(ipc_close(file));
+	if(!r) { ipc_close(user_ifs); return r; }
+	
+	r = ResultCode::ExpectOk(
+		ifilesystem_commit(user_ifs));
+	if(!r) { ipc_close(user_ifs); return r; }
+	printf("committed changes\n");
+
+	r = ResultCode::ExpectOk(ipc_close(user_ifs));
+	if(!r) { return r; }
+
+	printf("killing server...\n");
+	printf("  (you will have to manually relaunch Twili)\n");
+	destroy_flag = true;
+	return std::nullopt;
 }
 
 std::optional<twili::MonitoredProcess*> Twili::FindMonitoredProcess(uint64_t pid) {

@@ -75,8 +75,11 @@ USBBridge::USBBridge(Twili *twili) :
 	AddRequestHandler(CommandID::RUN, std::bind(&Twili::Run, twili, std::placeholders::_1, std::placeholders::_2));
 	AddRequestHandler(CommandID::REBOOT, std::bind(&Twili::Reboot, twili, std::placeholders::_1, std::placeholders::_2));
 	AddRequestHandler(CommandID::COREDUMP, std::bind(&Twili::CoreDump, twili, std::placeholders::_1, std::placeholders::_2));
-   AddRequestHandler(CommandID::TERMINATE, std::bind(&Twili::Terminate, twili, std::placeholders::_1, std::placeholders::_2));
-	
+	AddRequestHandler(CommandID::TERMINATE, std::bind(&Twili::Terminate, twili, std::placeholders::_1, std::placeholders::_2));
+	AddRequestHandler(CommandID::LIST_PROCESSES, std::bind(&Twili::ListProcesses, twili, std::placeholders::_1, std::placeholders::_2));
+	AddRequestHandler(CommandID::UPGRADE_TWILI, std::bind(&Twili::UpgradeTwili, twili, std::placeholders::_1, std::placeholders::_2));
+	AddRequestHandler(CommandID::IDENTIFY, std::bind(&Twili::Identify, twili, std::placeholders::_1, std::placeholders::_2));
+   
 	// wait for USB to come up
 	while(USBStateChangeCallback()) {
 		usb_state_change_event.ResetSignal();
@@ -328,6 +331,10 @@ trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(uint8_t *data, s
 		has_errored = true;
 	}
 	return r;
+}
+
+trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(std::string str) {
+	return Write((uint8_t*) str.data(), str.size());
 }
 
 USBBridge::USBResponseWriter::~USBResponseWriter() {
