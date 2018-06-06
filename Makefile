@@ -2,7 +2,7 @@ OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o Monito
 LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o util.o
 HBABI_SHIM_OBJECTS := hbabi_shim.o
 
-TWILI_CXX_FLAGS := -Werror-return-type
+TWILI_CXX_FLAGS := -Werror-return-type -Og
 
 all: build/twili_launcher.nsp build/twili.nro build/twili.nso
 
