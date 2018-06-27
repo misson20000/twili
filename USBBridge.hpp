@@ -17,6 +17,8 @@ namespace usb {
 class USBBridge {
  public:
 	struct TransactionHeader {
+		uint32_t client_id;
+		uint32_t object_id;
 		union {
 			uint32_t command_id; // request
 			uint32_t result_code; // response
@@ -101,7 +103,7 @@ class USBBridge {
 
 class USBBridge::USBResponseWriter {
  public:
-	USBResponseWriter(USBBridge *bridge, uint32_t tag);
+	USBResponseWriter(USBBridge *bridge, uint32_t client_id, uint32_t tag);
 	~USBResponseWriter();
 	
 	size_t GetMaxTransferSize();
@@ -124,6 +126,7 @@ class USBBridge::USBResponseWriter {
 	}
  private:
 	USBBridge *bridge;
+	uint32_t client_id;
 	uint32_t tag;
 	size_t transferred_size = 0;
 	size_t expected_size;

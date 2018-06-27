@@ -224,7 +224,7 @@ void USBBridge::USBRequestReader::DataTransactionCompleted() {
 	}
 	if(current_payload.size() + entry->transferred_size > current_header.payload_size) {
 		printf("Overshot payload size\n");
-		USBResponseWriter r(bridge, current_header.tag);
+		USBResponseWriter r(bridge, current_header.client_id, current_header.tag);
 		r.BeginError(TWILI_ERR_USB_TRANSFER, 0);
 		return;
 	}
@@ -241,7 +241,7 @@ void USBBridge::USBRequestReader::DataTransactionCompleted() {
 }
 
 void USBBridge::USBRequestReader::ProcessCommand() {
-	USBResponseWriter response(bridge, current_header.tag);
+	USBResponseWriter response(bridge, current_header.client_id, current_header.tag);
 	auto i = bridge->request_handlers.find(current_header.command_id);
 	if(i == bridge->request_handlers.end()) {
 		response.BeginError(TWILI_ERR_BAD_REQUEST, 0);
@@ -262,8 +262,9 @@ void USBBridge::USBRequestReader::ProcessCommand() {
 	}
 }
 
-USBBridge::USBResponseWriter::USBResponseWriter(USBBridge *bridge, uint32_t tag) :
+USBBridge::USBResponseWriter::USBResponseWriter(USBBridge *bridge, uint32_t client_id, uint32_t tag) :
 	bridge(bridge),
+	client_id(client_id),
 	tag(tag) {
 	
 }
@@ -281,6 +282,7 @@ trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t payload
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	TransactionHeader hdr;
+	hdr.client_id = client_id;
 	hdr.result_code = 0;
 	hdr.tag = tag;
 	hdr.payload_size = payload_size;
@@ -301,6 +303,7 @@ trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(ResultCode 
 		throw new ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	TransactionHeader hdr;
+	hdr.client_id = client_id;
 	hdr.result_code = code.code;
 	hdr.tag = tag;
 	hdr.payload_size = payload_size;

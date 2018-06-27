@@ -1,0 +1,416 @@
+#include "USBBackend.hpp"
+
+#include<msgpack11.hpp>
+
+#include "Twibd.hpp"
+#include "config.hpp"
+
+void show(msgpack11::MsgPack const& blob);
+
+namespace twili {
+namespace twibd {
+namespace backend {
+
+int hotplug_cb_shim(libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *user_data) {
+	if(event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED) {
+		((USBBackend*) user_data)->AddDevice(ctx, device);
+	} else if(event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT) {
+		((USBBackend*) user_data)->RemoveDevice(ctx, device);
+	}
+	return 0;
+}
+
+USBBackend::USBBackend(Twibd *twibd) : twibd(twibd) {
+	int r = libusb_init(&ctx);
+	if(r) {
+		log(FATAL, "failed to initialize libusb: %s", libusb_error_name(r));
+		exit(1);
+	}
+
+	std::thread event_thread(&USBBackend::event_thread_func, this);
+	this->event_thread = std::move(event_thread);
+}
+
+USBBackend::~USBBackend() {
+	event_thread_destroy = true;
+	if(Twibd_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		libusb_hotplug_deregister_callback(ctx, hotplug_handle); // wakes up usb_event_thread
+	}
+	event_thread.join();
+	libusb_exit(ctx);
+}
+
+USBBackend::Device::Device(USBBackend *backend, libusb_device_handle *handle, uint8_t endp_addrs[4], uint8_t interface_number) :
+	backend(backend), handle(handle),
+	endp_meta_out(endp_addrs[0]), endp_meta_in(endp_addrs[2]),
+	endp_data_out(endp_addrs[1]), endp_data_in(endp_addrs[3]),
+	interface_number(interface_number) {
+	
+	tfer_meta_out = libusb_alloc_transfer(0);
+	tfer_data_out = libusb_alloc_transfer(0);
+	tfer_meta_in = libusb_alloc_transfer(0);
+	tfer_data_in = libusb_alloc_transfer(0);
+}
+
+USBBackend::Device::~Device() {
+	libusb_free_transfer(tfer_meta_out);
+	libusb_free_transfer(tfer_data_out);
+	libusb_free_transfer(tfer_meta_in);
+	libusb_free_transfer(tfer_data_in);
+	libusb_release_interface(handle, interface_number);
+	libusb_close(handle);
+}
+
+void USBBackend::Device::Begin() {
+	ResubmitMetaInTransfer();
+
+	// request identification
+	SendRequest(Request(0xFFFFFFFF, 0x0, 0x0, (uint32_t) ITwibInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
+}
+
+void USBBackend::Device::SendRequest(const Request &&request) {
+	std::unique_lock<std::mutex> lock(state_mutex);
+	while(state != State::AVAILABLE) {
+		state_cv.wait(lock);
+	}
+	state = State::BUSY;
+	
+	log(DEBUG, "sending request");
+	log(DEBUG, "  client id 0x%x", request.client_id);
+	log(DEBUG, "  object id 0x%x", request.object_id);
+	log(DEBUG, "  command id 0x%x", request.command_id);
+	log(DEBUG, "  tag 0x%x", request.tag);
+	log(DEBUG, "  payload size 0x%lx", request.payload.size());
+	
+	mhdr.client_id = request.client_id;
+	mhdr.object_id = request.object_id;
+	mhdr.command_id = request.command_id;
+	mhdr.tag = request.tag;
+	mhdr.payload_size = request.payload.size();
+	
+	libusb_fill_bulk_transfer(tfer_meta_out, handle, endp_meta_out, (uint8_t*) &mhdr, sizeof(mhdr), &Device::MetaOutTransferShim, SharedPtrForTransfer(), 5000);
+	transferring_meta = true;
+	int r = libusb_submit_transfer(tfer_meta_out);
+	if(r != 0) {
+		log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+		deletion_flag = true;
+		return;
+	}
+	if(request.payload.size() > 0) {
+		libusb_fill_bulk_transfer(tfer_data_out, handle, endp_data_out, (uint8_t*) request.payload.data(), request.payload.size(), &Device::DataOutTransferShim, SharedPtrForTransfer(), 5000);
+		transferring_data = true;
+		int r = libusb_submit_transfer(tfer_meta_out);
+		if(r != 0) {
+			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+	}
+}
+
+std::shared_ptr<USBBackend::Device> *USBBackend::Device::SharedPtrForTransfer() {
+	return new std::shared_ptr<Device>(shared_from_this());
+}
+
+void USBBackend::Device::MetaOutTransferCompleted() {
+	log(DEBUG, "finished transferring meta");
+	std::unique_lock<std::mutex> lock(state_mutex);
+	transferring_meta = false;
+	if(!transferring_meta && !transferring_data) {
+		log(DEBUG, "entering AVAILABLE state");
+		state = State::AVAILABLE;
+	}
+}
+
+void USBBackend::Device::DataOutTransferCompleted() {
+	log(DEBUG, "finished transferring data");
+	std::unique_lock<std::mutex> lock(state_mutex);
+	transferring_data = false;
+	if(!transferring_meta && !transferring_data) {
+		log(DEBUG, "entering AVAILABLE state");
+		state = State::AVAILABLE;
+	}
+}
+
+void USBBackend::Device::MetaInTransferCompleted() {
+	log(DEBUG, "got response header");
+	log(DEBUG, "  client id: 0x%x", mhdr_in.client_id);
+	log(DEBUG, "  object_id: 0x%x", mhdr_in.object_id);
+	log(DEBUG, "  result_code: 0x%x", mhdr_in.result_code);
+	log(DEBUG, "  tag: 0x%x", mhdr_in.tag);
+	log(DEBUG, "  payload_size: 0x%lx", mhdr_in.payload_size);
+
+	response_in.device_id = device_id;
+	response_in.client_id = mhdr_in.client_id;
+	response_in.object_id = mhdr_in.object_id;
+	response_in.result_code = mhdr_in.result_code;
+	response_in.tag = mhdr_in.tag;
+	response_in.payload.resize(mhdr_in.payload_size);
+	log(DEBUG, "  payload.size(): 0x%lx", response_in.payload.size());
+	
+	if(mhdr_in.payload_size > 0) {
+		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, response_in.payload.data(), response_in.payload.size(), &Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
+		int r = libusb_submit_transfer(tfer_data_in);
+		if(r != 0) {
+			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+	} else {
+		DataInTransferCompleted();
+	}
+}
+
+void USBBackend::Device::DataInTransferCompleted() {
+	size_t beg_off = (tfer_data_in->buffer - response_in.payload.data());
+	log(DEBUG, "got response data 0x%x/0x%x", beg_off + tfer_data_in->actual_length, response_in.payload.size());
+	
+	if(beg_off + tfer_data_in->actual_length < response_in.payload.size()) {
+		// continue transferring
+		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in,
+															response_in.payload.data() + beg_off + tfer_data_in->actual_length,
+															mhdr.payload_size - beg_off - tfer_data_in->actual_length,
+															&Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
+		int r = libusb_submit_transfer(tfer_data_in);
+		if(r != 0) {
+			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+		return;
+	}
+	if(response_in.client_id == 0xFFFFFFFF) { // identification meta-client
+		Identified(response_in);
+	} else {
+		backend->twibd->PostResponse(std::move(response_in));
+	}
+	ResubmitMetaInTransfer();
+}
+
+void USBBackend::Device::Identified(Response &r) {
+	log(DEBUG, "got identification response back");
+	log(DEBUG, "payload size: 0x%x", r.payload.size());
+	if(r.result_code != 0) {
+		log(WARN, "device identification error: 0x%x", r.result_code);
+		deletion_flag = true;
+	}
+	std::string err;
+	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin(), r.payload.end()), err);
+	identification = obj;
+	device_nickname = obj["device_nickname"].string_value();
+	std::vector<uint8_t> sn = obj["serial_number"].binary_items();
+	serial_number = std::string(sn.begin(), sn.end());
+
+	log(INFO, "nickname: %s", device_nickname.c_str());
+	log(INFO, "serial number: %s", serial_number.c_str());
+	
+	device_id = std::hash<std::string>()(serial_number);
+	log(INFO, "assigned device id: %08x", device_id);
+	ready_flag = true;
+}
+
+void USBBackend::Device::ResubmitMetaInTransfer() {
+	log(DEBUG, "submitting meta in transfer");
+	libusb_fill_bulk_transfer(tfer_meta_in, handle, endp_meta_in, (uint8_t*) &mhdr_in, sizeof(mhdr_in), &Device::MetaInTransferShim, SharedPtrForTransfer(), 5000);
+	int r = libusb_submit_transfer(tfer_meta_in);
+	if(r != 0) {
+		log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+		deletion_flag = true;
+	}
+}
+
+bool USBBackend::Device::CheckTransfer(libusb_transfer *tfer) {
+	if(tfer->status != LIBUSB_TRANSFER_COMPLETED) {
+		log(DEBUG, "transfer failed (status = %d)", tfer->status);
+		deletion_flag = true;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+void USBBackend::Device::MetaOutTransferShim(libusb_transfer *tfer) {
+	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
+	if(!(*d)->CheckTransfer(tfer)) {
+		(*d)->MetaOutTransferCompleted();
+	}
+	delete d;
+}
+
+void USBBackend::Device::DataOutTransferShim(libusb_transfer *tfer) {
+	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
+	if(!(*d)->CheckTransfer(tfer)) {
+		(*d)->DataOutTransferCompleted();
+	}
+	delete d;
+}
+
+void USBBackend::Device::MetaInTransferShim(libusb_transfer *tfer) {
+	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
+	if(tfer->status == LIBUSB_TRANSFER_TIMED_OUT) {
+		(*d)->ResubmitMetaInTransfer();
+	} else {
+		if(!(*d)->CheckTransfer(tfer)) {
+			(*d)->MetaInTransferCompleted();
+		}
+	}
+	delete d;
+}
+
+void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
+	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
+	if(!(*d)->CheckTransfer(tfer)) {
+		(*d)->DataInTransferCompleted();
+	}
+	delete d;
+}
+
+void USBBackend::Probe() {
+	if(Twibd_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		int r = libusb_hotplug_register_callback(
+			ctx,
+			(libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
+			LIBUSB_HOTPLUG_ENUMERATE,
+			Twili_VENDOR_ID, Twili_PRODUCT_ID,
+			LIBUSB_HOTPLUG_MATCH_ANY,
+			hotplug_cb_shim, this,
+			&hotplug_handle);
+		if(r) {
+			log(FATAL, "failed to register hotplug callback: %s", libusb_error_name(r));
+		}
+	} else {
+		log(WARN, "hotplug is not supported");
+		log(FATAL, "implement this");
+		exit(1);
+	}
+}
+
+void USBBackend::AddDevice(libusb_context *ctx, libusb_device *device) {
+	log(INFO, "new USB device connected");
+	struct libusb_device_descriptor descriptor;
+	int r = libusb_get_device_descriptor(device, &descriptor);
+	if(r != 0) {
+		log(WARN, "failed to get device descriptor: %s", libusb_error_name(r));
+		return;
+	}
+
+	libusb_config_descriptor *config = NULL;
+	r = libusb_get_active_config_descriptor(device, &config);
+	if(r != 0) {
+		log(WARN, "failed to get config descriptor: %s", libusb_error_name(r));
+		return;
+	}
+
+	log(DEBUG, "  bNumInterfaces: %d", config->bNumInterfaces);
+
+	const struct libusb_interface_descriptor *twili_interface = NULL;
+	for(int i = 0; i < config->bNumInterfaces && twili_interface == NULL; i++) {
+		const struct libusb_interface *iface = &config->interface[i];
+		log(DEBUG, "  interface %d:", i);
+		log(DEBUG, "    num_altsetting: %d", iface->num_altsetting);
+		for(int j = 0; j < iface->num_altsetting; j++) {
+			const struct libusb_interface_descriptor *altsetting = &iface->altsetting[j];
+			log(DEBUG, "    altsetting %d:", j);
+			log(DEBUG, "      bNumEndpoints: %d", altsetting->bNumEndpoints);
+			log(DEBUG, "      bInterfaceClass: 0x%x", altsetting->bInterfaceClass);
+			log(DEBUG, "      bInterfaceSubClass: 0x%x", altsetting->bInterfaceSubClass);
+			log(DEBUG, "      bInterfaceProtocol: 0x%x", altsetting->bInterfaceProtocol);
+			if(altsetting->bInterfaceClass == 0xFF &&
+				 altsetting->bInterfaceSubClass == 0x1 &&
+				 altsetting->bInterfaceProtocol == 0x0) {
+				twili_interface = altsetting;
+				break;
+			}
+		}
+	}
+
+	if(twili_interface == NULL) {
+		log(INFO, "could not find Twili interface");
+		libusb_free_config_descriptor(config);
+		return;
+	}
+
+	if(twili_interface->bNumEndpoints != 4) {
+		log(WARN, "Twili interface exposes a bad number of endpoints");
+		libusb_free_config_descriptor(config);
+		return;
+	}
+	
+	libusb_endpoint_descriptor endp_meta_out = twili_interface->endpoint[0];
+	libusb_endpoint_descriptor endp_data_out = twili_interface->endpoint[1];
+	libusb_endpoint_descriptor endp_meta_in = twili_interface->endpoint[2];
+	libusb_endpoint_descriptor endp_data_in = twili_interface->endpoint[3];
+
+	if((endp_meta_out.bEndpointAddress & 0x80) != LIBUSB_ENDPOINT_OUT ||
+		 (endp_data_out.bEndpointAddress & 0x80) != LIBUSB_ENDPOINT_OUT ||
+		 (endp_meta_in.bEndpointAddress & 0x80) != LIBUSB_ENDPOINT_IN ||
+		 (endp_data_in.bEndpointAddress & 0x80) != LIBUSB_ENDPOINT_IN) {
+		log(WARN, "Twili interface exposes endpoints with bad directions");
+		libusb_free_config_descriptor(config);
+		return;
+	}
+
+	if((endp_meta_out.bmAttributes & 0x3) != LIBUSB_TRANSFER_TYPE_BULK ||
+		 (endp_data_out.bmAttributes & 0x3) != LIBUSB_TRANSFER_TYPE_BULK ||
+		 (endp_meta_in.bmAttributes & 0x3) != LIBUSB_TRANSFER_TYPE_BULK ||
+		 (endp_data_in.bmAttributes & 0x3) != LIBUSB_TRANSFER_TYPE_BULK) {
+		log(WARN, "Twili interface exposes endpoints with bad transfer types");
+		libusb_free_config_descriptor(config);
+		return;
+	}
+
+	libusb_device_handle *handle;
+	r = libusb_open(device, &handle);
+	if(r != 0) {
+		log(WARN, "failed to open device: %s", libusb_error_name(r));
+		libusb_free_config_descriptor(config);
+		return;
+	}
+	libusb_set_auto_detach_kernel_driver(handle, true);
+	r = libusb_claim_interface(handle, twili_interface->bInterfaceNumber);
+	if(r != 0) {
+		log(WARN, "failed to claim interface: %s", libusb_error_name(r));
+		libusb_close(handle);
+		libusb_free_config_descriptor(config);
+	}
+	
+	uint8_t addrs[] = {
+		endp_meta_out.bEndpointAddress,
+		endp_data_out.bEndpointAddress,
+		endp_meta_in.bEndpointAddress,
+		endp_data_in.bEndpointAddress};
+	
+	devices.emplace_back(std::make_shared<Device>(this, handle, addrs, twili_interface->bInterfaceNumber))->Begin();
+	
+	libusb_free_config_descriptor(config);
+}
+
+void USBBackend::RemoveDevice(libusb_context *ctx, libusb_device *device) {
+	log(DEBUG, "a device was removed, but not sure which one");
+}
+
+void USBBackend::event_thread_func() {
+	while(!event_thread_destroy) {
+		log(DEBUG, "usb event thread loop");
+		libusb_handle_events(ctx);
+
+		for(auto i = devices.begin(); i != devices.end(); ) {
+			auto d = *i;
+			if(d->ready_flag && !d->added_flag) {
+				twibd->AddDevice(d);
+				d->added_flag = true;
+			}
+			
+			if(d->deletion_flag) {
+				twibd->RemoveDevice(d);
+				i = devices.erase(i);
+			} else {
+				i++;
+			}
+		}
+	}
+}
+
+} // namespace backend
+} // namespace twibd
+} // namespace twili

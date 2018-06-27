@@ -1,8 +1,11 @@
 typedef bool _Bool;
 #include<iostream>
+#include<array>
 
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
+#include<libtransistor/cpp/ipcclient.hpp>
+#include<libtransistor/cpp/ipc/sm.hpp>
 #include<libtransistor/cpp/svc.hpp>
 #include<libtransistor/thread.h>
 #include<libtransistor/ipc/fs/ifilesystem.h>
@@ -235,10 +238,52 @@ Result<std::nullopt_t> Twili::ListProcesses(std::vector<uint8_t> payload, usb::U
 }
 
 Result<std::nullopt_t> Twili::Identify(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
+	printf("identifying...\n");
+	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+	trn::ipc::client::Object set_sys = ResultCode::AssertOk(
+		sm.GetService("set:sys"));
+	trn::ipc::client::Object set_cal = ResultCode::AssertOk(
+		sm.GetService("set:cal"));
+
+	std::vector<uint8_t> firmware_version(0x100);
+	ResultCode::AssertOk(
+		set_sys.SendSyncRequest<3>( // GetFirmwareVersion
+			trn::ipc::Buffer<uint8_t, 0x1a>(firmware_version)));
+
+	std::array<uint8_t, 0x18> serial_number;
+	ResultCode::AssertOk(
+		set_cal.SendSyncRequest<9>( // GetSerialNumber
+			trn::ipc::OutRaw<std::array<uint8_t, 0x18>>(serial_number)));
+
+	std::array<uint8_t, 6> bluetooth_bd_address;
+	ResultCode::AssertOk(
+		set_cal.SendSyncRequest<0>( // GetBluetoothBdAddress
+			trn::ipc::OutRaw<std::array<uint8_t, 6>>(bluetooth_bd_address)));
+
+	std::array<uint8_t, 6> wireless_lan_mac_address;
+	ResultCode::AssertOk(
+		set_cal.SendSyncRequest<6>( // GetWirelessLanMacAddress
+			trn::ipc::OutRaw<std::array<uint8_t, 6>>(wireless_lan_mac_address)));
+
+	std::vector<uint8_t> device_nickname(0x80);
+	ResultCode::AssertOk(
+		set_sys.SendSyncRequest<77>( // GetDeviceNickName
+			trn::ipc::Buffer<uint8_t, 0x16>(device_nickname)));
+
+	std::array<uint8_t, 16> mii_author_id;
+	ResultCode::AssertOk(
+		set_sys.SendSyncRequest<90>( // GetMiiAuthorId
+			trn::ipc::OutRaw<std::array<uint8_t, 16>>(mii_author_id)));
+	
 	msgpack11::MsgPack ident = msgpack11::MsgPack::object {
 		{"service", "twili"},
 		{"protocol", twili::usb::USBBridge::PROTOCOL_VERSION},
-		{"foo", "bar"}
+		{"firmware_version", firmware_version},
+		{"serial_number", serial_number},
+		{"bluetooth_bd_address", bluetooth_bd_address},
+		{"wireless_lan_mac_address", wireless_lan_mac_address},
+		{"device_nickname", std::string((char*) device_nickname.data())},
+		{"mii_author_id", mii_author_id}
 	};
 	std::string ser = ident.dump();
 	auto r = writer.BeginOk(ser.size());
