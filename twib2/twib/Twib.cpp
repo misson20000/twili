@@ -328,9 +328,9 @@ int main(int argc, char *argv[]) {
 
 	if(is_verbose) {
 		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
 	}
-
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
+	
 	log(MSG, "starting twib");
 	
 	twili::twib::Twib twib;
@@ -341,7 +341,21 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	uint32_t device_id = std::stoull(device_id_str, NULL, 16);
+	uint32_t device_id;
+	if(device_id_str.size() > 0) {
+		device_id = std::stoull(device_id_str, NULL, 16);
+	} else {
+		std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
+		if(devices.size() == 0) {
+			log(FATAL, "No devices were detected.");
+			return 1;
+		}
+		if(devices.size() > 1) {
+			log(FATAL, "Multiple devices were detected. Please use -d to specify which one you mean.");
+			return 1;
+		}
+		device_id = devices[0]["device_id"].uint32_value();
+	}
 	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(&twib, device_id, 0));
 	
 	if(ps->parsed()) {
