@@ -302,6 +302,9 @@ int main(int argc, char *argv[]) {
 	std::string device_id_str;
 	app.add_option("-d,--device", device_id_str, "Use a specific device")->type_name("DeviceId");
 
+	bool is_verbose;
+	app.add_flag("-v,--verbose", is_verbose, "Enable debug logging");
+	
 	CLI::App *ld = app.add_subcommand("list-devices", "List devices");
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
@@ -323,8 +326,10 @@ int main(int argc, char *argv[]) {
 		return app.exit(e);
 	}
 
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
+	if(is_verbose) {
+		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
+		add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
+	}
 
 	log(MSG, "starting twib");
 	
@@ -350,7 +355,7 @@ int main(int argc, char *argv[]) {
 			log(FATAL, "could not read file");
 			return 1;
 		}
-		log(MSG, "Process ID: 0x%lx", itdi.Run(*v_opt));
+		printf("Process ID: 0x%lx\n", itdi.Run(*v_opt));
 	}
 	
 	return 0;
