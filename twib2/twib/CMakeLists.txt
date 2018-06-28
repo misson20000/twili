@@ -1,4 +1,4 @@
-add_executable(twib Twib.cpp Messages.cpp)
+add_executable(twib Twib.cpp Messages.cpp RemoteObject.cpp ITwibMetaInterface.cpp ITwibDeviceInterface.cpp ../../util.cpp)
 
 target_link_libraries(twib twib-log)
 

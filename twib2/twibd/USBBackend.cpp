@@ -4,6 +4,7 @@
 
 #include "Twibd.hpp"
 #include "config.hpp"
+#include "err.hpp"
 
 void show(msgpack11::MsgPack const& blob);
 
@@ -12,10 +13,11 @@ namespace twibd {
 namespace backend {
 
 int hotplug_cb_shim(libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *user_data) {
+	USBBackend *self = (USBBackend*) user_data;
 	if(event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED) {
-		((USBBackend*) user_data)->AddDevice(ctx, device);
+		self->QueueAddDevice(device);
 	} else if(event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT) {
-		((USBBackend*) user_data)->RemoveDevice(ctx, device);
+		self->RemoveDevice(ctx, device);
 	}
 	return 0;
 }
@@ -53,6 +55,11 @@ USBBackend::Device::Device(USBBackend *backend, libusb_device_handle *handle, ui
 }
 
 USBBackend::Device::~Device() {
+	for(auto r : pending_requests) {
+		if(r.client_id != 0xffffffff) {
+			backend->twibd->PostResponse(r.RespondError(TWILI_ERR_PROTOCOL_TRANSFER_ERROR));
+		}
+	}
 	libusb_free_transfer(tfer_meta_out);
 	libusb_free_transfer(tfer_data_out);
 	libusb_free_transfer(tfer_meta_in);
@@ -65,7 +72,7 @@ void USBBackend::Device::Begin() {
 	ResubmitMetaInTransfer();
 
 	// request identification
-	SendRequest(Request(0xFFFFFFFF, 0x0, 0x0, (uint32_t) ITwibInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
+	SendRequest(Request(0xFFFFFFFF, 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
 }
 
 void USBBackend::Device::SendRequest(const Request &&request) {
@@ -87,7 +94,10 @@ void USBBackend::Device::SendRequest(const Request &&request) {
 	mhdr.command_id = request.command_id;
 	mhdr.tag = request.tag;
 	mhdr.payload_size = request.payload.size();
-	
+
+	pending_requests.push_back(request);
+
+	request_out = request;
 	libusb_fill_bulk_transfer(tfer_meta_out, handle, endp_meta_out, (uint8_t*) &mhdr, sizeof(mhdr), &Device::MetaOutTransferShim, SharedPtrForTransfer(), 5000);
 	transferring_meta = true;
 	int r = libusb_submit_transfer(tfer_meta_out);
@@ -95,16 +105,6 @@ void USBBackend::Device::SendRequest(const Request &&request) {
 		log(DEBUG, "transfer failed: %s", libusb_error_name(r));
 		deletion_flag = true;
 		return;
-	}
-	if(request.payload.size() > 0) {
-		libusb_fill_bulk_transfer(tfer_data_out, handle, endp_data_out, (uint8_t*) request.payload.data(), request.payload.size(), &Device::DataOutTransferShim, SharedPtrForTransfer(), 5000);
-		transferring_data = true;
-		int r = libusb_submit_transfer(tfer_meta_out);
-		if(r != 0) {
-			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
-			return;
-		}
 	}
 }
 
@@ -115,6 +115,19 @@ std::shared_ptr<USBBackend::Device> *USBBackend::Device::SharedPtrForTransfer() 
 void USBBackend::Device::MetaOutTransferCompleted() {
 	log(DEBUG, "finished transferring meta");
 	std::unique_lock<std::mutex> lock(state_mutex);
+
+	if(request_out.payload.size() > 0) {
+		log(DEBUG, "transferring data");
+		libusb_fill_bulk_transfer(tfer_data_out, handle, endp_data_out, (uint8_t*) request_out.payload.data(), LimitTransferSize(request_out.payload.size()), &Device::DataOutTransferShim, SharedPtrForTransfer(), 5000);
+		transferring_data = true;
+		int r = libusb_submit_transfer(tfer_data_out);
+		if(r != 0) {
+			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+	}
+	
 	transferring_meta = false;
 	if(!transferring_meta && !transferring_data) {
 		log(DEBUG, "entering AVAILABLE state");
@@ -123,12 +136,33 @@ void USBBackend::Device::MetaOutTransferCompleted() {
 }
 
 void USBBackend::Device::DataOutTransferCompleted() {
-	log(DEBUG, "finished transferring data");
-	std::unique_lock<std::mutex> lock(state_mutex);
-	transferring_data = false;
-	if(!transferring_meta && !transferring_data) {
-		log(DEBUG, "entering AVAILABLE state");
-		state = State::AVAILABLE;
+	size_t beg_off = (tfer_data_out->buffer - request_out.payload.data());
+	size_t read = beg_off + tfer_data_out->actual_length;
+	size_t remaining = mhdr.payload_size - read;
+	log(DEBUG, "send request data 0x%x/0x%x. 0x%x remaining", read, request_out.payload.size(), remaining);
+
+	if(remaining > 0) {
+		// continue transferring
+		libusb_fill_bulk_transfer(tfer_data_out, handle, endp_data_out,
+															request_out.payload.data() + read,
+															LimitTransferSize(remaining),
+															&Device::DataOutTransferShim, SharedPtrForTransfer(), 15000);
+		int r = libusb_submit_transfer(tfer_data_out);
+		if(r != 0) {
+			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+		return;
+	} else {
+		log(DEBUG, "finished transferring data");
+		std::unique_lock<std::mutex> lock(state_mutex);
+		
+		transferring_data = false;
+		if(!transferring_meta && !transferring_data) {
+			log(DEBUG, "entering AVAILABLE state");
+			state = State::AVAILABLE;
+		}
 	}
 }
 
@@ -149,7 +183,7 @@ void USBBackend::Device::MetaInTransferCompleted() {
 	log(DEBUG, "  payload.size(): 0x%lx", response_in.payload.size());
 	
 	if(mhdr_in.payload_size > 0) {
-		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, response_in.payload.data(), response_in.payload.size(), &Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
+		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, response_in.payload.data(), LimitTransferSize(response_in.payload.size()), &Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
@@ -163,14 +197,16 @@ void USBBackend::Device::MetaInTransferCompleted() {
 
 void USBBackend::Device::DataInTransferCompleted() {
 	size_t beg_off = (tfer_data_in->buffer - response_in.payload.data());
-	log(DEBUG, "got response data 0x%x/0x%x", beg_off + tfer_data_in->actual_length, response_in.payload.size());
+	size_t read = beg_off + tfer_data_in->actual_length;
+	size_t remaining = mhdr_in.payload_size - read;
+	log(DEBUG, "got response data 0x%x/0x%x, 0x%x remaining", read, response_in.payload.size(), remaining);
 	
-	if(beg_off + tfer_data_in->actual_length < response_in.payload.size()) {
+	if(remaining > 0) {
 		// continue transferring
 		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in,
-															response_in.payload.data() + beg_off + tfer_data_in->actual_length,
-															mhdr.payload_size - beg_off - tfer_data_in->actual_length,
-															&Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
+															response_in.payload.data() + read,
+															LimitTransferSize(remaining),
+															&Device::DataInTransferShim, SharedPtrForTransfer(), 15000);
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			log(DEBUG, "transfer failed: %s", libusb_error_name(r));
@@ -179,6 +215,11 @@ void USBBackend::Device::DataInTransferCompleted() {
 		}
 		return;
 	}
+
+	pending_requests.remove_if([this](Request &r) {
+			return r.tag == response_in.tag;
+		});
+	
 	if(response_in.client_id == 0xFFFFFFFF) { // identification meta-client
 		Identified(response_in);
 	} else {
@@ -229,7 +270,17 @@ bool USBBackend::Device::CheckTransfer(libusb_transfer *tfer) {
 	}
 }
 
+size_t USBBackend::Device::LimitTransferSize(size_t sz) {
+	const size_t max_size = 0x10000;
+	if(sz > max_size) {
+		return max_size;
+	} else {
+		return sz;
+	}
+}
+
 void USBBackend::Device::MetaOutTransferShim(libusb_transfer *tfer) {
+	log(DEBUG, "meta out transfer shim, status = %d", tfer->status);
 	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
 	if(!(*d)->CheckTransfer(tfer)) {
 		(*d)->MetaOutTransferCompleted();
@@ -258,6 +309,7 @@ void USBBackend::Device::MetaInTransferShim(libusb_transfer *tfer) {
 }
 
 void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
+	log(DEBUG, "data in transfer shim, status = %d", tfer->status);
 	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
 	if(!(*d)->CheckTransfer(tfer)) {
 		(*d)->DataInTransferCompleted();
@@ -285,8 +337,15 @@ void USBBackend::Probe() {
 	}
 }
 
-void USBBackend::AddDevice(libusb_context *ctx, libusb_device *device) {
-	log(INFO, "new USB device connected");
+void USBBackend::QueueAddDevice(libusb_device *device) {
+	//log(INFO, "new device connected, queueing...");
+	//libusb_ref_device(device);
+	//devices_to_add.push(device);
+	AddDevice(device);
+}
+
+void USBBackend::AddDevice(libusb_device *device) {
+	log(INFO, "probing connected device...");
 	struct libusb_device_descriptor descriptor;
 	int r = libusb_get_device_descriptor(device, &descriptor);
 	if(r != 0) {
@@ -394,6 +453,13 @@ void USBBackend::event_thread_func() {
 		log(DEBUG, "usb event thread loop");
 		libusb_handle_events(ctx);
 
+		while(!devices_to_add.empty()) {
+			libusb_device *d = devices_to_add.front();
+			devices_to_add.pop();
+			AddDevice(d);
+			libusb_unref_device(d);
+		}
+		
 		for(auto i = devices.begin(); i != devices.end(); ) {
 			auto d = *i;
 			if(d->ready_flag && !d->added_flag) {

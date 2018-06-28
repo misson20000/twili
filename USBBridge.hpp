@@ -31,11 +31,11 @@ class USBBridge {
 		USBRequestReader(USBBridge *bridge);
 		~USBRequestReader();
 		
-		void Begin();
-		void MetadataTransactionCompleted();
-		void DataTransactionCompleted();
-		void PostMetaBuffer();
-		void PostDataBuffer();
+		trn::Result<std::nullopt_t> Begin();
+		trn::Result<std::nullopt_t> MetadataTransactionCompleted();
+		trn::Result<std::nullopt_t> DataTransactionCompleted();
+		trn::Result<std::nullopt_t> PostMetaBuffer();
+		trn::Result<std::nullopt_t> PostDataBuffer();
 		void ProcessCommand();
 		
 	 private:
@@ -87,6 +87,7 @@ class USBBridge {
 	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_request_meta;
 	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_response_data;
 	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_request_data;
+	std::shared_ptr<trn::WaitHandle> state_change_wait;
 	std::map<uint64_t, RequestHandler> request_handlers;
 	
 	USBRequestReader request_reader;
@@ -98,6 +99,7 @@ class USBBridge {
 	trn::service::usb::ds::DS ds;
 	trn::KEvent usb_state_change_event;
 	
+	bool error_state = false;
 	bool USBStateChangeCallback();
 };
 

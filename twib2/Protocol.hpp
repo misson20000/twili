@@ -3,7 +3,8 @@
 #include<stdint.h>
 
 namespace twili {
-
+namespace protocol {
+	
 struct MessageHeader {
 	union {
 		uint32_t device_id;
@@ -25,7 +26,7 @@ class ITwibMetaInterface {
 	};
 };
 
-class ITwibInterface {
+class ITwibDeviceInterface {
  public:
 	enum class Command : uint32_t {
 		RUN = 10,
@@ -38,4 +39,5 @@ class ITwibInterface {
 	};
 };
 
+} // namespace protocol
 } // namespace twili

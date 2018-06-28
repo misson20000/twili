@@ -1,5 +1,7 @@
 #pragma once
 
+#include<memory>
+
 namespace twili {
 namespace log {
 
@@ -19,6 +21,7 @@ enum class Level {
 
 class Logger {
  public:
+	virtual ~Logger();
 	virtual void do_log(Level lvl, const char *fname, int line, const char *msg) = 0;
  protected:
 	char *format(char *buf, int size, bool use_color, Level lvl, const char *fname, int line, const char *msg);
@@ -27,7 +30,7 @@ class Logger {
 class FileLogger : public Logger {
  public:
 	FileLogger(FILE *f, Level minlvl, Level maxlvl = Level::MAX);
-	~FileLogger();
+	virtual ~FileLogger();
 
 	virtual void do_log(Level lvl, const char *fname, int line, const char *msg);
  protected:
@@ -44,8 +47,7 @@ class PrettyFileLogger : public FileLogger {
 };
 
 void _log(Level lvl, const char *fname, int line, const char *format, ...);
-void add_log(Logger *l); // takes ownership
-void close_logs();
+void add_log(std::shared_ptr<Logger> l);
 
-}
+} // namespace log
 } // namespace twili

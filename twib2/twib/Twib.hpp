@@ -10,6 +10,9 @@
 namespace twili {
 namespace twib {
 
+class ITwibMetaInterface;
+class ITwibDeviceInterface;
+
 class Twib {
  public:
 	Twib();

@@ -205,19 +205,19 @@ void UNIXFrontend::Client::PumpInput() {
 
 void UNIXFrontend::Client::Process() {
 	while(in_buffer.size() > 0) {
-		if(in_buffer.size() < sizeof(MessageHeader)) {
-			in_buffer_size_hint = sizeof(MessageHeader);
+		if(in_buffer.size() < sizeof(protocol::MessageHeader)) {
+			in_buffer_size_hint = sizeof(protocol::MessageHeader);
 			return;
 		}
-		MessageHeader &mh = *(MessageHeader*) in_buffer.data();
-		size_t total_message_size = sizeof(MessageHeader) + mh.payload_size;
+		protocol::MessageHeader &mh = *(protocol::MessageHeader*) in_buffer.data();
+		size_t total_message_size = sizeof(protocol::MessageHeader) + mh.payload_size;
 		if(in_buffer.size() < total_message_size) {
 			in_buffer_size_hint = total_message_size;
 			return;
 		}
 		
 		std::vector<uint8_t> payload(
-			in_buffer.begin() + sizeof(MessageHeader),
+			in_buffer.begin() + sizeof(protocol::MessageHeader),
 			in_buffer.begin() + total_message_size);
 		twibd->PostRequest(Request(client_id, mh.device_id, mh.object_id, mh.command_id, mh.tag, payload));
 		
@@ -229,7 +229,7 @@ void UNIXFrontend::Client::Process() {
 
 void UNIXFrontend::Client::PostResponse(Response &r) {
 	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	MessageHeader mh;
+	protocol::MessageHeader mh;
 	mh.device_id = r.device_id;
 	mh.object_id = r.object_id;
 	mh.result_code = r.result_code;

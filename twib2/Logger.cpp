@@ -12,7 +12,7 @@ namespace log {
 
 const size_t BUFFER_SIZE = 2048;
 
-std::forward_list<Logger*> logs;
+std::forward_list<std::shared_ptr<Logger>> logs;
 
 void _log(Level lvl,
           const char *fname,
@@ -25,7 +25,7 @@ void _log(Level lvl,
   char buf[BUFFER_SIZE];
   vsnprintf(buf, BUFFER_SIZE, format, ar);
 
-  for(std::forward_list<Logger*>::iterator i = logs.begin(); i != logs.end(); i++) {
+  for(auto i = logs.begin(); i != logs.end(); i++) {
     (*i)->do_log(lvl, fname, line, buf);
   }
   
@@ -54,6 +54,7 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
     case Level::MSG:   color = ANSI_BOLD ANSI_COLOR_WHITE; break;
     case Level::WARN:  color = ANSI_COLOR_BLUE; break;
     case Level::ERROR: color = ANSI_BOLD ANSI_COLOR_YELLOW; break;
+    case Level::MAX:
     case Level::FATAL: color = ANSI_BOLD ANSI_COLOR_RED; break;
     }
     
@@ -64,6 +65,9 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
              lvl, timebuf, fname, line, msg);
   }
   return buf;
+}
+
+Logger::~Logger() {
 }
 
 FileLogger::FileLogger(FILE *fp, Level minlvl, Level maxlvl) {
@@ -93,15 +97,8 @@ void PrettyFileLogger::do_log(Level lvl, const char *fname, int line, const char
 }
 
 
-void add_log(Logger *l) {
+void add_log(std::shared_ptr<Logger> l) {
   logs.push_front(l);
-}
-
-void close_logs() {
-  for(std::forward_list<Logger*>::iterator it = logs.begin();
-      it != logs.end(); it++) {
-    delete *it;
-  }
 }
 
 } // namespace log

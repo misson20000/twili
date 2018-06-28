@@ -15,6 +15,9 @@
 #include "Logger.hpp"
 #include "config.hpp"
 #include "Protocol.hpp"
+#include "ITwibMetaInterface.hpp"
+#include "ITwibDeviceInterface.hpp"
+#include "util.hpp"
 
 namespace twili {
 namespace twib {
@@ -152,19 +155,19 @@ void Twib::PumpInput() {
 
 void Twib::ProcessResponses() {
 	while(in_buffer.size() > 0) {
-		if(in_buffer.size() < sizeof(MessageHeader)) {
-			in_buffer_size_hint = sizeof(MessageHeader);
+		if(in_buffer.size() < sizeof(protocol::MessageHeader)) {
+			in_buffer_size_hint = sizeof(protocol::MessageHeader);
 			return;
 		}
-		MessageHeader &mh = *(MessageHeader*) in_buffer.data();
-		size_t total_message_size = sizeof(MessageHeader) + mh.payload_size;
+		protocol::MessageHeader &mh = *(protocol::MessageHeader*) in_buffer.data();
+		size_t total_message_size = sizeof(protocol::MessageHeader) + mh.payload_size;
 		if(in_buffer.size() < total_message_size) {
 			in_buffer_size_hint = total_message_size;
 			return;
 		}
 		
 		std::vector<uint8_t> payload(
-			in_buffer.begin() + sizeof(MessageHeader),
+			in_buffer.begin() + sizeof(protocol::MessageHeader),
 			in_buffer.begin() + total_message_size);
 		
 		std::promise<Response> promise;
@@ -201,7 +204,7 @@ std::future<Response> Twib::SendRequest(Request rq) {
 	}
 	{
 		std::lock_guard<std::mutex> lock(twibd_mutex);
-		MessageHeader mh;
+		protocol::MessageHeader mh;
 		mh.device_id = rq.device_id;
 		mh.object_id = rq.object_id;
 		mh.command_id = rq.command_id;
@@ -226,6 +229,68 @@ std::future<Response> Twib::SendRequest(Request rq) {
 	}
 	
 	return future;
+}
+
+template<size_t N>
+void PrintTable(std::vector<std::array<std::string, N>> rows) {
+	std::array<int, N> lengths = {0};
+	for(auto r : rows) {
+		for(size_t i = 0; i < N; i++) {
+			if(r[i].size() > lengths[i]) {
+				lengths[i] = r[i].size();
+			}
+		}
+	}
+	for(auto r : rows) {
+		for(size_t i = 0; i < N; i++) {
+			printf("%-*s%s", lengths[i], r[i].c_str(), (i + 1 == N) ? "\n" : " | ");
+		}
+	}
+}
+
+template<typename T>
+std::string ToHex(T num, int width, bool prefix) {
+	std::stringstream stream;
+	stream << (prefix ? "0x" : "") << std::setfill('0') << std::setw(width) << std::hex << num;
+	return stream.str();
+}
+
+template<typename T>
+std::string ToHex(T num, bool prefix) {
+	std::stringstream stream;
+	stream << (prefix ? "0x" : "") << std::hex << num;
+	return stream.str();
+}
+
+void ListDevices(ITwibMetaInterface &iface) {
+	std::vector<std::array<std::string, 3>> rows;
+	rows.push_back({"Device ID", "Nickname", "Firmware Version"});
+	auto devices = iface.ListDevices();
+	for(msgpack11::MsgPack device : devices) {
+		uint32_t device_id = device["device_id"].uint32_value();
+		msgpack11::MsgPack ident = device["identification"];
+		auto nickname = ident["device_nickname"].string_value();
+		auto version = ident["firmware_version"].binary_items();
+		std::string fw_version((char*) version.data() + 0x68);
+		
+		rows.push_back({ToHex(device_id, 8, false), nickname, fw_version});
+	}
+	PrintTable(rows);
+}
+
+void ListProcesses(ITwibDeviceInterface &iface) {
+	std::vector<std::array<std::string, 5>> rows;
+	rows.push_back({"Process ID", "Result", "Title ID", "Process Name", "MMU Flags"});
+	auto processes = iface.ListProcesses();
+	for(auto p : processes) {
+		rows.push_back({
+			ToHex(p.process_id, true),
+			ToHex(p.result, true),
+			ToHex(p.title_id, true),
+			std::string(p.process_name, 12),
+			ToHex(p.mmu_flags, true)});
+	}
+	PrintTable(rows);
 }
 
 } // namespace twib
@@ -258,55 +323,35 @@ int main(int argc, char *argv[]) {
 		return app.exit(e);
 	}
 
-	add_log(new twili::log::PrettyFileLogger(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
-	add_log(new twili::log::PrettyFileLogger(stderr, twili::log::Level::ERROR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
 
 	log(MSG, "starting twib");
 	
 	twili::twib::Twib twib;
-	
-	twili::twib::Request rq;
-	rq.device_id = 0;
-	rq.object_id = 0;
+	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(&twib, 0, 0));
 	
 	if(ld->parsed()) {
-		rq.command_id = 10;
-		std::future<twili::twib::Response> rs_future = twib.SendRequest(rq);
-		rs_future.wait();
-		twili::twib::Response rs = rs_future.get();
-		log(INFO, "got back response: code 0x%x", rs.result_code);
-		log(INFO, "payload size: 0x%x", rs.payload.size());
-		std::string err;
-		msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
-		std::vector<std::array<std::string, 3>> rows;
-		rows.push_back({"Device ID", "Nickname", "Firmware Version"});
-		for(msgpack11::MsgPack device : obj.array_items()) {
-			uint32_t device_id = device["device_id"].uint32_value();
-			msgpack11::MsgPack ident = device["identification"];
-			auto nickname = ident["device_nickname"].string_value();
-			auto version = ident["firmware_version"].binary_items();
-			std::string fw_version((char*) version.data() + 0x68);
-
-			std::stringstream device_id_stream;
-			device_id_stream << std::setfill('0') << std::setw(8) << std::hex << device_id;
-			rows.push_back({device_id_stream.str(), nickname, fw_version});
-		}
-		std::array<int, 3> lengths = {0, 0, 0};
-		for(auto r : rows) {
-			for(int i = 0; i < 3; i++) {
-				if(r[i].size() > lengths[i]) {
-					lengths[i] = r[i].size();
-				}
-			}
-		}
-		for(auto r : rows) {
-			printf("%-*s | %-*s | %-*s\n", lengths[0], r[0].c_str(), lengths[1], r[1].c_str(), lengths[2], r[2].c_str());
-		}
-
+		ListDevices(itmi);
 		return 0;
 	}
 
-	//device_id = std::stoull(device_id_str, NULL, 16);
+	uint32_t device_id = std::stoull(device_id_str, NULL, 16);
+	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(&twib, device_id, 0));
+	
+	if(ps->parsed()) {
+		ListProcesses(itdi);
+		return 0;
+	}
+
+	if(run->parsed()) {
+		auto v_opt = twili::util::ReadFile(run_file.c_str());
+		if(!v_opt) {
+			log(FATAL, "could not read file");
+			return 1;
+		}
+		log(MSG, "Process ID: 0x%lx", itdi.Run(*v_opt));
+	}
 	
 	return 0;
 }

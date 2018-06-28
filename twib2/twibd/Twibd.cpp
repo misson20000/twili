@@ -75,7 +75,21 @@ void Twibd::Process() {
 		if(rq.device_id == 0) {
 			PostResponse(HandleRequest(rq));
 		} else {
-			log(FATAL, "TODO: dispatch requests to devices");
+			std::shared_ptr<Device> device;
+			{
+				std::lock_guard<std::mutex> lock(device_map_mutex);
+				auto i = devices.find(rq.device_id);
+				if(i == devices.end()) {
+					PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
+					return;
+				}
+				device = i->second.lock();
+				if(!device || device->deletion_flag) {
+					PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
+					return;
+				}
+			}
+			device->SendRequest(std::move(rq));
 		}
 	} else if(v.index() == 1) {
 		Response rs = std::get<Response>(v);
@@ -110,8 +124,8 @@ void Twibd::Process() {
 Response Twibd::HandleRequest(Request &rq) {
 	switch(rq.object_id) {
 	case 0:
-		switch((ITwibMetaInterface::Command) rq.command_id) {
-		case ITwibMetaInterface::Command::LIST_DEVICES: {
+		switch((protocol::ITwibMetaInterface::Command) rq.command_id) {
+		case protocol::ITwibMetaInterface::Command::LIST_DEVICES: {
 			log(DEBUG, "command 0 issued to twibd meta object: LIST_DEVICES");
 			
 			Response r = rq.RespondOk();
@@ -141,8 +155,8 @@ Response Twibd::HandleRequest(Request &rq) {
 } // namespace twili
 
 int main(int argc, char *argv[]) {
-	add_log(new twili::log::PrettyFileLogger(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
-	add_log(new twili::log::PrettyFileLogger(stderr, twili::log::Level::ERROR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
 
 	log(MSG, "starting twibd");
 	twili::twibd::Twibd twibd;

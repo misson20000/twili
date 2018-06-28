@@ -24,6 +24,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__FILE_SHORT__='\"$(subst ${CMAKE_SOUR
 
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${PROJECT_SOURCE_DIR}/../")
 
 add_library(twib-log Logger.cpp)
 add_subdirectory(externals)

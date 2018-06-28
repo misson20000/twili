@@ -2,6 +2,7 @@
 
 #include<thread>
 #include<list>
+#include<queue>
 #include<mutex>
 #include<condition_variable>
 
@@ -57,8 +58,9 @@ class USBBackend {
 		bool transferring_data = false;
 		std::mutex state_mutex;
 		std::condition_variable state_cv;
-		MessageHeader mhdr;
-		MessageHeader mhdr_in;
+		protocol::MessageHeader mhdr;
+		protocol::MessageHeader mhdr_in;
+		Request request_out;
 		Response response_in;
 		std::list<Request> pending_requests;
 
@@ -70,6 +72,7 @@ class USBBackend {
 		void Identified(Response &r);
 		void ResubmitMetaInTransfer();
 		bool CheckTransfer(libusb_transfer *tfer);
+		static size_t LimitTransferSize(size_t size);
 		static void MetaOutTransferShim(libusb_transfer *tfer);
 		static void DataOutTransferShim(libusb_transfer *tfer);
 		static void MetaInTransferShim(libusb_transfer *tfer);
@@ -77,12 +80,14 @@ class USBBackend {
 	};
 
 	void Probe();
-	void AddDevice(libusb_context *ctx, libusb_device *device);
+	void QueueAddDevice(libusb_device *device);
+	void AddDevice(libusb_device *device);
 	void RemoveDevice(libusb_context *ctx, libusb_device *device);
 
  private:
 	Twibd *twibd;
 	std::list<std::shared_ptr<Device>> devices;
+	std::queue<libusb_device*> devices_to_add;
 	
 	bool event_thread_destroy = false;
 	void event_thread_func();
