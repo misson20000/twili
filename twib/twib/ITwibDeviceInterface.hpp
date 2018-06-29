@@ -20,6 +20,9 @@ class ITwibDeviceInterface {
 	ITwibDeviceInterface(RemoteObject obj);
 
 	uint64_t Run(std::vector<uint8_t> executable);
+	void Reboot();
+	std::vector<uint8_t> CoreDump();
+	void Terminate(uint64_t process_id);
 	std::vector<ProcessListEntry> ListProcesses();
  private:
 	RemoteObject obj;

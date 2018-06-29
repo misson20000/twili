@@ -312,6 +312,10 @@ int main(int argc, char *argv[]) {
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
 	
 	CLI::App *reboot = app.add_subcommand("reboot", "Reboot the device");
+
+	CLI::App *coredump = app.add_subcommand("coredump", "Make a coredump of a crashed process");
+	std::string core_file;
+	coredump->add_option("file", core_file, "File to dump core to")->required();
 	
 	CLI::App *terminate = app.add_subcommand("terminate", "Terminate a process on the device");
 	uint64_t terminate_process_id;
@@ -358,11 +362,6 @@ int main(int argc, char *argv[]) {
 	}
 	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(&twib, device_id, 0));
 	
-	if(ps->parsed()) {
-		ListProcesses(itdi);
-		return 0;
-	}
-
 	if(run->parsed()) {
 		auto v_opt = twili::util::ReadFile(run_file.c_str());
 		if(!v_opt) {
@@ -370,6 +369,41 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 		printf("Process ID: 0x%lx\n", itdi.Run(*v_opt));
+		return 0;
+	}
+
+	if(reboot->parsed()) {
+		itdi.Reboot();
+		return 0;
+	}
+
+	if(coredump->parsed()) {
+		FILE *f = fopen(core_file.c_str(), "wb");
+		if(!f) {
+			log(FATAL, "could not open '%s': %s", core_file.c_str(), strerror(errno));
+			return 1;
+		}
+		std::vector<uint8_t> core = itdi.CoreDump();
+		size_t written = 0;
+		while(written < core.size()) {
+			ssize_t r = fwrite(core.data() + written, 1, core.size() - written, f);
+			if(r <= 0 || ferror(f)) {
+				log(FATAL, "write error on '%s'");
+			} else {
+				written+= r;
+			}
+		}
+		fclose(f);
+	}
+	
+	if(terminate->parsed()) {
+		itdi.Terminate(terminate_process_id);
+		return 0;
+	}
+
+	if(ps->parsed()) {
+		ListProcesses(itdi);
+		return 0;
 	}
 	
 	return 0;
