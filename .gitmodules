@@ -1,6 +1,6 @@
 [submodule "msgpack11"]
 	path = msgpack11
-	url = git@github.com:ar90n/msgpack11.git
+	url = https://github.com/ar90n/msgpack11.git
 [submodule "twib2/externals/CLI11"]
 	path = twib/externals/CLI11
 	url = https://github.com/CLIUtils/CLI11.git

@@ -1,3 +1,6 @@
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(twibd Twibd.cpp USBBackend.cpp UNIXFrontend.cpp Messages.cpp LocalClient.cpp msgpack_show.cpp)
 
 target_link_libraries(twibd twib-log twib-buffer)

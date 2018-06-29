@@ -61,7 +61,7 @@ class USBBridge {
 
 	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, USBResponseWriter&)>;
 
-	static const uint32_t PROTOCOL_VERSION = 1;
+	static inline const uint32_t PROTOCOL_VERSION = 1;
 	enum class CommandID : uint32_t {
 		RUN = 10,
 		REBOOT = 11,

@@ -4,11 +4,13 @@ HBABI_SHIM_OBJECTS := hbabi_shim.o
 
 TWILI_CXX_FLAGS := -Werror-return-type -Og
 
+BUILD_PFS0 := build_pfs0
+
 all: build/twili_launcher.nsp build/twili.nro build/twili.nso
 
 build/twili_launcher.nsp: build/twili_launcher_exefs/main build/twili_launcher_exefs/main.npdm
 	mkdir -p $(@D)
-	build_pfs0 build/twili_launcher_exefs/ $@
+	$(BUILD_PFS0) build/twili_launcher_exefs/ $@
 
 build/twili_launcher_exefs/main: build/twili_launcher.nso
 	mkdir -p $(@D)

@@ -211,7 +211,7 @@ void UNIXFrontend::Client::Process() {
 					current_mh.object_id,
 					current_mh.command_id,
 					current_mh.tag,
-					std::vector(current_payload.Read(), current_payload.Read() + current_payload.ReadAvailable())));
+					std::vector<uint8_t>(current_payload.Read(), current_payload.Read() + current_payload.ReadAvailable())));
 			has_current_mh = false;
 		} else {
 			in_buffer.Reserve(current_mh.payload_size);
