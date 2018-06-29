@@ -69,6 +69,7 @@ class USBBackend {
 		void DataOutTransferCompleted();
 		void MetaInTransferCompleted();
 		void DataInTransferCompleted();
+		void DispatchResponse();
 		void Identified(Response &r);
 		void ResubmitMetaInTransfer();
 		bool CheckTransfer(libusb_transfer *tfer);

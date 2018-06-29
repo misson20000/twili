@@ -191,7 +191,7 @@ void USBBackend::Device::MetaInTransferCompleted() {
 			return;
 		}
 	} else {
-		DataInTransferCompleted();
+		DispatchResponse();
 	}
 }
 
@@ -216,6 +216,10 @@ void USBBackend::Device::DataInTransferCompleted() {
 		return;
 	}
 
+	DispatchResponse();
+}
+
+void USBBackend::Device::DispatchResponse() {
 	pending_requests.remove_if([this](Request &r) {
 			return r.tag == response_in.tag;
 		});
