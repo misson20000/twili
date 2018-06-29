@@ -67,6 +67,11 @@ trn::Result<std::nullopt_t> MonitoredProcess::CoreDump(usb::USBBridge::USBRespon
 	ELFCrashReport report;
 	
 	printf("generating crash report...\n");
+
+	std::vector<ELF::Note::elf_auxv_t> auxv;
+	auxv.push_back({ELF::AT_ENTRY, target_entry});
+	auxv.push_back({ELF::AT_NULL, 0});
+	report.AddNote("CORE", ELF::NT_AUXV, auxv);
 	
 	trn::KDebug debug = ResultCode::AssertOk(
 		trn::svc::DebugActiveProcess(

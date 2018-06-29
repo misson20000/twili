@@ -56,6 +56,12 @@ enum {
 	NT_AUXV = 6,
 };
 
+enum {
+	AT_NULL = 0, // end of vector
+	AT_IGNORE = 1, // entry should be ignored
+	AT_ENTRY = 9, // entry point for program
+};
+
 struct Elf64_Phdr {
 	uint32_t p_type;
 	uint32_t p_flags;
@@ -140,6 +146,14 @@ struct elf_prstatus {
 	uint32_t pr_sid;
 	uint64_t times[8];
 	uint64_t pr_reg[34]; // x0-x30, sp, pc, pstate
+	uint32_t pr_fpvalid;
+};
+	
+struct elf_auxv_t {
+	uint64_t a_type;
+	union {
+		uint64_t a_val;
+	} a_un;
 };
 
 }
