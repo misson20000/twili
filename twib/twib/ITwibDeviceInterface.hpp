@@ -21,7 +21,7 @@ class ITwibDeviceInterface {
 
 	uint64_t Run(std::vector<uint8_t> executable);
 	void Reboot();
-	std::vector<uint8_t> CoreDump();
+	std::vector<uint8_t> CoreDump(uint64_t process_id);
 	void Terminate(uint64_t process_id);
 	std::vector<ProcessListEntry> ListProcesses();
  private:

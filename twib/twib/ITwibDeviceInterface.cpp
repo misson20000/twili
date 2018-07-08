@@ -22,8 +22,9 @@ void ITwibDeviceInterface::Reboot() {
 	obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::REBOOT);
 }
 
-std::vector<uint8_t> ITwibDeviceInterface::CoreDump() {
-	return obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::COREDUMP).payload;
+std::vector<uint8_t> ITwibDeviceInterface::CoreDump(uint64_t process_id) {
+    uint8_t *process_id_bytes = (uint8_t*) &process_id;
+    return obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::COREDUMP, std::vector<uint8_t>(process_id_bytes, process_id_bytes + sizeof(process_id))).payload;
 }
 
 void ITwibDeviceInterface::Terminate(uint64_t process_id) {
