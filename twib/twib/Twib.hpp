@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include<thread>
 #include<future>
 #include<mutex>
