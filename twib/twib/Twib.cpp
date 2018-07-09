@@ -315,7 +315,9 @@ int main(int argc, char *argv[]) {
 
 	CLI::App *coredump = app.add_subcommand("coredump", "Make a coredump of a crashed process");
 	std::string core_file;
+	uint64_t core_process_id;
 	coredump->add_option("file", core_file, "File to dump core to")->required();
+	coredump->add_option("pid", core_process_id, "Process ID")->required();
 	
 	CLI::App *terminate = app.add_subcommand("terminate", "Terminate a process on the device");
 	uint64_t terminate_process_id;
@@ -383,7 +385,7 @@ int main(int argc, char *argv[]) {
 			log(FATAL, "could not open '%s': %s", core_file.c_str(), strerror(errno));
 			return 1;
 		}
-		std::vector<uint8_t> core = itdi.CoreDump();
+		std::vector<uint8_t> core = itdi.CoreDump(core_process_id);
 		size_t written = 0;
 		while(written < core.size()) {
 			ssize_t r = fwrite(core.data() + written, 1, core.size() - written, f);

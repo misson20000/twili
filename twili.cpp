@@ -150,12 +150,16 @@ Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBR
 }
 
 Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
-	for(auto i = monitored_processes.begin(); i != monitored_processes.end(); i++) {
-		if(i->crashed) {
-			return i->CoreDump(writer);
-		}
-	}
-	return tl::make_unexpected(TWILI_ERR_NO_CRASHED_PROCESSES);
+    if (payload.size() != sizeof(uint64_t)) {
+        return tl::make_unexpected(TWILI_ERR_BAD_REQUEST);
+    }
+    uint64_t pid = *((uint64_t*) payload.data());
+    auto proc = FindMonitoredProcess(pid);
+    if (!proc) {
+        return tl::make_unexpected(TWILI_ERR_UNRECOGNIZED_PID);
+    } else {
+        return (*proc)->CoreDump(writer);
+    }
 }
 
 Result<std::nullopt_t> Twili::Terminate(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer) {
