@@ -9,6 +9,8 @@
 #include<stdint.h>
 
 #include "Messages.hpp"
+#include "Protocol.hpp"
+#include "Buffer.hpp"
 
 namespace twili {
 namespace twibd {
@@ -35,11 +37,14 @@ class UNIXFrontend {
 		UNIXFrontend *frontend;
 		Twibd *twibd;
 		int fd;
-		size_t in_buffer_size_hint = 0;
-		std::vector<uint8_t> in_buffer;
+		util::Buffer in_buffer;
 
 		std::mutex out_buffer_mutex;
-		std::vector<uint8_t> out_buffer;
+		util::Buffer out_buffer;
+
+		bool has_current_mh = false;
+		protocol::MessageHeader current_mh;
+		util::Buffer current_payload;
 	};
 	
  private:

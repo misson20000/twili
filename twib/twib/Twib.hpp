@@ -6,6 +6,8 @@
 #include<mutex>
 #include<map>
 
+#include "Buffer.hpp"
+#include "Protocol.hpp"
 #include "Messages.hpp"
 
 namespace twili {
@@ -35,11 +37,14 @@ class Twib {
 	void PumpInput();
 	void ProcessResponses();
 	
-	size_t in_buffer_size_hint = 0;
-	std::vector<uint8_t> in_buffer;
-
+	util::Buffer in_buffer;
+	
 	std::mutex out_buffer_mutex;
-	std::vector<uint8_t> out_buffer;
+	util::Buffer out_buffer;
+
+	bool has_current_mh = false;
+	protocol::MessageHeader current_mh;
+	util::Buffer current_payload;
 	
 	std::map<uint32_t, std::promise<Response>> response_map;
 	std::mutex response_map_mutex;

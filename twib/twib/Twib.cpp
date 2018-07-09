@@ -66,7 +66,7 @@ void Twib::event_thread_func() {
 		struct pollfd pollfds[2];
 		pollfds[0] = {.fd = event_thread_notification_pipe[0], .events = POLLIN};
 		pollfds[1] = {.fd = fd, .events = POLLIN};
-		if(out_buffer.size() > 0) {
+		if(out_buffer.ReadAvailable() > 0) {
 			pollfds[1].events|= POLLOUT;
 		}
 
@@ -116,16 +116,14 @@ void Twib::NotifyEventThread() {
 
 void Twib::PumpOutput() {
 	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	if(out_buffer.size() > 0) {
-		ssize_t r = send(fd, out_buffer.data(), out_buffer.size(), 0);
+	if(out_buffer.ReadAvailable() > 0) {
+		ssize_t r = send(fd, out_buffer.Read(), out_buffer.ReadAvailable(), 0);
 		if(r < 0) {
 			log(FATAL, "failed to write to twibd: %s", strerror(errno));
 			exit(1);
 		}
 		if(r > 0) {
-			// move everything that we didn't send to the start of the buffer
-			std::move(out_buffer.begin() + r, out_buffer.end(), out_buffer.begin());
-			out_buffer.resize(out_buffer.size() - r);
+			out_buffer.MarkRead(r);
 		}
 	}
 }
@@ -133,59 +131,56 @@ void Twib::PumpOutput() {
 void Twib::PumpInput() {
 	log(DEBUG, "pumping input");
 	
-	size_t old_size = in_buffer.size();
-
-	// make some space to read into
-	if(in_buffer.size() < in_buffer_size_hint) {
-		in_buffer.resize(in_buffer_size_hint);
-	} else {
-		in_buffer.resize(old_size + 4096);
-	}
-
-	// read into the space we just made
-	ssize_t r = recv(fd, in_buffer.data() + old_size, in_buffer.size() - old_size, 0);
+	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
+	ssize_t r = recv(fd, std::get<0>(target), std::get<1>(target), 0);
 	if(r < 0) {
 		log(FATAL, "failed to receive from twibd: %s", strerror(errno));
 		exit(1);
 	} else {
-		// set the size of the buffer to reflect what we read
-		in_buffer.resize(old_size + r);
+		in_buffer.MarkWritten(r);
 	}
 }
 
 void Twib::ProcessResponses() {
-	while(in_buffer.size() > 0) {
-		if(in_buffer.size() < sizeof(protocol::MessageHeader)) {
-			in_buffer_size_hint = sizeof(protocol::MessageHeader);
-			return;
-		}
-		protocol::MessageHeader &mh = *(protocol::MessageHeader*) in_buffer.data();
-		size_t total_message_size = sizeof(protocol::MessageHeader) + mh.payload_size;
-		if(in_buffer.size() < total_message_size) {
-			in_buffer_size_hint = total_message_size;
-			return;
-		}
-		
-		std::vector<uint8_t> payload(
-			in_buffer.begin() + sizeof(protocol::MessageHeader),
-			in_buffer.begin() + total_message_size);
-		
-		std::promise<Response> promise;
-		{
-			std::lock_guard<std::mutex> lock(response_map_mutex);
-			auto it = response_map.find(mh.tag);
-			if(it == response_map.end()) {
-				log(WARN, "dropping response for unknown tag 0x%x", mh.tag);
-				continue;
+	while(in_buffer.ReadAvailable() > 0) {
+		if(!has_current_mh) {
+			if(in_buffer.Read(current_mh)) {
+				has_current_mh = true;
+			} else {
+				in_buffer.Reserve(sizeof(protocol::MessageHeader));
+				return;
 			}
-			promise.swap(it->second);
-			response_map.erase(it);
 		}
-		promise.set_value(Response(mh.device_id, mh.object_id, mh.result_code, mh.tag, payload));
-		
-		// move everything past the end of the message we just processed to the start of the buffer
-		std::move(in_buffer.begin() + total_message_size, in_buffer.end(), in_buffer.begin());
-		in_buffer.resize(in_buffer.size() - total_message_size);
+
+		current_payload.Clear();
+		if(in_buffer.Read(current_payload, current_mh.payload_size)) {
+			std::vector<uint8_t> payload(
+				current_payload.Read(),
+				current_payload.Read() + current_payload.ReadAvailable());
+			
+			std::promise<Response> promise;
+			{
+				std::lock_guard<std::mutex> lock(response_map_mutex);
+				auto it = response_map.find(current_mh.tag);
+				if(it == response_map.end()) {
+					log(WARN, "dropping response for unknown tag 0x%x", current_mh.tag);
+					continue;
+				}
+				promise.swap(it->second);
+				response_map.erase(it);
+			}
+			promise.set_value(
+				Response(
+					current_mh.device_id,
+					current_mh.object_id,
+					current_mh.result_code,
+					current_mh.tag,
+					payload));
+			has_current_mh = false;
+		} else {
+			in_buffer.Reserve(current_mh.payload_size);
+			return;
+		}
 	}
 }
 

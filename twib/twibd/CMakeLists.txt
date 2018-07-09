@@ -1,6 +1,6 @@
 add_executable(twibd Twibd.cpp USBBackend.cpp UNIXFrontend.cpp Messages.cpp LocalClient.cpp msgpack_show.cpp)
 
-target_link_libraries(twibd twib-log)
+target_link_libraries(twibd twib-log twib-buffer)
 
 include_directories(msgpack11 INTERFACE)
 target_link_libraries(twibd msgpack11)

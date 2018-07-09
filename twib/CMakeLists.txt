@@ -27,6 +27,7 @@ include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/../")
 
 add_library(twib-log Logger.cpp)
+add_library(twib-buffer Buffer.cpp)
 add_subdirectory(externals)
 add_subdirectory(twibd)
 add_subdirectory(twib)

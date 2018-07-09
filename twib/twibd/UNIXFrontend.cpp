@@ -72,7 +72,7 @@ void UNIXFrontend::event_thread_func() {
 
 		for(auto &c : clients) {
 			short int events = POLLIN;
-			if(c->out_buffer.size() > 0) {
+			if(c->out_buffer.ReadAvailable() > 0) {
 				events|= POLLOUT;
 			}
 			pollfds.push_back({.fd = c->fd, .events = events});
@@ -166,64 +166,57 @@ UNIXFrontend::Client::~Client() {
 }
 
 void UNIXFrontend::Client::PumpOutput() {
-	log(DEBUG, "pumping out 0x%lx bytes", out_buffer.size());
+	log(DEBUG, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
 	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	if(out_buffer.size() > 0) {
-		ssize_t r = send(fd, out_buffer.data(), out_buffer.size(), 0);
+	if(out_buffer.ReadAvailable() > 0) {
+		ssize_t r = send(fd, out_buffer.Read(), out_buffer.ReadAvailable(), 0);
 		if(r < 0) {
 			deletion_flag = true;
 			return;
 		}
 		if(r > 0) {
-			// move everything that we didn't send to the start of the buffer
-			std::move(out_buffer.begin() + r, out_buffer.end(), out_buffer.begin());
-			out_buffer.resize(out_buffer.size() - r);
+			out_buffer.MarkRead(r);
 		}
 	}
 }
 
 void UNIXFrontend::Client::PumpInput() {
-	size_t old_size = in_buffer.size();
-
-	// make some space to read into
-	if(in_buffer.size() < in_buffer_size_hint) {
-		in_buffer.resize(in_buffer_size_hint);
-	} else {
-		in_buffer.resize(old_size + 4096);
-	}
-
-	// read into the space we just made
-	ssize_t r = recv(fd, in_buffer.data() + old_size, in_buffer.size() - old_size, 0);
+	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
+	ssize_t r = recv(fd, std::get<0>(target), std::get<1>(target), 0);
 	if(r < 0) {
 		deletion_flag = true;
 		return;
 	} else {
-		// set the size of the buffer to reflect what we read
-		in_buffer.resize(old_size + r);
+		in_buffer.MarkWritten(r);
 	}
 }
 
 void UNIXFrontend::Client::Process() {
-	while(in_buffer.size() > 0) {
-		if(in_buffer.size() < sizeof(protocol::MessageHeader)) {
-			in_buffer_size_hint = sizeof(protocol::MessageHeader);
+	while(in_buffer.ReadAvailable() > 0) {
+		if(!has_current_mh) {
+			if(in_buffer.Read(current_mh)) {
+				has_current_mh = true;
+			} else {
+				in_buffer.Reserve(sizeof(protocol::MessageHeader));
+				return;
+			}
+		}
+
+		current_payload.Clear();
+		if(in_buffer.Read(current_payload, current_mh.payload_size)) {
+			twibd->PostRequest(
+				Request(
+					client_id,
+					current_mh.device_id,
+					current_mh.object_id,
+					current_mh.command_id,
+					current_mh.tag,
+					std::vector(current_payload.Read(), current_payload.Read() + current_payload.ReadAvailable())));
+			has_current_mh = false;
+		} else {
+			in_buffer.Reserve(current_mh.payload_size);
 			return;
 		}
-		protocol::MessageHeader &mh = *(protocol::MessageHeader*) in_buffer.data();
-		size_t total_message_size = sizeof(protocol::MessageHeader) + mh.payload_size;
-		if(in_buffer.size() < total_message_size) {
-			in_buffer_size_hint = total_message_size;
-			return;
-		}
-		
-		std::vector<uint8_t> payload(
-			in_buffer.begin() + sizeof(protocol::MessageHeader),
-			in_buffer.begin() + total_message_size);
-		twibd->PostRequest(Request(client_id, mh.device_id, mh.object_id, mh.command_id, mh.tag, payload));
-		
-		// move everything past the end of the message we just processed to the start of the buffer
-		std::move(in_buffer.begin() + total_message_size, in_buffer.end(), in_buffer.begin());
-		in_buffer.resize(in_buffer.size() - total_message_size);
 	}
 }
 
@@ -236,9 +229,8 @@ void UNIXFrontend::Client::PostResponse(Response &r) {
 	mh.tag = r.tag;
 	mh.payload_size = r.payload.size();
 
-	uint8_t *mh_bytes = (uint8_t*) &mh;
-	out_buffer.insert(out_buffer.end(), mh_bytes, mh_bytes + sizeof(mh));
-	out_buffer.insert(out_buffer.end(), r.payload.begin(), r.payload.end());
+	out_buffer.Write(mh);
+	out_buffer.Write(r.payload);
 
 	frontend->NotifyEventThread();
 }
