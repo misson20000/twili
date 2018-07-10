@@ -155,8 +155,18 @@ Response Twibd::HandleRequest(Request &rq) {
 } // namespace twili
 
 int main(int argc, char *argv[]) {
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERROR));
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERROR));
+#ifdef _WIN32
+	WSADATA wsaData;
+	int err;
+	err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (err != 0) {
+		printf("WSASStartup failed with error: %d\n", err);
+		return 1;
+	}
+#endif
+
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERR));
 
 	log(MSG, "starting twibd");
 	twili::twibd::Twibd twibd;

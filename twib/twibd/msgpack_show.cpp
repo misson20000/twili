@@ -42,19 +42,19 @@ void show_int64(MsgPack const& blob, int level) {
     std::cout << blob.int64_value();
 }
 
-void show_uint8(MsgPack const& blob, uint level) {
+void show_uint8(MsgPack const& blob, int level) {
     std::cout << std::to_string(blob.uint8_value());
 }
 
-void show_uint16(MsgPack const& blob, uint level) {
+void show_uint16(MsgPack const& blob, int level) {
     std::cout << blob.uint16_value();
 }
 
-void show_uint32(MsgPack const& blob, uint level) {
+void show_uint32(MsgPack const& blob, int level) {
     std::cout << blob.uint32_value();
 }
 
-void show_uint64(MsgPack const& blob, uint level) {
+void show_uint64(MsgPack const& blob, int level) {
     std::cout << blob.uint64_value();
 }
 

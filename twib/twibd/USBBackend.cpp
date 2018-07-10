@@ -6,12 +6,42 @@
 #include "config.hpp"
 #include "err.hpp"
 
+#ifdef _WIN32
+#include<libusbk.h>
+#endif
+
 void show(msgpack11::MsgPack const& blob);
 
 namespace twili {
 namespace twibd {
 namespace backend {
 
+//#ifdef _WIN32
+//void KUSB_API hotplug_cb_shim(KHOT_HANDLE handle, KLST_DEVINFO_HANDLE DeviceInfo, KLST_SYNC_FLAG NotificationType) {
+//	libusb_device **list;
+//	if (NotificationType == KLST_SYNC_FLAG_ADDED) {
+//		// Open device with libusb now.
+//		auto cnt = libusb_get_device_list(NULL, &list);
+//		if (cnt < 0) {
+//			log(ERR, "Failed to get device list: %d", cnt);
+//			exit(1);
+//		}
+//		for (auto i = 0; i < cnt; i++) {
+//			libusb_device *device = list[i];
+//			libusb_device_descriptor desc;
+//			if (libusb_get_device_descriptor(device, &desc) < 0) {
+//				log(ERR, "Failed to get device descriptor");
+//				exit(1);
+//			}
+//			printf("%d:%d vs %d:%d (This is %d)\n", DeviceInfo->BusNumber, DeviceInfo->DeviceAddress, libusb_get_bus_number(device), libusb_get_port_number(device), desc.idVendor, desc.idProduct);
+//		}
+//		exit(1);
+//		//self->QueueAddDevice(device->);
+//	} else {
+//		//self->RemoveDevice(/* get ctx and device */);
+//	}
+//}
+//#else
 int hotplug_cb_shim(libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *user_data) {
 	USBBackend *self = (USBBackend*) user_data;
 	if(event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED) {
@@ -21,6 +51,7 @@ int hotplug_cb_shim(libusb_context *ctx, libusb_device *device, libusb_hotplug_e
 	}
 	return 0;
 }
+//#endif
 
 USBBackend::USBBackend(Twibd *twibd) : twibd(twibd) {
 	int r = libusb_init(&ctx);
@@ -322,6 +353,20 @@ void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
 }
 
 void USBBackend::Probe() {
+//#ifdef _WIN32
+//	if (Twibd_HOTPLUG_ENABLED) {
+//		KHOT_HANDLE hotHandle = NULL;
+//		KHOT_PARAMS hotParams;
+//
+//		memset(&hotParams, 0, sizeof(hotParams));
+//		hotParams.OnHotPlug = hotplug_cb_shim;
+//		hotParams.Flags = KHOT_FLAG_PLUG_ALL_ON_INIT;
+//		sprintf_s(hotParams.PatternMatch.DeviceID, "*VID_%04X&PID_%04X*", Twili_VENDOR_ID, Twili_PRODUCT_ID);
+//
+//		if (!HotK_Init(&hotHandle, &hotParams)) {
+//			log(FATAL, "failed to register hotplug callback: %d", GetLastError());
+//		}
+//#else
 	if(Twibd_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		int r = libusb_hotplug_register_callback(
 			ctx,
@@ -334,10 +379,26 @@ void USBBackend::Probe() {
 		if(r) {
 			log(FATAL, "failed to register hotplug callback: %s", libusb_error_name(r));
 		}
+//#endif
 	} else {
 		log(WARN, "hotplug is not supported");
-		log(FATAL, "implement this");
-		exit(1);
+		libusb_device **list;
+		auto cnt = libusb_get_device_list(NULL, &list);
+		if (cnt < 0) {
+			log(ERR, "Failed to get device list: %d", cnt);
+			exit(1);
+		}
+		for (auto i = 0; i < cnt; i++) {
+			libusb_device *device = list[i];
+			libusb_device_descriptor desc;
+			if (libusb_get_device_descriptor(device, &desc) < 0) {
+				log(ERR, "Failed to get device descriptor");
+				exit(1);
+			}
+			if (desc.idVendor == Twili_VENDOR_ID && desc.idProduct == Twili_PRODUCT_ID) {
+				this->QueueAddDevice(device);
+			}
+		}
 	}
 }
 

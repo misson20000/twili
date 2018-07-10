@@ -12,7 +12,13 @@
 #include "blockingconcurrentqueue.h"
 
 #include "USBBackend.hpp"
+
+#ifdef WIN32
+#include "TCPFrontend.hpp"
+#else
 #include "UNIXFrontend.hpp"
+#endif
+
 #include "Logger.hpp"
 #include "Messages.hpp"
 #include "Device.hpp"
@@ -38,7 +44,11 @@ class Twibd {
 	
  private:
 	backend::USBBackend usb;
+#ifdef _WIN32
+	frontend::TCPFrontend unix;
+#else
 	frontend::UNIXFrontend unix;
+#endif
 
 	moodycamel::BlockingConcurrentQueue<std::variant<Request, Response>> dispatch_queue;
 	

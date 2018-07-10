@@ -14,3 +14,7 @@ target_link_libraries(twib CLI11)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(twib Threads::Threads)
+
+if (WIN32)
+	target_link_libraries(twib wsock32 ws2_32)
+endif()

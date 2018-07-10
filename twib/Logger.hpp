@@ -10,13 +10,13 @@ enum class Level {
 	INFO,
 	MSG,
 	WARN,
-	ERROR,
+	ERR,
 	FATAL,
 	MAX
 };
 
 #define log(lvl, format, ...) \
-	_log(::twili::log::Level::lvl, __FILE_SHORT__, __LINE__,	\
+	_log(::twili::log::Level::lvl, __FILE__, __LINE__,	\
 			 format, ##__VA_ARGS__);
 
 class Logger {

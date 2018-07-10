@@ -53,7 +53,7 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
     case Level::INFO:  color = ANSI_COLOR_WHITE; break;
     case Level::MSG:   color = ANSI_BOLD ANSI_COLOR_WHITE; break;
     case Level::WARN:  color = ANSI_COLOR_BLUE; break;
-    case Level::ERROR: color = ANSI_BOLD ANSI_COLOR_YELLOW; break;
+    case Level::ERR: color = ANSI_BOLD ANSI_COLOR_YELLOW; break;
     case Level::MAX:
     case Level::FATAL: color = ANSI_BOLD ANSI_COLOR_RED; break;
     }
