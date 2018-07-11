@@ -11,6 +11,7 @@
 
 #include<string.h>
 #include<unistd.h>
+#include<iostream>
 
 #include "Twibd.hpp"
 #include "Protocol.hpp"
@@ -106,7 +107,7 @@ void TCPFrontend::event_thread_func() {
 
 		// Check select status on server socket
 		if (FD_ISSET(fd, &readfds)) {
-			log(DEBUG, "incoming connection detected");
+			log(DEBUG, "incoming connection detected on %d", fd);
 
 			struct sockaddr_in6 client_addr;
 			socklen_t client_addrlen = sizeof(client_addr);
@@ -127,7 +128,7 @@ void TCPFrontend::event_thread_func() {
 				client->PumpOutput();
 			}
 			if (FD_ISSET(client->fd, &readfds)) {
-				log(DEBUG, "incoming data for client %d", client->fd);
+				log(DEBUG, "incoming data for client %x", client->client_id);
 				client->PumpInput();
 			}
 		}
@@ -169,6 +170,7 @@ TCPFrontend::Client::Client(TCPFrontend *frontend, int fd) : frontend(frontend),
 }
 
 TCPFrontend::Client::~Client() {
+	log(DEBUG, "Closing connection %x", this->client_id);
 	close(fd);
 }
 
@@ -177,14 +179,15 @@ void TCPFrontend::Client::PumpOutput() {
 	std::lock_guard<std::mutex> lock(out_buffer_mutex);
 	if (out_buffer.size() > 0) {
 		ssize_t r = send(fd, out_buffer.data(), out_buffer.size(), 0);
-		if (r < 0) {
+		log(DEBUG, "Managed to send 0x%lx bytes", r);
+		if (r <= 0) {
 			deletion_flag = true;
 			return;
 		}
-		// TODO: r == 0
 		if (r > 0) {
 			// move everything that we didn't send to the start of the buffer
 			std::move(out_buffer.begin() + r, out_buffer.end(), out_buffer.begin());
+			out_buffer.resize(out_buffer.size() - r);
 		}
 	}
 }
