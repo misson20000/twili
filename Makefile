@@ -6,7 +6,7 @@ TWILI_CXX_FLAGS := -Werror-return-type -Og
 
 BUILD_PFS0 := build_pfs0
 
-all: build/twili_launcher.nsp build/twili.nro build/twili.nso
+all: build/twili_launcher.nsp build/twili.nro build/twili.nso build/twili.kip
 
 build/twili_launcher.nsp: build/twili_launcher_exefs/main build/twili_launcher_exefs/main.npdm
 	mkdir -p $(@D)
@@ -48,6 +48,9 @@ build/twili.squashfs: build/hbabi_shim.nro
 build/twili_launcher.squashfs: build/twili.nro
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
+
+build/twili.kip: build/twili.nso.so twili_kip.json
+	elf2kip build/twili.nso.so twili_kip.json build/twili.kip
 
 build/twili.nro.so: $(addprefix build/,$(OBJECTS)) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)

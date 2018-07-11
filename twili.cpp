@@ -17,6 +17,7 @@ typedef bool _Bool;
 #include<libtransistor/ipc.h>
 #include<libtransistor/ipc_helpers.h>
 #include<libtransistor/loader_config.h>
+#include<libtransistor/runtime_config.h>
 #include<libtransistor/usb_serial.h>
 #include<libtransistor/svc.h>
 
@@ -32,6 +33,12 @@ typedef bool _Bool;
 #include "err.hpp"
 
 #include "msgpack11/msgpack11.hpp"
+
+uint8_t _local_heap[32 * 1024 * 1024];
+
+runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
+void *_trn_runconf_heap_base = _local_heap;
+size_t _trn_runconf_heap_size = sizeof(_local_heap);
 
 using ResultCode = trn::ResultCode;
 template<typename T>
