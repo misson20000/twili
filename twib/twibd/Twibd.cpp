@@ -10,10 +10,18 @@
 #include "config.hpp"
 #include "err.hpp"
 
+#include <iostream>
+#include <ostream>
+#include <string>
+
 namespace twili {
 namespace twibd {
 
-Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this), unix(this) {
+Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this), tcp(this)
+#ifndef _WIN32
+	, unix(this)
+#endif
+{
 	AddClient(local_client);
 	usb.Probe();
 }

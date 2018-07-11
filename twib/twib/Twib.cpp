@@ -7,6 +7,7 @@
 #include<ws2tcpip.h>
 #else
 #include<sys/socket.h>
+#include<netinet/in.h>
 #include<sys/un.h>
 #endif
 
@@ -33,9 +34,8 @@
 namespace twili {
 namespace twib {
 
-Twib::Twib() {
-#ifdef _WIN32
-	fd = socket(AF_INET6, SOCK_STREAM, 0);
+int connect_tcp() {
+	int fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
 		log(FATAL, "failed to create TCP socket: %s", strerror(errno));
 		exit(1);
@@ -52,15 +52,17 @@ Twib::Twib() {
 		close(fd);
 		exit(1);
 	}
-	log(INFO, "connected to twibd");
+	log(INFO, "connected to twibd: %d", fd);
+	return fd;
+}
 
-	/*if(pipe(event_thread_notification_pipe) < 0) {
-		log(FATAL, "failed to create pipe for event thread notifications: %s", strerror(errno));
-		close(fd);
-		exit(1);
-	}*/
+int connect_unix() {
+#ifdef _WIN32
+	log(FATAL, "UNIX domain socket not supported on windows");
+	exit(-1);
+	return -1;
 #else
-	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(fd < 0) {
 		log(FATAL, "failed to create UNIX domain socket: %s", strerror(errno));
 		exit(1);
@@ -76,8 +78,19 @@ Twib::Twib() {
 		close(fd);
 		exit(1);
 	}
-	log(INFO, "connected to twibd");
+	log(INFO, "connected to twibd: %d", fd);
+	return fd;
+#endif
+}
 
+Twib::Twib(int tcp) {
+	if (tcp)
+		fd = connect_tcp();
+	else
+		fd = connect_unix();
+
+	// TODO: Figure out how to fix this.
+#ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
 		log(FATAL, "failed to create pipe for event thread notifications: %s", strerror(errno));
 		close(fd);
@@ -97,27 +110,32 @@ Twib::~Twib() {
 }
 
 void Twib::event_thread_func() {
-	struct fd_set recvset;
-	struct fd_set sendset;
-	int maxfd = fd;
+	fd_set recvset;
+	fd_set sendset;
+	int maxfd = 0;
 	while(!event_thread_destroy) {
 		log(DEBUG, "event thread loop");
 
-		//pollfds[0] = {.fd = event_thread_notification_pipe[0], .events = POLLIN};
 		FD_ZERO(&recvset);
 		FD_ZERO(&sendset);
+#ifndef _WIN32
+		FD_SET(event_thread_notification_pipe[0], &recvset);
+		maxfd = std::max(maxfd, event_thread_notification_pipe[0]);
+#endif
 		FD_SET(fd, &recvset);
+		maxfd = std::max(maxfd, fd);
 		if(out_buffer.ReadAvailable() > 0) {
 			FD_SET(fd, &sendset);
 		}
 
-		if(select(maxfd, &recvset, &sendset, NULL, NULL) < 0) {
+		if(select(maxfd + 1, &recvset, &sendset, NULL, NULL) < 0) {
 			log(FATAL, "failed to select file descriptors: %s", strerror(errno));
 			exit(1);
 		}
 
+#ifndef _WIN32
 		// check poll flags on event notification pipe
-		/*if(FD_ISSET(fd, &recvset)) {
+		if(FD_ISSET(event_thread_notification_pipe[0], &recvset)) {
 			char buf[64];
 			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
 			if(r < 0) {
@@ -125,7 +143,8 @@ void Twib::event_thread_func() {
 				exit(1);
 			}
 			log(DEBUG, "event thread notified: '%.*s'", r, buf);
-		}*/
+		}
+#endif
 
 		// check poll flags on twibd socket
 		if(FD_ISSET(fd, &sendset)) {
@@ -341,7 +360,13 @@ int main(int argc, char *argv[]) {
 
 	bool is_verbose;
 	app.add_flag("-v,--verbose", is_verbose, "Enable debug logging");
-	
+
+#ifdef _WIN32
+	bool is_tcp = true;
+#else
+	bool is_tcp = false;
+	app.add_flag("-t,--tcp", is_tcp, "Enable TCP");
+#endif	
 	CLI::App *ld = app.add_subcommand("list-devices", "List devices");
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
@@ -376,7 +401,7 @@ int main(int argc, char *argv[]) {
 	
 	log(MSG, "starting twib");
 	
-	twili::twib::Twib twib;
+	twili::twib::Twib twib(is_tcp);
 	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(&twib, 0, 0));
 	
 	if(ld->parsed()) {

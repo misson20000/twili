@@ -18,7 +18,7 @@ class ITwibDeviceInterface;
 
 class Twib {
  public:
-	Twib();
+	Twib(int tcp);
 	~Twib();
 
 	std::future<Response> SendRequest(Request rq);

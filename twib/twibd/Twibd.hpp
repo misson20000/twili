@@ -13,9 +13,8 @@
 
 #include "USBBackend.hpp"
 
-#ifdef WIN32
 #include "TCPFrontend.hpp"
-#else
+#ifndef _WIN32
 #include "UNIXFrontend.hpp"
 #endif
 
@@ -44,9 +43,8 @@ class Twibd {
 	
  private:
 	backend::USBBackend usb;
-#ifdef _WIN32
-	frontend::TCPFrontend unix;
-#else
+	frontend::TCPFrontend tcp;
+#ifndef _WIN32
 	frontend::UNIXFrontend unix;
 #endif
 

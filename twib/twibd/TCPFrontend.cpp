@@ -1,8 +1,10 @@
-#include<winsock2.h>
 #ifdef _WIN32
 #include<ws2tcpip.h>
+#include<winsock2.h>
 #else
 #include<sys/socket.h>
+#include<sys/select.h>
+#include<netinet/in.h>
 #endif
 
 #include "TCPFrontend.hpp"
@@ -78,8 +80,8 @@ TCPFrontend::~TCPFrontend() {
 }
 
 void TCPFrontend::event_thread_func() {
-	struct fd_set readfds;
-	struct fd_set writefds;
+	fd_set readfds;
+	fd_set writefds;
 	int max_fd = 0;
 	while (!event_thread_destroy) {
 		log(DEBUG, "tcp event thread loop");
