@@ -18,7 +18,7 @@ matrix:
   - os: linux
     env: TARGET="twili" PLATFORM="nx-transistor"
     install: "./.travis/twili_install.sh"
-    script: make LIBTRANSISTOR_HOME=$PWD/libtransistor/ BUILD_PFS0=$PWD/fr/opt/devkitpro/tools/bin/build_pfs0
+    script: make LIBTRANSISTOR_HOME=$PWD/libtransistor/ PATH="$PWD/fr/:$PATH"
     before_deploy: "./.travis/twili_before_deploy.sh"
   - os: linux
     env: TARGET="twib" PLATFORM="linux"
