@@ -50,10 +50,8 @@ void ProcessBuilder::FileDataReader::Seek(size_t pos) {
 }
 
 void ProcessBuilder::FileDataReader::Read(uint8_t *target, size_t size) {
-	printf("reading 0x%lx bytes from 0x%lx...\n", size, ftell(f));
 	ssize_t r;
 	while((r = fread(target, 1, size, f)) < size) {
-		printf("got 0x%lx bytes\n", r);
 		if(r > 0) {
 			target+= r;
 			size-= r;

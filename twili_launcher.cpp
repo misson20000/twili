@@ -17,9 +17,7 @@
 
 uint8_t _local_heap[16 * 1024 * 1024]; // 16 MiB
 
-runconf_stdio_override_t _trn_runconf_stdio_override = _TRN_RUNCONF_STDIO_OVERRIDE_USB_SERIAL;
 runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
-
 void *_trn_runconf_heap_base = _local_heap;
 size_t _trn_runconf_heap_size = sizeof(_local_heap);
 
@@ -88,9 +86,11 @@ int main(int argc, char *argv[]) {
 			
 			
 			printf("Launched\n");
-			//while(1) {
-			//	waiter.Wait(3000000000);
-			//}
+#if false // enable to report twili crashes, disable to save the memory that twili_launcher takes up while running
+			while(1) {
+				waiter.Wait(3000000000);
+			}
+#endif
 		} catch(trn::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
 			fatal_init();
