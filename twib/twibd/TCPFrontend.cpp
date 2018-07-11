@@ -207,10 +207,10 @@ void TCPFrontend::Client::PumpInput() {
 
 	// read into the space we just made
 	ssize_t r = recv(fd, in_buffer.data() + old_size, in_buffer.size() - old_size, 0);
-	if(r < 0) {
+	if(r <= 0) {
 		deletion_flag = true;
 		return;
-	} else { // TODO: r == 0
+	} else {
 		// set the size of the buffer to reflect what we read
 		in_buffer.resize(old_size + r);
 	}
