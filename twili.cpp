@@ -26,6 +26,7 @@ typedef bool _Bool;
 #include "util.hpp"
 #include "twili.hpp"
 #include "process_creation.hpp"
+#include "Process.hpp"
 #include "ITwiliService.hpp"
 #include "USBBridge.hpp"
 #include "err.hpp"
@@ -155,10 +156,13 @@ Result<std::nullopt_t> Twili::CoreDump(std::vector<uint8_t> payload, usb::USBBri
     }
     uint64_t pid = *((uint64_t*) payload.data());
     auto proc = FindMonitoredProcess(pid);
+    ELFCrashReport report;
     if (!proc) {
-        return tl::make_unexpected(TWILI_ERR_UNRECOGNIZED_PID);
+	    printf("generating crash report for non-monitored process 0x%lx...\n", pid);
+	    return Process(pid).GenerateCrashReport(report, writer);
     } else {
-        return (*proc)->CoreDump(writer);
+	    printf("generating crash report for monitored process 0x%lx...\n", pid);
+	    return (*proc)->GenerateCrashReport(report, writer);
     }
 }
 
