@@ -34,12 +34,6 @@ typedef bool _Bool;
 
 #include "msgpack11/msgpack11.hpp"
 
-uint8_t _local_heap[32 * 1024 * 1024];
-
-runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
-void *_trn_runconf_heap_base = _local_heap;
-size_t _trn_runconf_heap_size = sizeof(_local_heap);
-
 using ResultCode = trn::ResultCode;
 template<typename T>
 using Result = trn::Result<T>;
@@ -142,9 +136,11 @@ Result<std::nullopt_t> Twili::Run(std::vector<uint8_t> nro, usb::USBBridge::USBR
 	};
 
 	twili::process_creation::ProcessBuilder builder("twili_child", caps);
-	Result<uint64_t>   shim_addr = builder.AppendNRO(hbabi_shim_nro);
+	process_creation::ProcessBuilder::VectorDataReader hbabi_shim_reader(hbabi_shim_nro);
+	process_creation::ProcessBuilder::VectorDataReader nro_reader(nro);
+	Result<uint64_t>   shim_addr = builder.AppendNRO(hbabi_shim_reader);
 	if(!  shim_addr) { return tl::make_unexpected(  shim_addr.error()); }
-	Result<uint64_t> target_addr = builder.AppendNRO(nro);
+	Result<uint64_t> target_addr = builder.AppendNRO(nro_reader);
 	if(!target_addr) { return tl::make_unexpected(target_addr.error()); }
 	
 	auto proc = builder.Build();

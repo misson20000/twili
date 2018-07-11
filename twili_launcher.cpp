@@ -15,6 +15,14 @@
 #include "process_creation.hpp"
 #include "util.hpp"
 
+uint8_t _local_heap[16 * 1024 * 1024]; // 16 MiB
+
+runconf_stdio_override_t _trn_runconf_stdio_override = _TRN_RUNCONF_STDIO_OVERRIDE_USB_SERIAL;
+runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
+
+void *_trn_runconf_heap_base = _local_heap;
+size_t _trn_runconf_heap_size = sizeof(_local_heap);
+
 void ReportCrash(uint64_t pid);
 
 int main(int argc, char *argv[]) {
@@ -40,8 +48,11 @@ int main(int argc, char *argv[]) {
 			};
 
 			twili::process_creation::ProcessBuilder builder("twili", caps);
-			trn::ResultCode::AssertOk(builder.AppendNRO(twili_image));
+			FILE *twili = fopen("/squash/twili.nro", "rb");
+			twili::process_creation::ProcessBuilder::FileDataReader data_reader(twili);
+			trn::ResultCode::AssertOk(builder.AppendNRO(data_reader));
 			auto proc = trn::ResultCode::AssertOk(builder.Build());
+			fclose(twili);
 			
 			// launch Twili
 			printf("Launching...\n");
@@ -77,9 +88,9 @@ int main(int argc, char *argv[]) {
 			
 			
 			printf("Launched\n");
-			while(1) {
-				waiter.Wait(3000000000);
-			}
+			//while(1) {
+			//	waiter.Wait(3000000000);
+			//}
 		} catch(trn::ResultError e) {
 			printf("caught ResultError: %s\n", e.what());
 			fatal_init();

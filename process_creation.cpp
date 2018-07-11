@@ -38,8 +38,61 @@ struct ProcessInfo {
 	uint32_t personal_mm_heap_num_pages;
 };
 
-ProcessBuilder::Segment::Segment(std::vector<uint8_t> data, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
+ProcessBuilder::Segment::Segment(DataReader &data, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
 	data(data), data_offset(data_offset), data_length(data_length), virt_length(virt_length), permissions(permissions) {
+}
+
+ProcessBuilder::FileDataReader::FileDataReader(FILE *f) : f(f) {
+}
+
+void ProcessBuilder::FileDataReader::Seek(size_t pos) {
+	fseek(f, pos, SEEK_SET);
+}
+
+void ProcessBuilder::FileDataReader::Read(uint8_t *target, size_t size) {
+	printf("reading 0x%lx bytes from 0x%lx...\n", size, ftell(f));
+	ssize_t r;
+	while((r = fread(target, 1, size, f)) < size) {
+		printf("got 0x%lx bytes\n", r);
+		if(r > 0) {
+			target+= r;
+			size-= r;
+		} else {
+			abort();
+		}
+	}
+}
+
+size_t ProcessBuilder::FileDataReader::Tell() {
+	return ftell(f);
+}
+
+size_t ProcessBuilder::FileDataReader::TotalSize() {
+	size_t pos = ftell(f);
+	fseek(f, 0, SEEK_END);
+	size_t size = ftell(f);
+	fseek(f, pos, SEEK_SET);
+	return size;
+}
+
+ProcessBuilder::VectorDataReader::VectorDataReader(std::vector<uint8_t> vec) : vec(vec) {
+}
+
+void ProcessBuilder::VectorDataReader::Seek(size_t pos) {
+	this->pos = pos;
+}
+
+void ProcessBuilder::VectorDataReader::Read(uint8_t *target, size_t size) {
+	memcpy(target, vec.data() + pos, size);
+	pos+= size;
+}
+
+size_t ProcessBuilder::VectorDataReader::Tell() {
+	return pos;
+}
+
+size_t ProcessBuilder::VectorDataReader::TotalSize() {
+	return vec.size();
 }
 
 ProcessBuilder::ProcessBuilder(const char *name, std::vector<uint32_t> caps) :
@@ -51,7 +104,7 @@ trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	if((seg.virt_length & 0xFFF) != 0) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
 	}
-	if(seg.data.size() < seg.data_offset + seg.data_length) {
+	if(seg.data.TotalSize() < seg.data_offset + seg.data_length) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
 	}
 	seg.load_addr = load_base + total_size;
@@ -60,26 +113,27 @@ trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	return seg.load_addr;
 }
 
-trn::Result<uint64_t> ProcessBuilder::AppendNRO(std::vector<uint8_t> nro) {
-	if(nro.size() < sizeof(NroHeader)) {
+trn::Result<uint64_t> ProcessBuilder::AppendNRO(DataReader &nro) {
+	if(nro.TotalSize() < sizeof(NroHeader)) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
-	NroHeader *nro_header = (NroHeader*) nro.data();
-	if(nro_header->magic != 0x304f524e) {
+	NroHeader nro_header;
+	nro.Read((uint8_t*) &nro_header, sizeof(nro_header));
+	if(nro_header.magic != 0x304f524e) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
-	if(nro.size() < nro_header->size) {
+	if(nro.TotalSize() < nro_header.size) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
 	uint64_t base;
 	trn::Result<uint64_t> r;
 
-	r = AppendSegment(Segment(nro, nro_header->segments[0].file_offset, nro_header->segments[0].size, nro_header->segments[0].size, 5)); // .text is RX
+	r = AppendSegment(Segment(nro, nro_header.segments[0].file_offset, nro_header.segments[0].size, nro_header.segments[0].size, 5)); // .text is RX
 	if(!r) { return r; }
 	if(r) { base = *r; }
-	r = AppendSegment(Segment(nro, nro_header->segments[1].file_offset, nro_header->segments[1].size, nro_header->segments[1].size, 1)); // .rodata is R
+	r = AppendSegment(Segment(nro, nro_header.segments[1].file_offset, nro_header.segments[1].size, nro_header.segments[1].size, 1)); // .rodata is R
 	if(!r) { return r; }
-	r = AppendSegment(Segment(nro, nro_header->segments[2].file_offset, nro_header->segments[2].size, nro_header->segments[2].size + nro_header->bss_size, 3)); // .data + .bss is RW
+	r = AppendSegment(Segment(nro, nro_header.segments[2].file_offset, nro_header.segments[2].size, nro_header.segments[2].size + nro_header.bss_size, 3)); // .data + .bss is RW
 	if(!r) { return r; }
 	return base;
 }
@@ -147,7 +201,9 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
 					trn::svc::MapProcessMemory(proc, load_base, total_size));
 			printf("Mapped at %p\n", map->Base());
 			for(auto i = segments.begin(); i != segments.end(); i++) {
-				memcpy(map->Base() + (i->load_addr - load_base), i->data.data() + i->data_offset, i->data_length);
+				uint8_t *target = map->Base() + (i->load_addr - load_base);
+				i->data.Seek(i->data_offset);
+				i->data.Read(target, i->data_length);
 			}
 			printf("Copied segments\n");
 		} // let map go out of scope
