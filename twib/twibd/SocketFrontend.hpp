@@ -5,24 +5,13 @@
 #include<thread>
 #include<mutex>
 
-#ifdef _WIN32
-#include<winsock2.h>
-#else
-#include<sys/socket.h>
-#include<sys/select.h>
-#endif
-
 #include<stdint.h>
 
+#include "Networking.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
-
-#ifndef _WIN32
-#define SOCKET int
-#define INVALID_SOCKET -1
-#define closesocket close
-#endif
+#include "MessageConnection.hpp"
 
 namespace twili {
 namespace twibd {
@@ -38,25 +27,15 @@ class SocketFrontend {
 
 	class Client : public twibd::Client {
 		public:
-		Client(SocketFrontend *frontend, SOCKET fd);
+		Client(twibc::MessageConnection<Client> &mc, SocketFrontend *frontend);
 		~Client();
-		void PumpOutput();
-		void PumpInput();
-		void Process();
 
+		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload);
 		virtual void PostResponse(Response &r);
 
+		twibc::MessageConnection<Client> &connection;
 		SocketFrontend *frontend;
 		Twibd *twibd;
-		SOCKET fd;
-		util::Buffer in_buffer;
-
-		std::mutex out_buffer_mutex;
-		util::Buffer out_buffer;
-
-		bool has_current_mh = false;
-		protocol::MessageHeader current_mh;
-		util::Buffer current_payload;
 	};
 
 	private:
@@ -76,7 +55,7 @@ class SocketFrontend {
 	int event_thread_notification_pipe[2];
 #endif
 	
-	std::list<std::shared_ptr<Client>> clients;
+	std::list<std::shared_ptr<twibc::MessageConnection<Client>>> connections;
 
 	void NotifyEventThread();
 };

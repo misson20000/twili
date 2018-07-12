@@ -83,17 +83,11 @@ int connect_unix() {
 #endif
 }
 
-Twib::Twib(int tcp) {
-	if (tcp)
-		fd = connect_tcp();
-	else
-		fd = connect_unix();
-
+Twib::Twib(int tcp) : mc(tcp ? connect_tcp() : connect_unix(), this) {
 	// TODO: Figure out how to fix this.
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
 		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", strerror(errno));
-		close(fd);
 		exit(1);
 	}
 #endif
@@ -105,8 +99,6 @@ Twib::~Twib() {
 	event_thread_destroy = true;
 	NotifyEventThread();
 	event_thread.join();
-
-	close(fd);
 }
 
 void Twib::event_thread_func() {
@@ -122,10 +114,10 @@ void Twib::event_thread_func() {
 		FD_SET(event_thread_notification_pipe[0], &recvset);
 		maxfd = std::max(maxfd, event_thread_notification_pipe[0]);
 #endif
-		FD_SET(fd, &recvset);
-		maxfd = std::max(maxfd, fd);
-		if(out_buffer.ReadAvailable() > 0) {
-			FD_SET(fd, &sendset);
+		FD_SET(mc.fd, &recvset);
+		maxfd = std::max(maxfd, mc.fd);
+		if(mc.out_buffer.ReadAvailable() > 0) {
+			FD_SET(mc.fd, &sendset);
 		}
 
 		if(select(maxfd + 1, &recvset, &sendset, NULL, NULL) < 0) {
@@ -147,13 +139,13 @@ void Twib::event_thread_func() {
 #endif
 
 		// check poll flags on twibd socket
-		if(FD_ISSET(fd, &sendset)) {
-			PumpOutput();
+		if(FD_ISSET(mc.fd, &sendset)) {
+			mc.PumpOutput();
 		}
-		if(FD_ISSET(fd, &recvset)) {
-			PumpInput();
+		if(FD_ISSET(mc.fd, &recvset)) {
+			mc.PumpInput();
 		}
-		ProcessResponses();
+		mc.Process();
 	}
 }
 
@@ -165,77 +157,32 @@ void Twib::NotifyEventThread() {
 	}
 }
 
-void Twib::PumpOutput() {
-	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	if(out_buffer.ReadAvailable() > 0) {
-		ssize_t r = send(fd, (char*)out_buffer.Read(), out_buffer.ReadAvailable(), 0);
-		if(r < 0) {
-			LogMessage(Fatal, "failed to write to twibd: %s", strerror(errno));
-			exit(1);
-		}
-		if(r > 0) {
-			out_buffer.MarkRead(r);
-		}
-	}
-}
-
-void Twib::PumpInput() {
-	LogMessage(Debug, "pumping input");
+Client::Client(twibc::MessageConnection<Client> &mc, Twib *twib) : mc(mc), twib(twib) {
 	
-	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
-	ssize_t r = recv(fd, (char*)std::get<0>(target), std::get<1>(target), 0);
-	if(r < 0) {
-		LogMessage(Fatal, "failed to receive from twibd: %s", strerror(errno));
-		exit(1);
-	} else {
-		in_buffer.MarkWritten(r);
-	}
 }
 
-void Twib::ProcessResponses() {
-	while(in_buffer.ReadAvailable() > 0) {
-		if(!has_current_mh) {
-			if(in_buffer.Read(current_mh)) {
-				has_current_mh = true;
-			} else {
-				in_buffer.Reserve(sizeof(protocol::MessageHeader));
-				return;
-			}
-		}
-
-		current_payload.Clear();
-		if(in_buffer.Read(current_payload, current_mh.payload_size)) {
-			std::vector<uint8_t> payload(
-				current_payload.Read(),
-				current_payload.Read() + current_payload.ReadAvailable());
-			
-			std::promise<Response> promise;
-			{
-				std::lock_guard<std::mutex> lock(response_map_mutex);
-				auto it = response_map.find(current_mh.tag);
-				if(it == response_map.end()) {
-					LogMessage(Warning, "dropping response for unknown tag 0x%x", current_mh.tag);
-					continue;
-				}
-				promise.swap(it->second);
-				response_map.erase(it);
-			}
-			promise.set_value(
-				Response(
-					current_mh.device_id,
-					current_mh.object_id,
-					current_mh.result_code,
-					current_mh.tag,
-					payload));
-			has_current_mh = false;
-		} else {
-			in_buffer.Reserve(current_mh.payload_size);
+void Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload) {
+	std::promise<Response> promise;
+	{
+		std::lock_guard<std::mutex> lock(response_map_mutex);
+		auto it = response_map.find(mh.tag);
+		if(it == response_map.end()) {
+			LogMessage(Warning, "dropping response for unknown tag 0x%x", mh.tag);
 			return;
 		}
+		promise.swap(it->second);
+		response_map.erase(it);
 	}
+	promise.set_value(
+		Response(
+			mh.device_id,
+			mh.object_id,
+			mh.result_code,
+			mh.tag,
+			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable())));
 }
 
-std::future<Response> Twib::SendRequest(Request rq) {
+std::future<Response> Client::SendRequest(Request rq) {
 	std::future<Response> future;
 	{
 		std::lock_guard<std::mutex> lock(response_map_mutex);
@@ -249,7 +196,7 @@ std::future<Response> Twib::SendRequest(Request rq) {
 		response_map[tag] = std::move(promise);
 	}
 	{
-		std::lock_guard<std::mutex> lock(twibd_mutex);
+		std::lock_guard<std::mutex> lock(mc.out_buffer_mutex);
 		protocol::MessageHeader mh;
 		mh.device_id = rq.device_id;
 		mh.object_id = rq.object_id;
@@ -257,20 +204,9 @@ std::future<Response> Twib::SendRequest(Request rq) {
 		mh.tag = rq.tag;
 		mh.payload_size = rq.payload.size();
 
-		ssize_t r = send(fd, (char*)&mh, sizeof(mh), 0);
-		if(r < sizeof(mh)) {
-			LogMessage(Fatal, "I/O error when sending request header");
-			exit(1);
-		}
-
-		for(size_t sent = 0; sent < rq.payload.size(); sent+= r) {
-			r = send(fd, (char*)rq.payload.data() + sent, rq.payload.size() - sent, 0);
-			if(r <= 0) {
-				LogMessage(Fatal, "I/O error when sending request payload");
-				exit(1);
-			}
-		}
-
+		mc.out_buffer.Write(mh);
+		mc.out_buffer.Write(rq.payload);
+		twib->NotifyEventThread();
 		LogMessage(Debug, "sent request");
 	}
 	
@@ -402,7 +338,7 @@ int main(int argc, char *argv[]) {
 	LogMessage(Message, "starting twib");
 	
 	twili::twib::Twib twib(is_tcp);
-	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(&twib, 0, 0));
+	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(twib.mc.obj, 0, 0));
 	
 	if(ld->parsed()) {
 		ListDevices(itmi);
@@ -424,7 +360,7 @@ int main(int argc, char *argv[]) {
 		}
 		device_id = devices[0]["device_id"].uint32_value();
 	}
-	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(&twib, device_id, 0));
+	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(twib.mc.obj, device_id, 0));
 	
 	if(run->parsed()) {
 		auto v_opt = twili::util::ReadFile(run_file.c_str());

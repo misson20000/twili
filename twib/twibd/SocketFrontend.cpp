@@ -134,7 +134,7 @@ void SocketFrontend::event_thread_func() {
 #endif
 		
 		// add client sockets
-		for(auto &c : clients) {
+		for(auto &c : connections) {
 			max_fd = std::max(max_fd, c->fd);
 			FD_SET(c->fd, &readfds);
 			
@@ -169,28 +169,28 @@ void SocketFrontend::event_thread_func() {
 			if(client_fd < 0) {
 				LogMessage(Warning, "failed to accept incoming connection");
 			} else {
-				std::shared_ptr<Client> client = std::make_shared<Client>(this, client_fd);
-				clients.push_back(client);
-				twibd->AddClient(client);
+				std::shared_ptr<twibc::MessageConnection<Client>> mc = std::make_shared<twibc::MessageConnection<Client>>(client_fd, this);
+				connections.push_back(mc);
+				twibd->AddClient(mc->obj);
 			}
 		}
 		
 		// pump i/o
-		for(auto ci = clients.begin(); ci != clients.end(); ci++) {
-			std::shared_ptr<Client> &client = *ci;
-			if(FD_ISSET(client->fd, &writefds)) {
-				client->PumpOutput();
+		for(auto mci = connections.begin(); mci != connections.end(); mci++) {
+			std::shared_ptr<twibc::MessageConnection<Client>> &mc = *mci;
+			if(FD_ISSET(mc->fd, &writefds)) {
+				mc->PumpOutput();
 			}
-			if(FD_ISSET(client->fd, &readfds)) {
-				LogMessage(Debug, "incoming data for client %x", client->client_id);
-				client->PumpInput();
+			if(FD_ISSET(mc->fd, &readfds)) {
+				LogMessage(Debug, "incoming data for client %x", mc->obj->client_id);
+				mc->PumpInput();
 			}
 		}
 
-		for (auto i = clients.begin(); i != clients.end(); ) {
-			if((*i)->deletion_flag) {
-				twibd->RemoveClient(*i);
-				i = clients.erase(i);
+		for(auto i = connections.begin(); i != connections.end(); ) {
+			if((*i)->obj->deletion_flag) {
+				twibd->RemoveClient((*i)->obj);
+				i = connections.erase(i);
 				continue;
 			}
 
@@ -231,70 +231,25 @@ void SocketFrontend::NotifyEventThread() {
 #endif
 }
 
-SocketFrontend::Client::Client(SocketFrontend *frontend, int fd) : frontend(frontend), twibd(frontend->twibd), fd(fd) {
+SocketFrontend::Client::Client(twibc::MessageConnection<Client> &mc, SocketFrontend *frontend) : connection(mc), frontend(frontend), twibd(frontend->twibd) {
 }
 
 SocketFrontend::Client::~Client() {
-	closesocket(fd);
 }
 
-void SocketFrontend::Client::PumpOutput() {
-	LogMessage(Debug, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
-	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	if(out_buffer.ReadAvailable() > 0) {
-		ssize_t r = send(fd, out_buffer.Read(), out_buffer.ReadAvailable(), 0);
-		if(r < 0) {
-			deletion_flag = true;
-			return;
-		}
-		if(r > 0) {
-			out_buffer.MarkRead(r);
-		}
-	}
-}
-
-void SocketFrontend::Client::PumpInput() {
-	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
-	ssize_t r = recv(fd, std::get<0>(target), std::get<1>(target), 0);
-	if(r <= 0) {
-		deletion_flag = true;
-		return;
-	} else {
-		in_buffer.MarkWritten(r);
-	}
-}
-
-void SocketFrontend::Client::Process() {
-	while(in_buffer.ReadAvailable() > 0) {
-		if(!has_current_mh) {
-			if(in_buffer.Read(current_mh)) {
-				has_current_mh = true;
-			} else {
-				in_buffer.Reserve(sizeof(protocol::MessageHeader));
-				return;
-			}
-		}
-
-		current_payload.Clear();
-		if(in_buffer.Read(current_payload, current_mh.payload_size)) {
-			twibd->PostRequest(
-				Request(
-					client_id,
-					current_mh.device_id,
-					current_mh.object_id,
-					current_mh.command_id,
-					current_mh.tag,
-					std::vector<uint8_t>(current_payload.Read(), current_payload.Read() + current_payload.ReadAvailable())));
-			has_current_mh = false;
-		} else {
-			in_buffer.Reserve(current_mh.payload_size);
-			return;
-		}
-	}
+void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload) {
+	twibd->PostRequest(
+		Request(
+			client_id,
+			mh.device_id,
+			mh.object_id,
+			mh.command_id,
+			mh.tag,
+			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable())));
 }
 
 void SocketFrontend::Client::PostResponse(Response &r) {
-	std::lock_guard<std::mutex> lock(out_buffer_mutex);
+	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex);
 	protocol::MessageHeader mh;
 	mh.device_id = r.device_id;
 	mh.object_id = r.object_id;
@@ -302,8 +257,8 @@ void SocketFrontend::Client::PostResponse(Response &r) {
 	mh.tag = r.tag;
 	mh.payload_size = r.payload.size();
 
-	out_buffer.Write(mh);
-	out_buffer.Write(r.payload);
+	connection.out_buffer.Write(mh);
+	connection.out_buffer.Write(r.payload);
 
 	frontend->NotifyEventThread();
 }
