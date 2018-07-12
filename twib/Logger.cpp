@@ -2,7 +2,12 @@
 #include<time.h>
 #include<forward_list>
 #include<stdarg.h>
+
+#ifdef _MSC_VER
+#include<io.h>
+#else
 #include<unistd.h>
+#endif
 
 #include "Logger.hpp"
 #include "ansi-colors.h"

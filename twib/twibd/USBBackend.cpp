@@ -6,9 +6,9 @@
 #include "config.hpp"
 #include "err.hpp"
 
-#ifdef _WIN32
-#include<libusbk.h>
-#endif
+//#ifdef _WIN32
+//#include<libusbk.h>
+//#endif
 
 void show(msgpack11::MsgPack const& blob);
 

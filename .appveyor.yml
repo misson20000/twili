@@ -1,0 +1,25 @@
+version: 'appveyor-t{build}'
+image: Visual Studio 2017
+configuration:
+- Release
+platform:
+- x64
+install:
+- cmd: |-
+    git submodule update --init --recursive
+before_build:
+- cmd: |-
+    cd twib
+    mkdir build
+    cd build
+    mkdir libusb
+    cd libusb
+    curl --output libusb.7z -L https://github.com/libusb/libusb/releases/download/v1.0.22/libusb-1.0.22.7z
+    7z x libusb.7z
+    cd ..
+    cmake --version
+    cmake .. -DLIBUSB_1_LIBRARY=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=libusb/include -DLIBUSB_1_LIBRARIES=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=libusb/include
+- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+build:
+  project: c:\projects\twili\twib\build\twib.sln
+  parallel: true
