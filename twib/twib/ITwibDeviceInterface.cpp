@@ -12,7 +12,7 @@ ITwibDeviceInterface::ITwibDeviceInterface(RemoteObject obj) : obj(obj) {
 uint64_t ITwibDeviceInterface::Run(std::vector<uint8_t> executable) {
 	Response rs = obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::RUN, executable);
 	if(rs.payload.size() < sizeof(uint64_t)) {
-		log(FATAL, "response size invalid");
+		LogMessage(Fatal, "response size invalid");
 		exit(1);
 	}
 	return *(uint64_t*) rs.payload.data();

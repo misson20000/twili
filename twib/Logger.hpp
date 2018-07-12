@@ -51,16 +51,16 @@ namespace twili {
 namespace log {
 
 enum class Level {
-	DEBUG,
-	INFO,
-	MSG,
-	WARN,
-	ERR,
-	FATAL,
-	MAX
+	Debug,
+	Info,
+	Message,
+	Warning,
+	Error,
+	Fatal,
+	Max
 };
 
-#define log(lvl, format, ...) \
+#define LogMessage(lvl, format, ...) \
 	_log(::twili::log::Level::lvl, __FILE__, __LINE__,	\
 			 format, ##__VA_ARGS__);
 
@@ -74,7 +74,7 @@ class Logger {
 
 class FileLogger : public Logger {
  public:
-	FileLogger(FILE *f, Level minlvl, Level maxlvl = Level::MAX);
+	FileLogger(FILE *f, Level minlvl, Level maxlvl = Level::Max);
 	virtual ~FileLogger();
 
 	virtual void do_log(Level lvl, const char *fname, int line, const char *msg);
@@ -86,7 +86,7 @@ class FileLogger : public Logger {
 
 class PrettyFileLogger : public FileLogger {
  public:
-	PrettyFileLogger(FILE *f, Level minlvl, Level maxlvl = Level::MAX) : FileLogger(f, minlvl, maxlvl) {}
+	PrettyFileLogger(FILE *f, Level minlvl, Level maxlvl = Level::Max) : FileLogger(f, minlvl, maxlvl) {}
 
 	virtual void do_log(Level lvl, const char *fname, int line, const char *msg);
 };

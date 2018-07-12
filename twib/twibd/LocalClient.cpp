@@ -34,7 +34,7 @@ void LocalClient::PostResponse(Response &r) {
 		std::lock_guard<std::mutex> lock(response_map_mutex);
 		auto it = response_map.find(r.tag);
 		if(it == response_map.end()) {
-			log(WARN, "dropping response for unknown tag 0x%x", r.tag);
+			LogMessage(Warning, "dropping response for unknown tag 0x%x", r.tag);
 			return;
 		}
 		promise.swap(it->second);

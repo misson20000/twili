@@ -49,13 +49,13 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
     const char *color = "";
     
     switch(lvl) {
-    case Level::DEBUG: color = ANSI_BOLD ANSI_COLOR_BLACK; break;  
-    case Level::INFO:  color = ANSI_COLOR_WHITE; break;
-    case Level::MSG:   color = ANSI_BOLD ANSI_COLOR_WHITE; break;
-    case Level::WARN:  color = ANSI_COLOR_BLUE; break;
-    case Level::ERR: color = ANSI_BOLD ANSI_COLOR_YELLOW; break;
-    case Level::MAX:
-    case Level::FATAL: color = ANSI_BOLD ANSI_COLOR_RED; break;
+    case Level::Debug: color = ANSI_BOLD ANSI_COLOR_BLACK; break;  
+    case Level::Info:  color = ANSI_COLOR_WHITE; break;
+    case Level::Message:   color = ANSI_BOLD ANSI_COLOR_WHITE; break;
+    case Level::Warning:  color = ANSI_COLOR_BLUE; break;
+    case Level::Error: color = ANSI_BOLD ANSI_COLOR_YELLOW; break;
+    case Level::Max:
+    case Level::Fatal: color = ANSI_BOLD ANSI_COLOR_RED; break;
     }
     
     snprintf(buf, size, ANSI_RESET "[%d][%s]%s %s:%d: %s" ANSI_RESET,

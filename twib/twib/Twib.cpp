@@ -37,7 +37,7 @@ namespace twib {
 int connect_tcp() {
 	int fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
-		log(FATAL, "failed to create TCP socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -48,23 +48,23 @@ int connect_tcp() {
 	addr.sin6_port = htons(15151);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		log(FATAL, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}
-	log(INFO, "connected to twibd: %d", fd);
+	LogMessage(Info, "connected to twibd: %d", fd);
 	return fd;
 }
 
 int connect_unix() {
 #ifdef _WIN32
-	log(FATAL, "UNIX domain socket not supported on windows");
+	LogMessage(Fatal, "UNIX domain socket not supported on windows");
 	exit(-1);
 	return -1;
 #else
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(fd < 0) {
-		log(FATAL, "failed to create UNIX domain socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create UNIX domain socket: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -74,11 +74,11 @@ int connect_unix() {
 	strncpy(addr.sun_path, twibd::frontend::Twibd_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		log(FATAL, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}
-	log(INFO, "connected to twibd: %d", fd);
+	LogMessage(Info, "connected to twibd: %d", fd);
 	return fd;
 #endif
 }
@@ -92,7 +92,7 @@ Twib::Twib(int tcp) {
 	// TODO: Figure out how to fix this.
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
-		log(FATAL, "failed to create pipe for event thread notifications: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}
@@ -114,7 +114,7 @@ void Twib::event_thread_func() {
 	fd_set sendset;
 	int maxfd = 0;
 	while(!event_thread_destroy) {
-		log(DEBUG, "event thread loop");
+		LogMessage(Debug, "event thread loop");
 
 		FD_ZERO(&recvset);
 		FD_ZERO(&sendset);
@@ -129,7 +129,7 @@ void Twib::event_thread_func() {
 		}
 
 		if(select(maxfd + 1, &recvset, &sendset, NULL, NULL) < 0) {
-			log(FATAL, "failed to select file descriptors: %s", strerror(errno));
+			LogMessage(Fatal, "failed to select file descriptors: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -139,10 +139,10 @@ void Twib::event_thread_func() {
 			char buf[64];
 			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
 			if(r < 0) {
-				log(FATAL, "failed to read from event thread notification pipe: %s", strerror(errno));
+				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", strerror(errno));
 				exit(1);
 			}
-			log(DEBUG, "event thread notified: '%.*s'", r, buf);
+			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
 		}
 #endif
 
@@ -160,7 +160,7 @@ void Twib::event_thread_func() {
 void Twib::NotifyEventThread() {
 	char buf[] = ".";
 	if(write(event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
-		log(FATAL, "failed to write to event thread notification pipe: %s", strerror(errno));
+		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", strerror(errno));
 		exit(1);
 	}
 }
@@ -170,7 +170,7 @@ void Twib::PumpOutput() {
 	if(out_buffer.ReadAvailable() > 0) {
 		ssize_t r = send(fd, (char*)out_buffer.Read(), out_buffer.ReadAvailable(), 0);
 		if(r < 0) {
-			log(FATAL, "failed to write to twibd: %s", strerror(errno));
+			LogMessage(Fatal, "failed to write to twibd: %s", strerror(errno));
 			exit(1);
 		}
 		if(r > 0) {
@@ -180,12 +180,12 @@ void Twib::PumpOutput() {
 }
 
 void Twib::PumpInput() {
-	log(DEBUG, "pumping input");
+	LogMessage(Debug, "pumping input");
 	
 	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
 	ssize_t r = recv(fd, (char*)std::get<0>(target), std::get<1>(target), 0);
 	if(r < 0) {
-		log(FATAL, "failed to receive from twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to receive from twibd: %s", strerror(errno));
 		exit(1);
 	} else {
 		in_buffer.MarkWritten(r);
@@ -214,7 +214,7 @@ void Twib::ProcessResponses() {
 				std::lock_guard<std::mutex> lock(response_map_mutex);
 				auto it = response_map.find(current_mh.tag);
 				if(it == response_map.end()) {
-					log(WARN, "dropping response for unknown tag 0x%x", current_mh.tag);
+					LogMessage(Warning, "dropping response for unknown tag 0x%x", current_mh.tag);
 					continue;
 				}
 				promise.swap(it->second);
@@ -259,19 +259,19 @@ std::future<Response> Twib::SendRequest(Request rq) {
 
 		ssize_t r = send(fd, (char*)&mh, sizeof(mh), 0);
 		if(r < sizeof(mh)) {
-			log(FATAL, "I/O error when sending request header");
+			LogMessage(Fatal, "I/O error when sending request header");
 			exit(1);
 		}
 
 		for(size_t sent = 0; sent < rq.payload.size(); sent+= r) {
 			r = send(fd, (char*)rq.payload.data() + sent, rq.payload.size() - sent, 0);
 			if(r <= 0) {
-				log(FATAL, "I/O error when sending request payload");
+				LogMessage(Fatal, "I/O error when sending request payload");
 				exit(1);
 			}
 		}
 
-		log(DEBUG, "sent request");
+		LogMessage(Debug, "sent request");
 	}
 	
 	return future;
@@ -395,11 +395,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	if(is_verbose) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERR));
+		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
 	}
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	
-	log(MSG, "starting twib");
+	LogMessage(Message, "starting twib");
 	
 	twili::twib::Twib twib(is_tcp);
 	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(&twib, 0, 0));
@@ -415,11 +415,11 @@ int main(int argc, char *argv[]) {
 	} else {
 		std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
 		if(devices.size() == 0) {
-			log(FATAL, "No devices were detected.");
+			LogMessage(Fatal, "No devices were detected.");
 			return 1;
 		}
 		if(devices.size() > 1) {
-			log(FATAL, "Multiple devices were detected. Please use -d to specify which one you mean.");
+			LogMessage(Fatal, "Multiple devices were detected. Please use -d to specify which one you mean.");
 			return 1;
 		}
 		device_id = devices[0]["device_id"].uint32_value();
@@ -429,7 +429,7 @@ int main(int argc, char *argv[]) {
 	if(run->parsed()) {
 		auto v_opt = twili::util::ReadFile(run_file.c_str());
 		if(!v_opt) {
-			log(FATAL, "could not read file");
+			LogMessage(Fatal, "could not read file");
 			return 1;
 		}
 		printf("Process ID: 0x%lx\n", itdi.Run(*v_opt));
@@ -444,7 +444,7 @@ int main(int argc, char *argv[]) {
 	if(coredump->parsed()) {
 		FILE *f = fopen(core_file.c_str(), "wb");
 		if(!f) {
-			log(FATAL, "could not open '%s': %s", core_file.c_str(), strerror(errno));
+			LogMessage(Fatal, "could not open '%s': %s", core_file.c_str(), strerror(errno));
 			return 1;
 		}
 		std::vector<uint8_t> core = itdi.CoreDump(core_process_id);
@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) {
 		while(written < core.size()) {
 			ssize_t r = fwrite(core.data() + written, 1, core.size() - written, f);
 			if(r <= 0 || ferror(f)) {
-				log(FATAL, "write error on '%s'");
+				LogMessage(Fatal, "write error on '%s'");
 			} else {
 				written+= r;
 			}

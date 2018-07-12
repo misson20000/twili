@@ -27,12 +27,12 @@ Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this) {
 }
 
 Twibd::~Twibd() {
-	log(DEBUG, "destroying twibd");
+	LogMessage(Debug, "destroying twibd");
 }
 
 void Twibd::AddDevice(std::shared_ptr<Device> device) {
 	std::lock_guard<std::mutex> lock(device_map_mutex);
-	log(INFO, "adding device with id %08x", device->device_id);
+	LogMessage(Info, "adding device with id %08x", device->device_id);
 	devices[device->device_id] = device;
 }
 
@@ -44,7 +44,7 @@ void Twibd::AddClient(std::shared_ptr<Client> client) {
 		client_id = rng();
 	} while(clients.find(client_id) != clients.end());
 	client->client_id = client_id;
-	log(INFO, "adding client with newly assigned id %08x", client_id);
+	LogMessage(Info, "adding client with newly assigned id %08x", client_id);
 	
 	clients[client_id] = client;
 }
@@ -73,12 +73,12 @@ void Twibd::Process() {
 
 	if(v.index() == 0) {
 		Request rq = std::get<Request>(v);
-		log(DEBUG, "dispatching request");
-		log(DEBUG, "  client id: %08x", rq.client_id);
-		log(DEBUG, "  device id: %08x", rq.device_id);
-		log(DEBUG, "  object id: %08x", rq.object_id);
-		log(DEBUG, "  command id: %08x", rq.command_id);
-		log(DEBUG, "  tag: %08x", rq.tag);
+		LogMessage(Debug, "dispatching request");
+		LogMessage(Debug, "  client id: %08x", rq.client_id);
+		LogMessage(Debug, "  device id: %08x", rq.device_id);
+		LogMessage(Debug, "  object id: %08x", rq.object_id);
+		LogMessage(Debug, "  command id: %08x", rq.command_id);
+		LogMessage(Debug, "  tag: %08x", rq.tag);
 		
 		if(rq.device_id == 0) {
 			PostResponse(HandleRequest(rq));
@@ -101,27 +101,27 @@ void Twibd::Process() {
 		}
 	} else if(v.index() == 1) {
 		Response rs = std::get<Response>(v);
-		log(DEBUG, "dispatching response");
-		log(DEBUG, "  client id: %08x", rs.client_id);
-		log(DEBUG, "  object id: %08x", rs.object_id);
-		log(DEBUG, "  result code: %08x", rs.result_code);
-		log(DEBUG, "  tag: %08x", rs.tag);
+		LogMessage(Debug, "dispatching response");
+		LogMessage(Debug, "  client id: %08x", rs.client_id);
+		LogMessage(Debug, "  object id: %08x", rs.object_id);
+		LogMessage(Debug, "  result code: %08x", rs.result_code);
+		LogMessage(Debug, "  tag: %08x", rs.tag);
 
 		std::shared_ptr<Client> client;
 		{
 			std::lock_guard<std::mutex> lock(client_map_mutex);
 			auto i = clients.find(rs.client_id);
 			if(i == clients.end()) {
-				log(INFO, "dropping response destined for unknown client %08x", rs.client_id);
+				LogMessage(Info, "dropping response destined for unknown client %08x", rs.client_id);
 				return;
 			}
 			client = i->second.lock();
 			if(!client) {
-				log(INFO, "dropping response destined for destroyed client %08x", rs.client_id);
+				LogMessage(Info, "dropping response destined for destroyed client %08x", rs.client_id);
 				return;
 			}
 			if(client->deletion_flag) {
-				log(INFO, "dropping response destined for client flagged for deletion %08x", rs.client_id);
+				LogMessage(Info, "dropping response destined for client flagged for deletion %08x", rs.client_id);
 				return;
 			}
 		}
@@ -134,7 +134,7 @@ Response Twibd::HandleRequest(Request &rq) {
 	case 0:
 		switch((protocol::ITwibMetaInterface::Command) rq.command_id) {
 		case protocol::ITwibMetaInterface::Command::LIST_DEVICES: {
-			log(DEBUG, "command 0 issued to twibd meta object: LIST_DEVICES");
+			LogMessage(Debug, "command 0 issued to twibd meta object: LIST_DEVICES");
 			
 			Response r = rq.RespondOk();
 			std::vector<msgpack11::MsgPack> device_packs;
@@ -190,10 +190,10 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::DEBUG, twili::log::Level::ERR));
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::ERR));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 
-	log(MSG, "starting twibd");
+	LogMessage(Message, "starting twibd");
 	twili::twibd::Twibd twibd;
 	twili::twibd::frontend::SocketFrontend tcp_frontend = twili::twibd::CreateTCPFrontend(twibd);
 	twili::twibd::frontend::SocketFrontend unix_frontend = twili::twibd::CreateUNIXFrontend(twibd);

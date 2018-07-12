@@ -46,36 +46,36 @@ SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, s
 	bind_addrlen(bind_addrlen) {
 
 	if(bind_addr == NULL) {
-		log(FATAL, "failed to allocate bind_addr");
+		LogMessage(Fatal, "failed to allocate bind_addr");
 		exit(1);
 	}
 	memcpy((char*) &this->bind_addr, bind_addr, bind_addrlen);
 	
 	fd = socket(address_family, socktype, 0);
 	if(fd == INVALID_SOCKET) {
-		log(FATAL, "failed to create socket: %s", NetErrStr());
+		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
 		exit(1);
 	}
 	
-	log(DEBUG, "created socket: %d", fd);
+	LogMessage(Debug, "created socket: %d", fd);
 
 	if(address_family == AF_INET6) {
 		int ipv6only = 0;
 		if(setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*) &ipv6only, sizeof(ipv6only)) == -1) {
-			log(FATAL, "failed to make ipv6 server dual stack: %s", NetErrStr());
+			LogMessage(Fatal, "failed to make ipv6 server dual stack: %s", NetErrStr());
 		}
 	}
 
 	UnlinkIfUnix();
 	
 	if(bind(fd, bind_addr, bind_addrlen) < 0) {
-		log(FATAL, "failed to bind socket: %s", NetErrStr());
+		LogMessage(Fatal, "failed to bind socket: %s", NetErrStr());
 		closesocket(fd);
 		exit(1);
 	}
 
 	if(listen(fd, 20) < 0) {
-		log(FATAL, "failed to listen on socket: %s", NetErrStr());
+		LogMessage(Fatal, "failed to listen on socket: %s", NetErrStr());
 		closesocket(fd);
 		UnlinkIfUnix();
 		exit(1);
@@ -83,7 +83,7 @@ SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, s
 
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
-		log(FATAL, "failed to create pipe for event thread notifications: %s", NetErrStr());
+		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", NetErrStr());
 		closesocket(fd);
 		UnlinkIfUnix();
 		exit(1);
@@ -118,7 +118,7 @@ void SocketFrontend::event_thread_func() {
 	fd_set writefds;
 	int max_fd = 0;
 	while(!event_thread_destroy) {
-		log(DEBUG, "socket event thread loop");
+		LogMessage(Debug, "socket event thread loop");
 		
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
@@ -144,7 +144,7 @@ void SocketFrontend::event_thread_func() {
 		}
 
 		if(select(max_fd + 1, &readfds, &writefds, NULL, NULL) < 0) {
-			log(FATAL, "failed to select file descriptors: %s", NetErrStr());
+			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
 			exit(1);
 		}
 
@@ -154,20 +154,20 @@ void SocketFrontend::event_thread_func() {
 			char buf[64];
 			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
 			if(r < 0) {
-				log(FATAL, "failed to read from event thread notification pipe: %s", strerror(errno));
+				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", strerror(errno));
 				exit(1);
 			}
-			log(DEBUG, "event thread notified: '%.*s'", r, buf);
+			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
 		}
 #endif
 		
 		// Check select status on server socket
 		if(FD_ISSET(fd, &readfds)) {
-			log(DEBUG, "incoming connection detected on %d", fd);
+			LogMessage(Debug, "incoming connection detected on %d", fd);
 
 			int client_fd = accept(fd, NULL, NULL);
 			if(client_fd < 0) {
-				log(WARN, "failed to accept incoming connection");
+				LogMessage(Warning, "failed to accept incoming connection");
 			} else {
 				std::shared_ptr<Client> client = std::make_shared<Client>(this, client_fd);
 				clients.push_back(client);
@@ -182,7 +182,7 @@ void SocketFrontend::event_thread_func() {
 				client->PumpOutput();
 			}
 			if(FD_ISSET(client->fd, &readfds)) {
-				log(DEBUG, "incoming data for client %x", client->client_id);
+				LogMessage(Debug, "incoming data for client %x", client->client_id);
 				client->PumpInput();
 			}
 		}
@@ -205,19 +205,19 @@ void SocketFrontend::NotifyEventThread() {
 	struct sockaddr_storage addr;
 	size_t addrlen = sizeof(addr);
 	if(getsockname(fd, &addr, &addrlen) != 0) {
-		log(FATAL, "failed to get local server address: %s", NetErrStr());
+		LogMessage(Fatal, "failed to get local server address: %s", NetErrStr());
 		exit(1);
 	}
 
 	// Connect to the server in order to wake it up
 	SOCKET cfd = socket(address_family, socktype, 0);
 	if(cfd < 0) {
-		log(FATAL, "failed to create socket: %s", NetErrStr());
+		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
 		exit(1);
 	}
 
 	if(connect(cfd, (struct sockaddr*) &addr, addrlen) < 0) {
-		log(FATAL, "failed to connect for notification: %s", NetErrStr());
+		LogMessage(Fatal, "failed to connect for notification: %s", NetErrStr());
 		exit(1);
 	}
 	
@@ -225,7 +225,7 @@ void SocketFrontend::NotifyEventThread() {
 #else
 	char buf[] = ".";
 	if(write(event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
-		log(FATAL, "failed to write to event thread notification pipe: %s", strerror(errno));
+		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", strerror(errno));
 		exit(1);
 	}
 #endif
@@ -239,7 +239,7 @@ SocketFrontend::Client::~Client() {
 }
 
 void SocketFrontend::Client::PumpOutput() {
-	log(DEBUG, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
+	LogMessage(Debug, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
 	std::lock_guard<std::mutex> lock(out_buffer_mutex);
 	if(out_buffer.ReadAvailable() > 0) {
 		ssize_t r = send(fd, out_buffer.Read(), out_buffer.ReadAvailable(), 0);
