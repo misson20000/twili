@@ -2,10 +2,14 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include<string.h>
+#include<netinet/in.h>
+#include<sys/un.h>
 
 #include<libusb.h>
 #include<msgpack11.hpp>
 
+#include "SocketFrontend.hpp"
 #include "Protocol.hpp"
 #include "config.hpp"
 #include "err.hpp"
@@ -17,11 +21,7 @@
 namespace twili {
 namespace twibd {
 
-Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this), tcp(this)
-#ifndef _WIN32
-	, unix(this)
-#endif
-{
+Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this) {
 	AddClient(local_client);
 	usb.Probe();
 }
@@ -159,6 +159,23 @@ Response Twibd::HandleRequest(Request &rq) {
 	}
 }
 
+static frontend::SocketFrontend CreateTCPFrontend(Twibd &twibd) {
+	struct sockaddr_in6 addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons(15151);
+	addr.sin6_addr = in6addr_any;
+	return frontend::SocketFrontend(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+}
+
+static frontend::SocketFrontend CreateUNIXFrontend(Twibd &twibd) {
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, frontend::Twibd_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
+	return frontend::SocketFrontend(&twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+}
+
 } // namespace twibd
 } // namespace twili
 
@@ -178,6 +195,8 @@ int main(int argc, char *argv[]) {
 
 	log(MSG, "starting twibd");
 	twili::twibd::Twibd twibd;
+	twili::twibd::frontend::SocketFrontend tcp_frontend = twili::twibd::CreateTCPFrontend(twibd);
+	twili::twibd::frontend::SocketFrontend unix_frontend = twili::twibd::CreateUNIXFrontend(twibd);
 	while(1) {
 		twibd.Process();
 	}

@@ -5,12 +5,24 @@
 #include<thread>
 #include<mutex>
 
-#include<poll.h>
+#ifdef _WIN32
+#include<winsock2.h>
+#else
+#include<sys/socket.h>
+#include<sys/select.h>
+#endif
+
 #include<stdint.h>
 
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
+
+#ifndef _WIN32
+#define SOCKET int
+#define INVALID_SOCKET -1
+#define closesocket close
+#endif
 
 namespace twili {
 namespace twibd {
@@ -19,14 +31,14 @@ class Twibd;
 
 namespace frontend {
 
-class UNIXFrontend {
- public:
-	UNIXFrontend(Twibd *twibd);
-	~UNIXFrontend();
+class SocketFrontend {
+	public:
+	SocketFrontend(Twibd *twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen);
+	~SocketFrontend();
 
 	class Client : public twibd::Client {
-	 public:
-		Client(UNIXFrontend *frontend, int fd);
+		public:
+		Client(SocketFrontend *frontend, SOCKET fd);
 		~Client();
 		void PumpOutput();
 		void PumpInput();
@@ -34,9 +46,9 @@ class UNIXFrontend {
 
 		virtual void PostResponse(Response &r);
 
-		UNIXFrontend *frontend;
+		SocketFrontend *frontend;
 		Twibd *twibd;
-		int fd;
+		SOCKET fd;
 		util::Buffer in_buffer;
 
 		std::mutex out_buffer_mutex;
@@ -46,19 +58,26 @@ class UNIXFrontend {
 		protocol::MessageHeader current_mh;
 		util::Buffer current_payload;
 	};
-	
- private:
+
+	private:
 	Twibd *twibd;
-	int fd;
+	SOCKET fd;
+
+	int address_family;
+	int socktype;
+	struct sockaddr_storage bind_addr;
+	size_t bind_addrlen;
+	void UnlinkIfUnix();
 	
 	bool event_thread_destroy = false;
 	void event_thread_func();
 	std::thread event_thread;
-	std::vector<struct pollfd> pollfds; // to be used only by the event_thread
+#ifndef _WIN32
 	int event_thread_notification_pipe[2];
-
-	std::list<std::shared_ptr<Client>> clients;
+#endif
 	
+	std::list<std::shared_ptr<Client>> clients;
+
 	void NotifyEventThread();
 };
 
