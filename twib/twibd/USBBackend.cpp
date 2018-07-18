@@ -379,6 +379,19 @@ void USBBackend::Probe() {
 		if(r) {
 			log(FATAL, "failed to register hotplug callback: %s", libusb_error_name(r));
 		}
+		if(Twibd_ACCEPT_NINTENDO_SDK_DEBUGGER) {
+			int r = libusb_hotplug_register_callback(
+				ctx,
+				(libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
+				LIBUSB_HOTPLUG_ENUMERATE,
+				Twibd_NINTENDO_SDK_DEBUGGER_VENDOR_ID, Twibd_NINTENDO_SDK_DEBUGGER_PRODUCT_ID,
+				LIBUSB_HOTPLUG_MATCH_ANY,
+				hotplug_cb_shim, this,
+				&hotplug_handle_nintendo_sdk_debugger);
+			if(r) {
+				log(FATAL, "failed to register hotplug callback for nintendo sdk debugger: %s", libusb_error_name(r));
+			}
+		}
 //#endif
 	} else {
 		log(WARN, "hotplug is not supported");
@@ -395,8 +408,14 @@ void USBBackend::Probe() {
 				log(ERR, "Failed to get device descriptor");
 				exit(1);
 			}
-			if (desc.idVendor == Twili_VENDOR_ID && desc.idProduct == Twili_PRODUCT_ID) {
+			if(desc.idVendor == Twili_VENDOR_ID && desc.idProduct == Twili_PRODUCT_ID) {
 				this->QueueAddDevice(device);
+			}
+			if(Twibd_ACCEPT_NINTENDO_SDK_DEBUGGER) {
+				if(desc.idVendor == Twibd_NINTENDO_SDK_DEBUGGER_VENDOR_ID &&
+					 desc.idProduct == Twibd_NINTENDO_SDK_DEBUGGER_PRODUCT_ID) {
+					this->QueueAddDevice(device);
+				}
 			}
 		}
 	}

@@ -96,6 +96,7 @@ class USBBackend {
 
 	libusb_context *ctx;
 	libusb_hotplug_callback_handle hotplug_handle;
+	libusb_hotplug_callback_handle hotplug_handle_nintendo_sdk_debugger;
 };
 
 } // namespace backend

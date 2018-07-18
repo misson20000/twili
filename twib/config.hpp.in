@@ -13,6 +13,9 @@ const uint16_t Twili_PRODUCT_ID = @Twili_PRODUCT_ID@;
 namespace twibd {
 
 const bool Twibd_HOTPLUG_ENABLED = @Twibd_HOTPLUG_ENABLED@;
+const uint16_t Twibd_NINTENDO_SDK_DEBUGGER_VENDOR_ID = @Twibd_NINTENDO_SDK_DEBUGGER_VENDOR_ID@;
+const uint16_t Twibd_NINTENDO_SDK_DEBUGGER_PRODUCT_ID = @Twibd_NINTENDO_SDK_DEBUGGER_PRODUCT_ID@;
+const bool Twibd_ACCEPT_NINTENDO_SDK_DEBUGGER = @Twibd_ACCEPT_NINTENDO_SDK_DEBUGGER@;
 
 namespace frontend {
 
