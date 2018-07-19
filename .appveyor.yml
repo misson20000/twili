@@ -27,7 +27,7 @@ artifacts:
 - path: twib/build/twibd/Release/twibd.exe
   name: twibd_win64.exe
 deploy:
-  description: 'TODO: describe this release'
+  description: 'describe this release'
   provider: GitHub
   auth_token:
     # secure: DzLSBd8C9af8pEBk+td3FnGySUJmMlpgE2QTRJk9gsaClLktgjEmeJLRfQwRp+Mr # m20k key
