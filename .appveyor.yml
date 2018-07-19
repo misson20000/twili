@@ -1,5 +1,5 @@
 version: 'appveyor-t{build}'
-image: Visual Studio 2015 # libusb binaries are compiled against vs2015, so we have to use vs2015 too
+image: Visual Studio 2017
 configuration:
 - Release
 platform:
@@ -9,7 +9,11 @@ install:
     git submodule update --init --recursive
 before_build:
 - cmd: |-
-    cd twib
+    cd C:/projects
+	git clone https://github.com/libusb/libusb.git
+	cd libusb
+	msbuild msvc/libusb_2017.sln /p:Configuration=Release /p:Platform=x64
+    cd C:/projects/twili/twib
     mkdir build
     cd build
     mkdir libusb
@@ -18,8 +22,8 @@ before_build:
     7z x libusb.7z
     cd ..
     cmake --version
-    cmake .. -DLIBUSB_1_LIBRARY=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=libusb/include/libusb-1.0/ -DLIBUSB_1_LIBRARIES=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=libusb/include/libusb-1.0/
+    cmake .. -DLIBUSB_1_LIBRARY=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=C:/projects/libusb/libusb/ -DLIBUSB_1_LIBRARIES=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=C:/projects/libusb/libusb/
 - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 build:
-  project: c:\projects\twili\twib\build\twib.sln
+  project: c:/projects/twili/twib/build/twib.sln
   parallel: true
