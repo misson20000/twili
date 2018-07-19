@@ -21,5 +21,10 @@ before_build:
 build:
   project: c:/projects/twili/twib/build/twib.sln
   parallel: true
-after_build:
-- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+artifacts:
+- path: twib/build/twib/Release/twib.exe
+  name: twib_win64.exe
+- path: twib/build/twibd/Release/twibd.exe
+  name: twibd_win64.exe
+#after_build:
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
