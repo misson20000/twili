@@ -31,8 +31,7 @@ configure_file(
 	"${PROJECT_BINARY_DIR}/config.hpp"
 	)
 
-# Provide __FILE_SHORT__ for logging
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__FILE_SHORT__='\"placeholder\"'")
+add_definitions("-DPROJECT_ROOT=\"${PROJECT_SOURCE_DIR}\"") # for logging
 
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
