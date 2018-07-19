@@ -10,17 +10,12 @@ install:
 before_build:
 - cmd: |-
     cd C:/projects
-	git clone https://github.com/libusb/libusb.git
-	cd libusb
-	msbuild msvc/libusb_2017.sln /p:Configuration=Release /p:Platform=x64
+    git clone https://github.com/libusb/libusb.git
+    cd libusb
+    msbuild msvc/libusb_2017.sln /p:Configuration=Release /p:Platform=x64
     cd C:/projects/twili/twib
     mkdir build
     cd build
-    mkdir libusb
-    cd libusb
-    curl --output libusb.7z -L https://github.com/libusb/libusb/releases/download/v1.0.22/libusb-1.0.22.7z
-    7z x libusb.7z
-    cd ..
     cmake --version
     cmake .. -DLIBUSB_1_LIBRARY=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=C:/projects/libusb/libusb/ -DLIBUSB_1_LIBRARIES=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=C:/projects/libusb/libusb/
 - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
