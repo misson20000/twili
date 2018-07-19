@@ -1,15 +1,9 @@
 #include "Twib.hpp"
 
+#include "platform.hpp"
+
 #include<random>
 #include<iomanip>
-
-#ifdef _WIN32
-#include<ws2tcpip.h>
-#else
-#include<sys/socket.h>
-#include<netinet/in.h>
-#include<sys/un.h>
-#endif
 
 #include<string.h>
 #include<unistd.h>

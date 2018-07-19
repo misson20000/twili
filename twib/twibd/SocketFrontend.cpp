@@ -1,20 +1,11 @@
 #include "SocketFrontend.hpp"
 
+#include "platform.hpp"
+
 #include<algorithm>
 #include<iostream>
 
-#ifdef _WIN32
-#include<ws2tcpip.h>
-#include<winsock2.h>
-#else
-#include<sys/socket.h>
-#include<sys/select.h>
-#include<sys/un.h>
-#include<netinet/in.h>
-#endif
-
 #include<string.h>
-#include<unistd.h>
 
 #include "Twibd.hpp"
 #include "Protocol.hpp"
@@ -108,15 +99,17 @@ SocketFrontend::~SocketFrontend() {
 }
 
 void SocketFrontend::UnlinkIfUnix() {
+#ifndef WIN32
 	if(address_family == AF_UNIX) {
 		unlink(((struct sockaddr_un*) &bind_addr)->sun_path);
 	}
+#endif
 }
 
 void SocketFrontend::event_thread_func() {
 	fd_set readfds;
 	fd_set writefds;
-	int max_fd = 0;
+	SOCKET max_fd = 0;
 	while(!event_thread_destroy) {
 		LogMessage(Debug, "socket event thread loop");
 		
@@ -203,8 +196,8 @@ void SocketFrontend::event_thread_func() {
 void SocketFrontend::NotifyEventThread() {
 #ifdef _WIN32
 	struct sockaddr_storage addr;
-	size_t addrlen = sizeof(addr);
-	if(getsockname(fd, &addr, &addrlen) != 0) {
+	socklen_t addrlen = sizeof(addr);
+	if(getsockname(fd, (struct sockaddr*) &addr, &addrlen) != 0) {
 		LogMessage(Fatal, "failed to get local server address: %s", NetErrStr());
 		exit(1);
 	}

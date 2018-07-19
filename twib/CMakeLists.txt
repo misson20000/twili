@@ -3,7 +3,10 @@ project(twib)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if (WIN32)
-	set (CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -static -static-libgcc -static-libstdc++")
+	add_definitions(-DWIN32_LEAN_AND_MEAN)
+	if(MINGW)
+		set (CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -static -static-libgcc -static-libstdc++")
+	endif()
 endif()
 
 # enable ASAN

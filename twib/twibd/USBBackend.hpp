@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform.hpp"
+
 #include<thread>
 #include<list>
 #include<queue>

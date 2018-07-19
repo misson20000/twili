@@ -1,11 +1,10 @@
 #pragma once
 
-#include<unistd.h>
+#include "platform.hpp"
 
 #include<mutex>
 #include<memory>
 
-#include "Networking.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
 #include "Logger.hpp"
@@ -27,7 +26,7 @@ class MessageConnection {
 		LogMessage(Debug, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
 		std::lock_guard<std::mutex> lock(out_buffer_mutex);
 		if(out_buffer.ReadAvailable() > 0) {
-			ssize_t r = send(fd, out_buffer.Read(), out_buffer.ReadAvailable(), 0);
+			ssize_t r = send(fd, (char*) out_buffer.Read(), out_buffer.ReadAvailable(), 0);
 			if(r < 0) {
 				obj->deletion_flag = true;
 				return;
@@ -40,7 +39,7 @@ class MessageConnection {
 	
 	void PumpInput() {
 		std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
-		ssize_t r = recv(fd, std::get<0>(target), std::get<1>(target), 0);
+		ssize_t r = recv(fd, (char*) std::get<0>(target), std::get<1>(target), 0);
 		if(r <= 0) {
 			obj->deletion_flag = true;
 			return;
