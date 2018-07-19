@@ -1,0 +1,9 @@
+[Unit]
+Description=Twili Bridge Daemon
+Requires=twibd.socket
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=twibd -s
+StandardError=journal

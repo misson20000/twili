@@ -85,6 +85,25 @@ SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, s
 	this->event_thread = std::move(event_thread);
 }
 
+SocketFrontend::SocketFrontend(Twibd *twibd, int fd) :
+	twibd(twibd),
+	fd(fd),
+	address_family(0),
+	socktype(SOCK_STREAM) {
+
+#ifndef _WIN32
+	if(pipe(event_thread_notification_pipe) < 0) {
+		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", NetErrStr());
+		closesocket(fd);
+		UnlinkIfUnix();
+		exit(1);
+	}
+#endif // _WIN32
+
+	std::thread event_thread(&SocketFrontend::event_thread_func, this);
+	this->event_thread = std::move(event_thread);
+}
+
 SocketFrontend::~SocketFrontend() {
 	event_thread_destroy = true;
 	NotifyEventThread();
@@ -203,7 +222,7 @@ void SocketFrontend::NotifyEventThread() {
 	}
 
 	// Connect to the server in order to wake it up
-	SOCKET cfd = socket(address_family, socktype, 0);
+	SOCKET cfd = socket(addr.ss_family, socktype, 0);
 	if(cfd < 0) {
 		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
 		exit(1);

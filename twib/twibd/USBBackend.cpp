@@ -66,7 +66,7 @@ USBBackend::USBBackend(Twibd *twibd) : twibd(twibd) {
 
 USBBackend::~USBBackend() {
 	event_thread_destroy = true;
-	if(Twibd_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+	if(TWIBD_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		libusb_hotplug_deregister_callback(ctx, hotplug_handle); // wakes up usb_event_thread
 	}
 	event_thread.join();
@@ -354,25 +354,25 @@ void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
 
 void USBBackend::Probe() {
 //#ifdef _WIN32
-//	if (Twibd_HOTPLUG_ENABLED) {
+//	if (TWIBD_HOTPLUG_ENABLED) {
 //		KHOT_HANDLE hotHandle = NULL;
 //		KHOT_PARAMS hotParams;
 //
 //		memset(&hotParams, 0, sizeof(hotParams));
 //		hotParams.OnHotPlug = hotplug_cb_shim;
 //		hotParams.Flags = KHOT_FLAG_PLUG_ALL_ON_INIT;
-//		sprintf_s(hotParams.PatternMatch.DeviceID, "*VID_%04X&PID_%04X*", Twili_VENDOR_ID, Twili_PRODUCT_ID);
+//		sprintf_s(hotParams.PatternMatch.DeviceID, "*VID_%04X&PID_%04X*", TWILI_VENDOR_ID, TWILI_PRODUCT_ID);
 //
 //		if (!HotK_Init(&hotHandle, &hotParams)) {
 //			LogMessage(Fatal, "failed to register hotplug callback: %d", GetLastError());
 //		}
 //#else
-	if(Twibd_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+	if(TWIBD_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		int r = libusb_hotplug_register_callback(
 			ctx,
 			(libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
 			LIBUSB_HOTPLUG_ENUMERATE,
-			Twili_VENDOR_ID, Twili_PRODUCT_ID,
+			TWILI_VENDOR_ID, TWILI_PRODUCT_ID,
 			LIBUSB_HOTPLUG_MATCH_ANY,
 			hotplug_cb_shim, this,
 			&hotplug_handle);
@@ -395,7 +395,7 @@ void USBBackend::Probe() {
 				LogMessage(Error, "Failed to get device descriptor");
 				exit(1);
 			}
-			if (desc.idVendor == Twili_VENDOR_ID && desc.idProduct == Twili_PRODUCT_ID) {
+			if (desc.idVendor == TWILI_VENDOR_ID && desc.idProduct == TWILI_PRODUCT_ID) {
 				this->QueueAddDevice(device);
 			}
 		}

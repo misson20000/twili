@@ -24,6 +24,7 @@ namespace frontend {
 class SocketFrontend {
 	public:
 	SocketFrontend(Twibd *twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen);
+	SocketFrontend(Twibd *twibd, int fd);
 	~SocketFrontend();
 
 	class Client : public twibd::Client {

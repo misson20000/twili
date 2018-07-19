@@ -58,7 +58,7 @@ int connect_unix() {
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, twibd::frontend::Twibd_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
+	strncpy(addr.sun_path, TWIBD_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
 		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));

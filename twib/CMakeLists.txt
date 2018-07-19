@@ -17,10 +17,11 @@ endif()
 
 set(MSGPACK11_BUILD_TESTS OFF CACHE BOOL "foo")
 
-set(Twibd_UNIX_SOCKET_PATH "./twibd.sock")
-set(Twibd_HOTPLUG_ENABLED true)
-set(Twili_VENDOR_ID 0x1209)
-set(Twili_PRODUCT_ID 0x8b00)
+set(WITH_SYSTEMD OFF CACHE BOOL "Enable systemd integration in twibd")
+set(TWIBD_UNIX_SOCKET_PATH "/var/run/twibd.sock" CACHE FILEPATH "Path for the twibd unix socket")
+set(TWIBD_HOTPLUG_ENABLED ON CACHE BOOL "Enable USB hotplug in twibd")
+set(TWILI_VENDOR_ID 0x1209 CACHE STRING "Vendor ID for Twili USB device")
+set(TWILI_PRODUCT_ID 0x8b00 CACHE STRING "Product ID for Twili USB device")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,6 +40,6 @@ include_directories("${PROJECT_SOURCE_DIR}/../")
 
 add_library(twib-log Logger.cpp)
 add_library(twib-buffer Buffer.cpp)
-add_subdirectory(externals)
+add_subdirectory(externals EXCLUDE_FROM_ALL)
 add_subdirectory(twibd)
 add_subdirectory(twib)

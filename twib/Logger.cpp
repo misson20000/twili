@@ -10,6 +10,11 @@
 #include<unistd.h>
 #endif
 
+#include "config.hpp"
+#if WITH_SYSTEMD == 1
+#include<systemd/sd-daemon.h>
+#endif
+
 #include "Logger.hpp"
 #include "ansi-colors.h"
 
@@ -38,6 +43,13 @@ void _log(Level lvl,
   va_end(ar);
 }
 
+static const char *trim_filename(const char *fname) {
+	if(strncmp(fname, PROJECT_ROOT, sizeof(PROJECT_ROOT)-1) == 0) {
+		fname+= sizeof(PROJECT_ROOT);
+	}
+	return fname;
+}
+
 // utility function
 char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fname, int line, const char *msg) {
   time_t rawtime;
@@ -51,10 +63,6 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
            "%Y-%m-%d %R",
            timeinfo);
 
-	if(strncmp(fname, PROJECT_ROOT, sizeof(PROJECT_ROOT)-1) == 0) {
-		fname+= sizeof(PROJECT_ROOT);
-	}
-	
   if(color) {
     const char *color = "";
     
@@ -69,10 +77,10 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
     }
     
     snprintf(buf, size, ANSI_RESET "[%d][%s]%s %s:%d: %s" ANSI_RESET,
-             lvl, timebuf, color, fname, line, msg);
+             lvl, timebuf, color, trim_filename(fname), line, msg);
   } else {
     snprintf(buf, size, "[%d][%s] %s:%d: %s",
-             lvl, timebuf, fname, line, msg);
+             lvl, timebuf, trim_filename(fname), line, msg);
   }
   return buf;
 }
@@ -106,6 +114,22 @@ void PrettyFileLogger::do_log(Level lvl, const char *fname, int line, const char
   }
 }
 
+#if WITH_SYSTEMD == 1
+void SystemdLogger::do_log(Level lvl, const char *fname, int line, const char *msg) {
+	const char *lvl_str;
+	switch(lvl) {
+	case Level::Debug:   lvl_str = SD_DEBUG; break;
+	case Level::Info:    lvl_str = SD_INFO; break;
+	case Level::Message: lvl_str = SD_NOTICE; break;
+	case Level::Warning: lvl_str = SD_WARNING; break;
+	case Level::Error:   lvl_str = SD_ERR; break;
+	case Level::Fatal:   lvl_str = SD_CRIT; break;
+	default:
+		lvl_str = SD_ERR;
+	}
+	fprintf(file, "%s%s:%d: %s\n", lvl_str, trim_filename(fname), line, msg);
+}
+#endif // WITH_SYSTEMD == 1
 
 void add_log(std::shared_ptr<Logger> l) {
   logs.push_front(l);

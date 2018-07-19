@@ -1,24 +1,9 @@
 #pragma once
 
-#include<stdint.h>
-
-#define TWIBD_UNIX_SOCKETS @Twibd_UNIX_SOCKETS@
-#define TWIBD_WIN32_PIPES @Twibd_WIN32_PIPES@
-
-namespace twili {
-
-const uint16_t Twili_VENDOR_ID = @Twili_VENDOR_ID@;
-const uint16_t Twili_PRODUCT_ID = @Twili_PRODUCT_ID@;
-
-namespace twibd {
-
-const bool Twibd_HOTPLUG_ENABLED = @Twibd_HOTPLUG_ENABLED@;
-
-namespace frontend {
-
-static const char *Twibd_UNIX_SOCKET_PATH = "@Twibd_UNIX_SOCKET_PATH@";
-
-} // namespace frontend
-
-} // namespace twibd
-} // namespace twili
+#cmakedefine01 WITH_SYSTEMD
+#cmakedefine01 TWIBD_UNIX_SOCKETS
+#cmakedefine01 TWIBD_WIN32_PIPES
+#cmakedefine01 TWIBD_HOTPLUG_ENABLED
+#define TWIBD_UNIX_SOCKET_PATH "@TWIBD_UNIX_SOCKET_PATH@"
+#define TWILI_VENDOR_ID @TWILI_VENDOR_ID@
+#define TWILI_PRODUCT_ID @TWILI_PRODUCT_ID@

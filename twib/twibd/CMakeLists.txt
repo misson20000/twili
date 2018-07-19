@@ -21,3 +21,20 @@ target_link_libraries(twibd Threads::Threads)
 if (WIN32)
 	target_link_libraries(twibd wsock32 ws2_32)
 endif()
+
+if(WITH_SYSTEMD)
+	find_package(systemd REQUIRED)
+	include_directories(${SYSTEMD_INCLUDE_DIRS})
+	target_link_libraries(twibd ${SYSTEMD_LIBRARIES})
+
+	configure_file(
+		"${PROJECT_SOURCE_DIR}/twibd/twibd.socket"
+		"${PROJECT_BINARY_DIR}/twibd/twibd.socket"
+		)
+	
+	set(SYSTEMD_CONFIG_DIR "lib/systemd/system")
+	install(FILES ${PROJECT_BINARY_DIR}/twibd/twibd.socket DESTINATION ${SYSTEMD_CONFIG_DIR})
+	install(FILES ${PROJECT_SOURCE_DIR}/twibd/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
+endif()
+
+install(TARGETS twibd RUNTIME DESTINATION bin)

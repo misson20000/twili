@@ -3,6 +3,8 @@
 #include<memory>
 #include<ostream>
 
+#include "config.hpp"
+
 namespace neolib
 {
 	template<class Elem, class Traits>
@@ -90,6 +92,16 @@ class PrettyFileLogger : public FileLogger {
 
 	virtual void do_log(Level lvl, const char *fname, int line, const char *msg);
 };
+
+#if WITH_SYSTEMD == 1
+// formats log messages syslog-style
+class SystemdLogger : public FileLogger {
+ public:
+	SystemdLogger(FILE *f, Level minlvl, Level maxlvl = Level::Max) : FileLogger(f, minlvl, maxlvl) {}
+
+	virtual void do_log(Level lvl, const char *fname, int line, const char *msg);
+};
+#endif // WITH_SYSTEMD == 1
 
 void _log(Level lvl, const char *fname, int line, const char *format, ...);
 void add_log(std::shared_ptr<Logger> l);

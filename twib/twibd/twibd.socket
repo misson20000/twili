@@ -1,0 +1,10 @@
+[Unit]
+Description=Twili Bridge Daemon Socket
+
+[Socket]
+ListenStream=@Twibd_UNIX_SOCKET_PATH@
+Mode=0666
+Accept=no
+
+[Install]
+WantedBy=sockets.target
