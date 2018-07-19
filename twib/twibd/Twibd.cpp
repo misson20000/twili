@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
 	twili::twibd::Twibd twibd;
 	std::shared_ptr<twili::twibd::frontend::SocketFrontend> tcp_frontend = twili::twibd::CreateTCPFrontend(twibd);
 #ifndef WIN32
-	std::shared_ptr<twili::twibd::frontend::SocketFrontend unix_frontend> = twili::twibd::CreateUNIXFrontend(twibd);
+	std::shared_ptr<twili::twibd::frontend::SocketFrontend> unix_frontend = twili::twibd::CreateUNIXFrontend(twibd);
 #endif
 	while(1) {
 		twibd.Process();
