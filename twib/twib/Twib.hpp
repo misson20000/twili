@@ -1,6 +1,8 @@
 #pragma once
 
-#include <array>
+#include "platform.hpp"
+
+#include<array>
 #include<thread>
 #include<future>
 #include<mutex>

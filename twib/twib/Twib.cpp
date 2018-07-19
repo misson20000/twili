@@ -6,13 +6,6 @@
 #include<iomanip>
 
 #include<string.h>
-#include<unistd.h>
-
-#ifdef _WIN32
-#include<winsock2.h>
-#else
-#include<sys/select.h>
-#endif
 
 #include<msgpack11.hpp>
 
@@ -29,7 +22,7 @@ namespace twili {
 namespace twib {
 
 int connect_tcp() {
-	int fd = socket(AF_INET6, SOCK_STREAM, 0);
+	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
 		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
 		exit(1);
@@ -43,7 +36,7 @@ int connect_tcp() {
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
 		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
-		close(fd);
+		closesocket(fd);
 		exit(1);
 	}
 	LogMessage(Info, "connected to twibd: %d", fd);
@@ -98,7 +91,7 @@ Twib::~Twib() {
 void Twib::event_thread_func() {
 	fd_set recvset;
 	fd_set sendset;
-	int maxfd = 0;
+	SOCKET maxfd = 0;
 	while(!event_thread_destroy) {
 		LogMessage(Debug, "event thread loop");
 

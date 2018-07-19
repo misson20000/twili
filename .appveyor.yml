@@ -1,5 +1,5 @@
 version: 'appveyor-t{build}'
-image: Visual Studio 2017
+image: Visual Studio 2015 # libusb binaries are compiled against vs2015, so we have to use vs2015 too
 configuration:
 - Release
 platform:
@@ -18,7 +18,7 @@ before_build:
     7z x libusb.7z
     cd ..
     cmake --version
-    cmake .. -DLIBUSB_1_LIBRARY=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=libusb/include -DLIBUSB_1_LIBRARIES=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=libusb/include
+    cmake .. -DLIBUSB_1_LIBRARY=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=libusb/include/libusb-1.0/ -DLIBUSB_1_LIBRARIES=libusb/MS64/static/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=libusb/include/libusb-1.0/
 - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 build:
   project: c:\projects\twili\twib\build\twib.sln
