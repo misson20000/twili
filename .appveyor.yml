@@ -12,12 +12,12 @@ before_build:
     cd C:/projects
     git clone https://github.com/libusb/libusb.git
     cd libusb
-    msbuild msvc/libusb_2017.sln /p:Configuration=Release,Platform=x64
+    msbuild msvc/libusb_2017.sln /p:Configuration=Release,Platform=x64 /t:"libusb-1_0 _static_"
     cd C:/projects/twili/twib
     mkdir build
     cd build
     cmake --version
-    cmake .. -DLIBUSB_1_LIBRARY=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=C:/projects/libusb/libusb/ -DLIBUSB_1_LIBRARIES=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=C:/projects/libusb/libusb/ -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_BUILD_TYPE=Release
+    cmake .. -DLIBUSB_1_LIBRARY=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIR=C:/projects/libusb/libusb/ -DLIBUSB_1_LIBRARIES=C:/projects/libusb/x64/Release/lib/libusb-1.0.lib -DLIBUSB_1_INCLUDE_DIRS=C:/projects/libusb/libusb/ -DCMAKE_GENERATOR_PLATFORM=x64
 build:
   project: c:/projects/twili/twib/build/twib.sln
   parallel: true
@@ -26,5 +26,15 @@ artifacts:
   name: twib_win64.exe
 - path: twib/build/twibd/Release/twibd.exe
   name: twibd_win64.exe
+deploy:
+  description: 'TODO: describe this release'
+  provider: GitHub
+  auth_token:
+    # secure: DzLSBd8C9af8pEBk+td3FnGySUJmMlpgE2QTRJk9gsaClLktgjEmeJLRfQwRp+Mr # m20k key
+    secure: S/hibwHUTh6XJMB6iixGFBZBgng4QgtP7r9loKFxpvEKrl+cseji6jwc2RBW59yL # reswitchedteam key
+  draft: true
+  force_update: true
+  on:
+    appveyor_repo_tag: true
 #after_build:
 #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

@@ -16,18 +16,18 @@ language: cpp
 matrix:
   include:
   - os: linux
-    env: TARGET="twili" PLATFORM="nx-transistor"
+    env: TARGET="twili" PLATFORM="nx-transistor64"
     install: "./.travis/twili_install.sh"
     script: make LIBTRANSISTOR_HOME=$PWD/libtransistor/ PATH="$PWD/fr/:$PATH"
     before_deploy: "./.travis/twili_before_deploy.sh"
   - os: linux
-    env: TARGET="twib" PLATFORM="linux"
+    env: TARGET="twib" PLATFORM="linux64"
     script: "./.travis/twib.sh -DCMAKE_CXX_COMPILER=g++-8"
     before_deploy: "./.travis/twib_before_deploy.sh"
   - os: osx
     osx_image: xcode9.4
     compiler: clang
-    env: TARGET="twib" PLATFORM="osx"
+    env: TARGET="twib" PLATFORM="osx64"
     script:
     - brew update
     - brew install llvm
