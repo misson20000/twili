@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform.hpp"
+
 #include<list>
 #include<vector>
 #include<thread>
@@ -7,7 +9,6 @@
 
 #include<stdint.h>
 
-#include "Networking.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"

@@ -1,6 +1,7 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(SOURCE Twibd.cpp USBBackend.cpp Messages.cpp LocalClient.cpp msgpack_show.cpp SocketFrontend.cpp)
 add_executable(twibd ${SOURCE})
 
@@ -19,8 +20,4 @@ target_link_libraries(twibd Threads::Threads)
 
 if (WIN32)
 	target_link_libraries(twibd wsock32 ws2_32)
-
-	find_package(libusbk REQUIRED)
-	include_directories(${LIBUSBK_INCLUDE_DIRS})
-	target_link_libraries(twibd ${LIBUSBK_LIBRARIES})
 endif()

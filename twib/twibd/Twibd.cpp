@@ -1,10 +1,10 @@
 #include "Twibd.hpp"
 
+#include "platform.hpp"
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-#include<netinet/in.h>
-#include<sys/un.h>
 
 #include<libusb.h>
 #include<msgpack11.hpp>
@@ -159,22 +159,24 @@ Response Twibd::HandleRequest(Request &rq) {
 	}
 }
 
-static frontend::SocketFrontend CreateTCPFrontend(Twibd &twibd) {
+static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd) {
 	struct sockaddr_in6 addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
-	addr.sin6_port = htons(15151);
+	addr.sin6_port = htons((u_short) 15151);
 	addr.sin6_addr = in6addr_any;
-	return frontend::SocketFrontend(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
 
-static frontend::SocketFrontend CreateUNIXFrontend(Twibd &twibd) {
+#ifndef _WIN32
+static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd) {
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, frontend::Twibd_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
-	return frontend::SocketFrontend(&twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
+#endif
 
 } // namespace twibd
 } // namespace twili
@@ -195,8 +197,10 @@ int main(int argc, char *argv[]) {
 
 	LogMessage(Message, "starting twibd");
 	twili::twibd::Twibd twibd;
-	twili::twibd::frontend::SocketFrontend tcp_frontend = twili::twibd::CreateTCPFrontend(twibd);
-	twili::twibd::frontend::SocketFrontend unix_frontend = twili::twibd::CreateUNIXFrontend(twibd);
+	std::shared_ptr<twili::twibd::frontend::SocketFrontend> tcp_frontend = twili::twibd::CreateTCPFrontend(twibd);
+#ifndef WIN32
+	std::shared_ptr<twili::twibd::frontend::SocketFrontend> unix_frontend = twili::twibd::CreateUNIXFrontend(twibd);
+#endif
 	while(1) {
 		twibd.Process();
 	}

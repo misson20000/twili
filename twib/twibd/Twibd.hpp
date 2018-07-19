@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform.hpp"
+
 #include<list>
 #include<thread>
 #include<mutex>

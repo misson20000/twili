@@ -2,7 +2,13 @@
 #include<time.h>
 #include<forward_list>
 #include<stdarg.h>
+#include<string.h>
+
+#ifdef _MSC_VER
+#include<io.h>
+#else
 #include<unistd.h>
+#endif
 
 #include "Logger.hpp"
 #include "ansi-colors.h"
@@ -44,7 +50,11 @@ char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fna
   strftime(timebuf, 64,
            "%Y-%m-%d %R",
            timeinfo);
-           
+
+	if(strncmp(fname, PROJECT_ROOT, sizeof(PROJECT_ROOT)-1) == 0) {
+		fname+= sizeof(PROJECT_ROOT);
+	}
+	
   if(color) {
     const char *color = "";
     
