@@ -21,11 +21,13 @@ before_build:
 build:
   project: c:/projects/twili/twib/build/twib.sln
   parallel: true
+after_build:
+- cmd: |-
+    copy C:\projects\twili\twib\build\twib\Release\twib.exe C:\projects\twili\twib_win64.exe
+    copy C:\projects\twili\twib\build\twibd\Release\twibd.exe C:\projects\twili\twibd_win64.exe
 artifacts:
-- path: twib/build/twib/Release/twib.exe
-  name: twib_win64.exe
-- path: twib/build/twibd/Release/twibd.exe
-  name: twibd_win64.exe
+- path: twib_win64.exe
+- path: twibd_win64.exe
 deploy:
   description: 'describe this release'
   provider: GitHub
@@ -35,6 +37,6 @@ deploy:
   draft: true
   force_update: true
   on:
-    appveyor_repo_tag: true
+    APPVEYOR_REPO_TAG: true
 #after_build:
 #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
