@@ -68,6 +68,9 @@ USBBackend::~USBBackend() {
 	event_thread_destroy = true;
 	if(TWIBD_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		libusb_hotplug_deregister_callback(ctx, hotplug_handle); // wakes up usb_event_thread
+		if(TWIBD_ACCEPT_NINTENDO_SDK_DEBUGGER) {
+			libusb_hotplug_deregister_callback(ctx, hotplug_handle_nintendo_sdk_debugger);
+		}
 	}
 	event_thread.join();
 	libusb_exit(ctx);
