@@ -15,11 +15,14 @@ if(NOT WIN32)
 	set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 endif()
 
-set(MSGPACK11_BUILD_TESTS OFF CACHE BOOL "foo")
+set(MSGPACK11_BUILD_TESTS OFF CACHE BOOL "Build msgpack11 unit tests")
 
 set(WITH_SYSTEMD OFF CACHE BOOL "Enable systemd integration in twibd")
-set(TWIBD_UNIX_SOCKET_PATH "/var/run/twibd.sock" CACHE FILEPATH "Path for the twibd unix socket")
 set(TWIBD_HOTPLUG_ENABLED ON CACHE BOOL "Enable USB hotplug in twibd")
+set(TWIB_UNIX_FRONTEND_ENABLED NOT WIN32 CACHE BOOL "Enable UNIX socket frontend")
+set(TWIB_UNIX_FRONTEND_DEFAULT_PATH "/var/run/twibd.sock" CACHE FILEPATH "Default path for the twibd UNIX socket frontend")
+set(TWIB_TCP_FRONTEND_ENABLED ON CACHE BOOL "Enable TCP socket frontend")
+set(TWIB_TCP_FRONTEND_DEFAULT_PORT 15151 CACHE STRING "Default port for twibd TCP socket frontend")
 set(TWILI_VENDOR_ID 0x1209 CACHE STRING "Vendor ID for Twili USB device")
 set(TWILI_PRODUCT_ID 0x8b00 CACHE STRING "Product ID for Twili USB device")
 

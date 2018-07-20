@@ -13,6 +13,7 @@
 
 #include<libusb.h>
 #include<msgpack11.hpp>
+#include<CLI/CLI.hpp>
 
 #include "SocketFrontend.hpp"
 #include "Protocol.hpp"
@@ -163,21 +164,21 @@ Response Twibd::HandleRequest(Request &rq) {
 	}
 }
 
-static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd) {
+static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd, uint16_t port) {
 	struct sockaddr_in6 addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
-	addr.sin6_port = htons((u_short) 15151);
+	addr.sin6_port = htons(port);
 	addr.sin6_addr = in6addr_any;
 	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
 
 #ifndef _WIN32
-static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd) {
+static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd, std::string path) {
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, TWIBD_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
+	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path)-1);
 	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
 #endif
@@ -196,10 +197,59 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
+	CLI::App app {"Twili debug monitor daemon"};
+
 	bool systemd_mode = false;
 #if WITH_SYSTEMD == 1
-	if(argc > 1 && strcmp(argv[1], "-s") == 0) {
-		systemd_mode = true;
+	app.add_flag("--systemd", systemd_mode, "Log in systemd format and obtain sockets from systemd (disables unix and tcp frontends)");
+#endif
+
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
+	bool unix_frontend_enabled = true;
+	app.add_flag_function(
+		"--unix",
+		[&unix_frontend_enabled](int count) {
+			unix_frontend_enabled = true;
+		}, "Enable UNIX socket frontend");
+	app.add_flag_function(
+		"--no-unix",
+		[&unix_frontend_enabled](int count) {
+			unix_frontend_enabled = false;
+		}, "Disable UNIX socket frontend");
+	std::string unix_frontend_path = TWIB_UNIX_FRONTEND_DEFAULT_PATH;
+	app.add_option(
+		"-P,--unix-path", unix_frontend_path,
+		"Path for the twibd UNIX socket frontend")
+		->envname("TWIB_UNIX_FRONTEND_PATH");
+#endif
+
+#if TWIB_TCP_FRONTEND_ENABLED == 1
+	bool tcp_frontend_enabled = true;
+	app.add_flag_function(
+		"--tcp",
+		[&tcp_frontend_enabled](int count) {
+			tcp_frontend_enabled = true;
+		}, "Enable TCP socket frontend");
+	app.add_flag_function(
+		"--no-tcp",
+		[&tcp_frontend_enabled](int count) {
+			tcp_frontend_enabled = false;
+		}, "Disable TCP socket frontend");
+	uint16_t tcp_frontend_port;
+	app.add_option(
+		"-p,--tcp-port", tcp_frontend_port,
+		"Port for the twibd TCP socket frontend")
+		->envname("TWIB_TCP_FRONTEND_PORT");
+#endif
+
+	try {
+		app.parse(argc, argv);
+	} catch(const CLI::ParseError &e) {
+		return app.exit(e);
+	}
+	
+#if WITH_SYSTEMD == 1
+	if(systemd_mode) {
 		add_log(std::make_shared<twili::log::SystemdLogger>(stderr, twili::log::Level::Debug));
 	}
 #endif
@@ -212,25 +262,35 @@ int main(int argc, char *argv[]) {
 	twili::twibd::Twibd twibd;
 	std::vector<std::shared_ptr<twili::twibd::frontend::SocketFrontend>> frontends;
 	if(!systemd_mode) {
-		frontends.push_back(twili::twibd::CreateTCPFrontend(twibd));
-		frontends.push_back(twili::twibd::CreateUNIXFrontend(twibd));
+#if TWIB_TCP_FRONTEND_ENABLED == 1
+		if(tcp_frontend_enabled) {
+			frontends.push_back(twili::twibd::CreateTCPFrontend(twibd, tcp_frontend_port));
+		}
+#endif
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
+		if(unix_frontend_enabled) {
+			frontends.push_back(twili::twibd::CreateUNIXFrontend(twibd, unix_frontend_path));
+		}
+#endif
 	}
 
 #if WITH_SYSTEMD == 1
-	int num_fds = sd_listen_fds(false);
-	if(num_fds < 0) {
-		LogMessage(Warning, "failed to get FDs from systemd");
-	} else {
-		LogMessage(Info, "got %d sockets from systemd", num_fds);
-		for(int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + num_fds; fd++) {
-			if(sd_is_socket(fd, 0, SOCK_STREAM, 1) == 1) {
-				frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(&twibd, fd));
-			} else {
-				LogMessage(Warning, "got an FD from systemd that wasn't a SOCK_STREAM: %d", fd);
+	if(systemd_mode) {
+		int num_fds = sd_listen_fds(false);
+		if(num_fds < 0) {
+			LogMessage(Warning, "failed to get FDs from systemd");
+		} else {
+			LogMessage(Info, "got %d sockets from systemd", num_fds);
+			for(int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + num_fds; fd++) {
+				if(sd_is_socket(fd, 0, SOCK_STREAM, 1) == 1) {
+					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(&twibd, fd));
+				} else {
+					LogMessage(Warning, "got an FD from systemd that wasn't a SOCK_STREAM: %d", fd);
+				}
 			}
 		}
+		sd_notify(false, "READY=1");
 	}
-	sd_notify(false, "READY=1");
 #endif
 	
 	while(1) {

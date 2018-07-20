@@ -21,56 +21,7 @@
 namespace twili {
 namespace twib {
 
-int connect_tcp() {
-	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
-	if(fd < 0) {
-		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
-		exit(1);
-	}
-
-	struct sockaddr_in6 addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	addr.sin6_addr = in6addr_loopback;
-	addr.sin6_port = htons(15151);
-
-	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
-		closesocket(fd);
-		exit(1);
-	}
-	LogMessage(Info, "connected to twibd: %d", fd);
-	return fd;
-}
-
-int connect_unix() {
-#ifdef _WIN32
-	LogMessage(Fatal, "UNIX domain socket not supported on windows");
-	exit(-1);
-	return -1;
-#else
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if(fd < 0) {
-		LogMessage(Fatal, "failed to create UNIX domain socket: %s", strerror(errno));
-		exit(1);
-	}
-
-	struct sockaddr_un addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, TWIBD_UNIX_SOCKET_PATH, sizeof(addr.sun_path)-1);
-
-	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
-		close(fd);
-		exit(1);
-	}
-	LogMessage(Info, "connected to twibd: %d", fd);
-	return fd;
-#endif
-}
-
-Twib::Twib(int tcp) : mc(tcp ? connect_tcp() : connect_unix(), this) {
+Twib::Twib(int fd) : mc(fd, this) {
 	// TODO: Figure out how to fix this.
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
@@ -265,6 +216,9 @@ void ListProcesses(ITwibDeviceInterface &iface) {
 } // namespace twib
 } // namespace twili
 
+int connect_tcp(uint16_t port);
+int connect_unix(std::string path);
+
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -276,20 +230,49 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-	CLI::App app{"Twili debug monitor client"};
+	CLI::App app {"Twili debug monitor client"};
 
 	std::string device_id_str;
-	app.add_option("-d,--device", device_id_str, "Use a specific device")->type_name("DeviceId");
+	app.add_option("-d,--device", device_id_str, "Use a specific device")
+		->type_name("DeviceId")
+		->envname("TWIB_DEVICE");
 
 	bool is_verbose;
 	app.add_flag("-v,--verbose", is_verbose, "Enable debug logging");
 
-#ifdef _WIN32
-	bool is_tcp = true;
+	std::string frontend;
+	std::string unix_frontend_path = TWIB_UNIX_FRONTEND_DEFAULT_PATH;
+	uint16_t tcp_frontend_port = TWIB_TCP_FRONTEND_DEFAULT_PORT;
+	
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
+	frontend = "unix";
 #else
-	bool is_tcp = false;
-	app.add_flag("-t,--tcp", is_tcp, "Enable TCP");
-#endif	
+	frontend = "tcp";
+#endif
+	
+	app.add_set("-f,--frontend", frontend, {
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
+			"unix",
+#endif
+#if TWIB_TCP_FRONTEND_ENABLED == 1
+			"tcp",
+#endif
+		})->envname("TWIB_FRONTEND");
+
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
+	app.add_option(
+		"-P,--unix-path", unix_frontend_path,
+		"Path to the twibd UNIX socket")
+		->envname("TWIB_UNIX_FRONTEND_PATH");
+#endif
+
+#if TWIB_TCP_FRONTEND_ENABLED == 1
+	app.add_option(
+		"-p,--tcp-port", tcp_frontend_port,
+		"Port for the twibd TCP socket")
+		->envname("TWIB_TCP_FRONTEND_PORT");
+#endif
+	
 	CLI::App *ld = app.add_subcommand("list-devices", "List devices");
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
@@ -323,8 +306,17 @@ int main(int argc, char *argv[]) {
 	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	
 	LogMessage(Message, "starting twib");
-	
-	twili::twib::Twib twib(is_tcp);
+
+	int fd;
+	if(TWIB_UNIX_FRONTEND_ENABLED && frontend == "unix") {
+		fd = connect_unix(unix_frontend_path);
+	} else if(TWIB_TCP_FRONTEND_ENABLED && frontend == "tcp") {
+		fd = connect_tcp(tcp_frontend_port);
+	} else {
+		LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
+		exit(1);
+	}
+	twili::twib::Twib twib(fd);
 	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(twib.mc.obj, 0, 0));
 	
 	if(ld->parsed()) {
@@ -394,4 +386,59 @@ int main(int argc, char *argv[]) {
 	}
 	
 	return 0;
+}
+
+int connect_tcp(uint16_t port) {
+#if TWIB_TCP_FRONTEND_ENABLED == 0
+	LogMessage(Fatal, "TCP socket not supported");
+	exit(1);
+	return -1;
+#else
+	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
+	if(fd < 0) {
+		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
+		exit(1);
+	}
+
+	struct sockaddr_in6 addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_addr = in6addr_loopback;
+	addr.sin6_port = htons(port);
+
+	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		closesocket(fd);
+		exit(1);
+	}
+	LogMessage(Info, "connected to twibd: %d", fd);
+	return fd;
+#endif
+}
+
+int connect_unix(std::string path) {
+#if TWIB_UNIX_FRONTEND_ENABLED == 0
+	LogMessage(Fatal, "UNIX domain socket not supported");
+	exit(1);
+	return -1;
+#else
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(fd < 0) {
+		LogMessage(Fatal, "failed to create UNIX domain socket: %s", strerror(errno));
+		exit(1);
+	}
+
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path)-1);
+
+	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		close(fd);
+		exit(1);
+	}
+	LogMessage(Info, "connected to twibd: %d", fd);
+	return fd;
+#endif
 }

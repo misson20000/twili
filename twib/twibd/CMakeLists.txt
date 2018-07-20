@@ -10,6 +10,9 @@ target_link_libraries(twibd twib-log twib-buffer)
 include_directories(msgpack11 INTERFACE)
 target_link_libraries(twibd msgpack11)
 
+include_directories(CLI11 INTERFACE)
+target_link_libraries(twibd CLI11)
+
 find_package(libusb-1.0 REQUIRED)
 include_directories(${LIBUSB_1_INCLUDE_DIRS})
 target_link_libraries(twibd ${LIBUSB_1_LIBRARIES})
@@ -28,13 +31,13 @@ if(WITH_SYSTEMD)
 	target_link_libraries(twibd ${SYSTEMD_LIBRARIES})
 
 	configure_file(
-		"${PROJECT_SOURCE_DIR}/twibd/twibd.socket"
-		"${PROJECT_BINARY_DIR}/twibd/twibd.socket"
+		"${CMAKE_CURRENT_SOURCE_DIR}/twibd.socket"
+		"${CMAKE_CURRENT_BINARY_DIR}/twibd.socket"
 		)
 	
 	set(SYSTEMD_CONFIG_DIR "lib/systemd/system")
-	install(FILES ${PROJECT_BINARY_DIR}/twibd/twibd.socket DESTINATION ${SYSTEMD_CONFIG_DIR})
-	install(FILES ${PROJECT_SOURCE_DIR}/twibd/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/twibd.socket DESTINATION ${SYSTEMD_CONFIG_DIR})
+	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
 endif()
 
 install(TARGETS twibd RUNTIME DESTINATION bin)

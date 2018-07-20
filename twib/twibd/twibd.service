@@ -5,5 +5,5 @@ Requires=twibd.socket
 [Service]
 Type=notify
 NotifyAccess=all
-ExecStart=twibd -s
+ExecStart=twibd --systemd
 StandardError=journal
