@@ -164,6 +164,7 @@ Response Twibd::HandleRequest(Request &rq) {
 	}
 }
 
+#if TWIB_TCP_FRONTEND_ENABLED == 1
 static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd, uint16_t port) {
 	struct sockaddr_in6 addr;
 	memset(&addr, 0, sizeof(addr));
@@ -172,8 +173,9 @@ static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd,
 	addr.sin6_addr = in6addr_any;
 	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
+#endif
 
-#ifndef _WIN32
+#if TWIB_UNIX_FRONTEND_ENABLED == 1
 static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd, std::string path) {
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
