@@ -1,18 +1,38 @@
+# Twili
+
 [![AppVeyor build status](https://ci.appveyor.com/api/projects/status/vfgm34q4lf29ctaq/branch/master?svg=true)](https://ci.appveyor.com/project/misson20000/twili/branch/master)
 [![Travis build status](https://travis-ci.org/misson20000/twili.svg?branch=master)](https://travis-ci.org/misson20000/twili)
-
-# Twili
 
 Twili is a debug monitor/bridge for homebrew applications running on the Nintendo Switch.
 
 The debug monitor aspect of it aims to provide a sane solution for stdio and logging, and to ease development by generating crash reports.
 The debug bridge aspect aims to provide similar utilities to [ADB](https://developer.android.com/studio/command-line/adb), allowing fast and convenient sideloading and filesystem access.
 
-# Running and Usage
+## Supported Firmware Versions
 
-The currently recommended way to use Twili is to use Hekate to load twili_launcher.kip. Next, you will have to connect to the stdio console. Recent versions of the Linux kernel have a driver built in, so Linux users only have to do `minicom -D /dev/ttyUSB0`. Use `Ctrl-A U` to fix the carraige returns. Alternatively, `twik` can be used. Once Twili is able to write over the stdio console, it will bring up the USB interface.
+Version | Support
+-|-
+1.0.0 | Tested partially working
+2.0.0 | Expected working
+2.1.0 - 2.3.0 | Expected working
+3.0.0 | Tested working
+3.0.1 - 4.0.1 | Unknown
+4.1.0 | Unknown
+5.0.0 - 5.0.1 | Unknown
+5.0.2 | Unknown
 
-Once the USB interface is up, you need to run `twibd`. Twibd supports hotplugging Twili devices, so you can leave it running. Twibd will create a UNIX socket in its working directory. You can use `twib` in the same directory to send commands to `twibd`, and, in turn, send them to `twili`.
+# Installation
+
+The currently recommended way to use Twili is to use Hekate to load `twili_launcher.kip`.
+I suggest that you build the latest version of Twili from source, but I understand that lots of people don't want to do that. You can download the latest version of `twili_launcher.kip` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t6).
+
+You will also need `twib` and `twibd`. These are somewhat easier to build than twili, if you don't have a libtransistor toolchain set up.
+
+If you're running Arch Linux, you can install [twib-git from the AUR](https://aur.archlinux.org/packages/twib-git/). This package installs twibd as a systemd service, so you're ready to launch Twili and start using `twib`.
+
+If you're not running Arch Linux, you can download `twib` and `twibd` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t6). Twibd will likely need to be run as root to grant permissions for USB devices and /var/run, but with udev rules, you can run it as a normal user. You will need to leave twibd running in the background.
+
+Windows support is experimental.
 
 ## Twib Usage
 
@@ -22,8 +42,14 @@ Usage: twib [OPTIONS] SUBCOMMAND
 
 Options:
   -h,--help                   Print this help message and exit
-  -d,--device DeviceId        Use a specific device
+  -d,--device DeviceId (Env:TWIB_DEVICE)
+                              Use a specific device
   -v,--verbose                Enable debug logging
+  -f,--frontend TEXT in {tcp,unix} (Env:TWIB_FRONTEND)
+  -P,--unix-path TEXT (Env:TWIB_UNIX_FRONTEND_PATH)
+                              Path to the twibd UNIX socket
+  -p,--tcp-port UINT (Env:TWIB_TCP_FRONTEND_PORT)
+                              Port for the twibd TCP socket
 
 Subcommands:
   list-devices                List devices
@@ -42,7 +68,7 @@ First, you will need to install libtransistor. Download the [latest release](htt
 
 ## Twib
 
-Twib currently uses a CMake-based build system. I recommend building out-of-tree.
+Twib currently uses a CMake-based build system. I recommend building out-of-tree. You may want to enable systemd integration with `cmake -DWITH_SYSTEMD=ON`.
 
 ```
 $ cd twib/
@@ -116,7 +142,7 @@ Initially, only the pipe with id 0 exists on the device. It represents `ITwibInt
 
 #### Command ID 10: `RUN`
 
-The request payload for this command is a complete executable file, in either `NRO` or `ELF` format. Upon successful completion, the response payload is a `u64 process_id` followed by three `u32 object_id`s corresponding to an `ITwibPipeWriter` representing `stdin`, and two `ITwibPipeReader`s representing `stdout` and `stderr`.
+The request payload for this command is a complete executable file, in either `NRO` format. Upon successful completion, the response payload is a `u64 process_id`.
 
 ##### Request
 ```
@@ -126,9 +152,6 @@ u8 executable[];
 ##### Response
 ```
 u64 process_id;
-u32 stdin_object_id;
-u32 stdout_object_id;
-u32 stderr_object_id;
 ```
 
 #### Command ID 11: `REBOOT`
