@@ -6,6 +6,10 @@
 namespace twili {
 namespace util {
 
+#ifdef WIN32
+typedef signed long long ssize_t;
+#endif
+
 std::optional<std::vector<uint8_t>> ReadFile(const char *path) {
 	FILE *f = fopen(path, "rb");
 	if(f == NULL) {

@@ -18,3 +18,5 @@ target_link_libraries(twib Threads::Threads)
 if (WIN32)
 	target_link_libraries(twib wsock32 ws2_32)
 endif()
+
+install(TARGETS twib RUNTIME DESTINATION bin)

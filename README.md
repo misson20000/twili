@@ -1,3 +1,6 @@
+[![AppVeyor build status](https://ci.appveyor.com/api/projects/status/vfgm34q4lf29ctaq/branch/master?svg=true)](https://ci.appveyor.com/project/misson20000/twili/branch/master)
+[![Travis build status](https://travis-ci.org/misson20000/twili.svg?branch=master)](https://travis-ci.org/misson20000/twili)
+
 # Twili
 
 Twili is a debug monitor/bridge for homebrew applications running on the Nintendo Switch.

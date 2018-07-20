@@ -7,7 +7,7 @@ namespace twib {
 
 class RemoteObject {
  public:
-	RemoteObject(Twib *twib, uint32_t device_id, uint32_t object_id);
+	RemoteObject(std::shared_ptr<Client> client, uint32_t device_id, uint32_t object_id);
 	~RemoteObject();
 
 	std::future<Response> SendRequest(uint32_t command_id, std::vector<uint8_t> payload);
@@ -20,7 +20,7 @@ class RemoteObject {
 	
 	RemoteObject CreateSiblingFromId(uint32_t object_id);
  private:
-	Twib *twib;
+	std::shared_ptr<Client> client;
 	uint32_t device_id;
 	uint32_t object_id;
 };

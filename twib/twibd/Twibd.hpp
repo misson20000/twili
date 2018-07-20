@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform.hpp"
+
 #include<list>
 #include<thread>
 #include<mutex>
@@ -12,11 +14,6 @@
 #include "blockingconcurrentqueue.h"
 
 #include "USBBackend.hpp"
-
-#include "TCPFrontend.hpp"
-#ifndef _WIN32
-#include "UNIXFrontend.hpp"
-#endif
 
 #include "Logger.hpp"
 #include "Messages.hpp"
@@ -43,10 +40,6 @@ class Twibd {
 	
  private:
 	backend::USBBackend usb;
-	frontend::TCPFrontend tcp;
-#ifndef _WIN32
-	frontend::UNIXFrontend unix;
-#endif
 
 	moodycamel::BlockingConcurrentQueue<std::variant<Request, Response>> dispatch_queue;
 	
