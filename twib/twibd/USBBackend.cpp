@@ -230,7 +230,6 @@ void USBBackend::Device::DataInTransferCompleted() {
 	size_t beg_off = (tfer_data_in->buffer - response_in.payload.data());
 	size_t read = beg_off + tfer_data_in->actual_length;
 	size_t remaining = mhdr_in.payload_size - read;
-	LogMessage(Debug, "got response data 0x%x/0x%x, 0x%x remaining", read, response_in.payload.size(), remaining);
 	
 	if(remaining > 0) {
 		// continue transferring
@@ -287,7 +286,7 @@ void USBBackend::Device::Identified(Response &r) {
 
 void USBBackend::Device::ResubmitMetaInTransfer() {
 	LogMessage(Debug, "submitting meta in transfer");
-	libusb_fill_bulk_transfer(tfer_meta_in, handle, endp_meta_in, (uint8_t*) &mhdr_in, sizeof(mhdr_in), &Device::MetaInTransferShim, SharedPtrForTransfer(), 5000);
+	libusb_fill_bulk_transfer(tfer_meta_in, handle, endp_meta_in, (uint8_t*) &mhdr_in, sizeof(mhdr_in), &Device::MetaInTransferShim, SharedPtrForTransfer(), 600000);
 	int r = libusb_submit_transfer(tfer_meta_in);
 	if(r != 0) {
 		LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
@@ -344,7 +343,6 @@ void USBBackend::Device::MetaInTransferShim(libusb_transfer *tfer) {
 }
 
 void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
-	LogMessage(Debug, "data in transfer shim, status = %d", tfer->status);
 	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
 	if(!(*d)->CheckTransfer(tfer)) {
 		(*d)->DataInTransferCompleted();
