@@ -441,9 +441,17 @@ void USBBackend::AddDevice(libusb_device *device) {
 			LogMessage(Debug, "      bInterfaceProtocol: 0x%x", altsetting->bInterfaceProtocol);
 			if(altsetting->bInterfaceClass == 0xFF &&
 				 altsetting->bInterfaceSubClass == 0x1 &&
-				 altsetting->bInterfaceProtocol == 0x0) {
+				 altsetting->bInterfaceProtocol == 0x0) { // twili interface
+				if(twili_interface != NULL) {
+					LogMessage(Warning, "    device has multiple twili interfaces?");
+				}
 				twili_interface = altsetting;
 				break;
+			}
+			if(altsetting->bInterfaceClass == 0xFF &&
+				 altsetting->bInterfaceSubClass == 0x0 &&
+				 altsetting->bInterfaceProtocol == 0x0) { // stdio console interface
+				ProbeStdioInterface(device, altsetting);
 			}
 		}
 	}
@@ -513,9 +521,95 @@ void USBBackend::RemoveDevice(libusb_context *ctx, libusb_device *device) {
 	LogMessage(Debug, "a device was removed, but not sure which one");
 }
 
+void USBBackend::ProbeStdioInterface(libusb_device *device, const libusb_interface_descriptor *d) {
+	LogMessage(Debug, "probing stdio interface");
+	if(d->bNumEndpoints != 2) {
+		LogMessage(Warning, "Stdio interface exposes a bad number of endpoints");
+		return;
+	}
+	libusb_endpoint_descriptor endp_stdio_out = d->endpoint[0];
+	libusb_endpoint_descriptor endp_stdio_in = d->endpoint[1];
+	if((endp_stdio_out.bEndpointAddress & 0x80) != LIBUSB_ENDPOINT_OUT ||
+		 (endp_stdio_in.bEndpointAddress  & 0x80) != LIBUSB_ENDPOINT_IN) {
+		LogMessage(Warning, "Stdio interface exposes endpoints with bad directions");
+		return;
+	}
+
+	if((endp_stdio_out.bmAttributes & 0x3) != LIBUSB_TRANSFER_TYPE_BULK ||
+		 (endp_stdio_in.bmAttributes  & 0x3) != LIBUSB_TRANSFER_TYPE_BULK) {
+		LogMessage(Warning, "Stdio interface exposes endpoints with bad transfer types");
+		return;
+	}
+	
+	libusb_device_handle *handle;
+	int r = libusb_open(device, &handle);
+	if(r != 0) {
+		LogMessage(Warning, "failed to open device: %s", libusb_error_name(r));
+		return;
+	}
+	libusb_set_auto_detach_kernel_driver(handle, true);
+
+	r = libusb_claim_interface(handle, d->bInterfaceNumber);
+	if(r != 0) {
+		LogMessage(Warning, "failed to claim interface: %s", libusb_error_name(r));
+		libusb_close(handle);
+		return;
+	}
+
+	auto state = std::make_shared<StdoutTransferState>(handle, endp_stdio_in.bEndpointAddress);
+	stdout_transfers.push_back(state);
+	state->Submit();
+}
+
+USBBackend::StdoutTransferState::StdoutTransferState(libusb_device_handle *handle, uint8_t addr) :
+	handle(handle), address(addr) {
+	tfer = libusb_alloc_transfer(0);
+}
+
+USBBackend::StdoutTransferState::~StdoutTransferState() {
+	libusb_free_transfer(tfer);
+	libusb_close(handle);
+}
+
+void USBBackend::StdoutTransferState::Submit() {
+	libusb_fill_bulk_transfer(tfer, handle, address, io_buffer, sizeof(io_buffer), &StdoutTransferState::Callback, this, 60000);
+	int r = libusb_submit_transfer(tfer);
+	if(r != 0) {
+		LogMessage(Debug, "submit failed");
+		Kill();
+	}
+}
+
+void USBBackend::StdoutTransferState::Kill() {
+	deletion_flag = true;
+}
+
+void USBBackend::StdoutTransferState::Callback(libusb_transfer *tfer) {
+	StdoutTransferState *state = (StdoutTransferState*) tfer->user_data;
+	if(tfer->status == LIBUSB_TRANSFER_COMPLETED) {
+		state->string_buffer.Write(state->io_buffer, tfer->actual_length);
+		for(bool found_line = true; found_line; found_line = false) {
+			char *current_line = (char*) state->string_buffer.Read();
+			for(size_t i = 0; i < state->string_buffer.ReadAvailable(); i++) {
+				if(current_line[i] == '\n') {
+					LogMessage(Message, "[TWILI] %.*s", i, current_line);
+					state->string_buffer.MarkRead(i+1);
+					found_line = true;
+					break;
+				}
+			}
+		}
+		state->Submit();
+	} else if(tfer->status == LIBUSB_TRANSFER_TIMED_OUT) {
+		state->Submit();
+	} else {
+		LogMessage(Debug, "stdout transfer failed");
+		state->Kill();
+	}
+}
+
 void USBBackend::event_thread_func() {
 	while(!event_thread_destroy) {
-		LogMessage(Debug, "usb event thread loop");
 		libusb_handle_events(ctx);
 
 		while(!devices_to_add.empty()) {
@@ -535,6 +629,14 @@ void USBBackend::event_thread_func() {
 			if(d->deletion_flag) {
 				twibd->RemoveDevice(d);
 				i = devices.erase(i);
+			} else {
+				i++;
+			}
+		}
+
+		for(auto i = stdout_transfers.begin(); i != stdout_transfers.end(); ) {
+			if((*i)->deletion_flag) {
+				i = stdout_transfers.erase(i);
 			} else {
 				i++;
 			}

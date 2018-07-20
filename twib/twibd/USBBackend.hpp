@@ -10,6 +10,7 @@
 
 #include<libusb.h>
 
+#include "Buffer.hpp"
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
@@ -91,6 +92,27 @@ class USBBackend {
 	Twibd *twibd;
 	std::list<std::shared_ptr<Device>> devices;
 	std::queue<libusb_device*> devices_to_add;
+	
+	class StdoutTransferState {
+	 public:
+		StdoutTransferState(libusb_device_handle *handle, uint8_t address);
+		~StdoutTransferState();
+
+		void Submit();
+		void Kill(); // we have to delete this outside of the libusb event loop
+		static void Callback(libusb_transfer *tfer);
+		
+		libusb_transfer *tfer;
+		libusb_device_handle *handle;
+		uint8_t address;
+		uint8_t io_buffer[0x4000];
+		util::Buffer string_buffer;
+		bool deletion_flag = false;
+	};
+
+	std::list<std::shared_ptr<StdoutTransferState>> stdout_transfers;
+	
+	void ProbeStdioInterface(libusb_device *dev, const libusb_interface_descriptor *d);
 	
 	bool event_thread_destroy = false;
 	void event_thread_func();
