@@ -8,28 +8,34 @@
 #include<map>
 #include<functional>
 
+#include "twib/Protocol.hpp"
+
 namespace twili {
 
 class Twili;
 
+namespace bridge {
+
+class Object;
+
+} // namespace bridge
+
 namespace usb {
+
+class USBBuffer {
+ public:
+	USBBuffer(size_t size);
+	~USBBuffer();
+	uint8_t *data;
+	size_t size;
+};
 
 class USBBridge {
  public:
-	struct TransactionHeader {
-		uint32_t client_id;
-		uint32_t object_id;
-		union {
-			uint32_t command_id; // request
-			uint32_t result_code; // response
-		};
-		uint32_t tag;
-		uint64_t payload_size;
-	};
-	class USBRequestReader {
+	class RequestReader {
 	 public:
-		USBRequestReader(USBBridge *bridge);
-		~USBRequestReader();
+		RequestReader(USBBridge *bridge);
+		~RequestReader();
 		
 		trn::Result<std::nullopt_t> Begin();
 		trn::Result<std::nullopt_t> MetadataTransactionCompleted();
@@ -47,38 +53,22 @@ class USBBridge {
 		uint32_t meta_urb_id;
 		uint32_t data_urb_id;
 		
-		TransactionHeader current_header;
+		protocol::MessageHeader current_header;
 		std::vector<uint8_t> current_payload;
 	};
-	class USBBuffer {
-	 public:
-		USBBuffer(size_t size);
-		~USBBuffer();
-		uint8_t *data;
-		size_t size;
-	};
-	class USBResponseWriter;
-
-	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, USBResponseWriter&)>;
-
-	static inline const uint32_t PROTOCOL_VERSION = 1;
-	enum class CommandID : uint32_t {
-		RUN = 10,
-		REBOOT = 11,
-		COREDUMP = 12,
-		TERMINATE = 13,
-		LIST_PROCESSES = 14,
-		UPGRADE_TWILI = 15,
-		IDENTIFY = 16,
-	};
 	
-	USBBridge(Twili *twili);
+	class ResponseOpener;
+	class ResponseWriter;
+	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, std::shared_ptr<ResponseOpener>)>;
+	
+	USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero);
 	~USBBridge();
+
+	USBBridge(const USBBridge&) = delete;
+	USBBridge &operator=(USBBridge const&) = delete;
 	
 	static usb_ds_report_entry_t *FindReport(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, usb_ds_report_t &buffer, uint32_t urb_id);
 	static trn::Result<std::nullopt_t> PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size);
-
-	void AddRequestHandler(CommandID id, RequestHandler handler);
 	
  private:
 	Twili *twili;
@@ -88,13 +78,17 @@ class USBBridge {
 	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_response_data;
 	std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint_request_data;
 	std::shared_ptr<trn::WaitHandle> state_change_wait;
-	std::map<uint64_t, RequestHandler> request_handlers;
+
+	uint32_t object_id = 1;
+	std::map<uint32_t, std::shared_ptr<bridge::Object>> objects;
 	
-	USBRequestReader request_reader;
+	RequestReader request_reader;
 	USBBuffer request_meta_buffer;
 	USBBuffer response_meta_buffer;
 	USBBuffer request_data_buffer;
 	USBBuffer response_data_buffer;
+
+	bool is_writing_response = false;
 
 	trn::service::usb::ds::DS ds;
 	trn::KEvent usb_state_change_event;
@@ -103,15 +97,43 @@ class USBBridge {
 	bool USBStateChangeCallback();
 };
 
-class USBBridge::USBResponseWriter {
+class USBBridge::ResponseOpener {
  public:
-	USBResponseWriter(USBBridge *bridge, uint32_t client_id, uint32_t tag);
-	~USBResponseWriter();
+	ResponseOpener(USBBridge *bridge, uint32_t client_id, uint32_t tag);
+	~ResponseOpener();
+
+	trn::Result<std::nullopt_t> BeginOk(size_t payload_size, std::function<void(ResponseWriter&)> cb);
+	trn::Result<std::nullopt_t> BeginError(trn::ResultCode code, size_t payload_size, std::function<void(ResponseWriter&)> cb);
+	
+	template<typename T, typename... Args>
+	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
+		uint32_t object_id = bridge->object_id++;
+		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, args...);
+		bridge->objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(object_id, obj));
+		return obj;
+	}
+	
+ private:
+	friend class ResponseWriter;
+	USBBridge *bridge;
+	uint32_t client_id;
+	uint32_t tag;
+	
+	size_t transferred_size = 0;
+	trn::Result<std::nullopt_t> status = std::nullopt;
+	
+	bool has_begun = false;
+};
+
+class USBBridge::ResponseWriter {
+ public:
+	ResponseWriter(ResponseOpener &opener);
+
+	// don't extend my lifetime
+	ResponseWriter(const ResponseWriter&) = delete;
+	ResponseWriter &operator=(ResponseWriter const&) = delete;
 	
 	size_t GetMaxTransferSize();
-	bool HasBegun();
-	trn::Result<std::nullopt_t> BeginOk(size_t payload_size);
-	trn::Result<std::nullopt_t> BeginError(trn::ResultCode code, size_t payload_size);
 	trn::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
 	trn::Result<std::nullopt_t> Write(std::string str);
 	
@@ -127,13 +149,7 @@ class USBBridge::USBResponseWriter {
 		return Write((uint8_t*) &data, sizeof(data));
 	}
  private:
-	USBBridge *bridge;
-	uint32_t client_id;
-	uint32_t tag;
-	size_t transferred_size = 0;
-	size_t expected_size;
-	bool has_begun = false;
-	bool has_errored = false;
+	ResponseOpener &opener;
 };
 
 }

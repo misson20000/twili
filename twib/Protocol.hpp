@@ -19,6 +19,8 @@ struct MessageHeader {
 	uint64_t payload_size;
 };
 
+const int VERSION = 2;
+
 class ITwibMetaInterface {
  public:
 	enum class Command : uint32_t {

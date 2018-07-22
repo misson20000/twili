@@ -9,6 +9,7 @@ typedef bool _Bool;
 #include<libtransistor/svc.h>
 
 #include "twili.hpp"
+#include "BridgeObject.hpp"
 #include "USBBridge.hpp"
 #include "err.hpp"
 
@@ -50,7 +51,7 @@ using trn::ResultError;
 
 static const size_t TRANSFER_BUFFER_SIZE = 0x8000;
 
-USBBridge::USBBridge(Twili *twili) :
+USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
 	ds(ResultCode::AssertOk(trn::service::usb::ds::DS::Initialize(2))),
 	usb_state_change_event(ResultCode::AssertOk(ds.GetStateChangeEvent())),
@@ -72,13 +73,7 @@ USBBridge::USBBridge(Twili *twili) :
 		interface->GetEndpoint(endpoint_out_descriptor)); // out from host
 	ResultCode::AssertOk(interface->Enable());
 
-	AddRequestHandler(CommandID::RUN, std::bind(&Twili::Run, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::REBOOT, std::bind(&Twili::Reboot, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::COREDUMP, std::bind(&Twili::CoreDump, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::TERMINATE, std::bind(&Twili::Terminate, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::LIST_PROCESSES, std::bind(&Twili::ListProcesses, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::UPGRADE_TWILI, std::bind(&Twili::UpgradeTwili, twili, std::placeholders::_1, std::placeholders::_2));
-	AddRequestHandler(CommandID::IDENTIFY, std::bind(&Twili::Identify, twili, std::placeholders::_1, std::placeholders::_2));
+	objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(0, object_zero));
 
 	state_change_wait = twili->event_waiter.Add(usb_state_change_event, [this]() {
 			return USBStateChangeCallback();
@@ -140,20 +135,16 @@ bool USBBridge::USBStateChangeCallback() {
 	return true;
 }
 
-void USBBridge::AddRequestHandler(CommandID id, RequestHandler handler) {
-	request_handlers[(uint32_t) id] = handler;
-}
-
 USBBridge::~USBBridge() {
 }
 
-USBBridge::USBRequestReader::USBRequestReader(twili::usb::USBBridge *bridge) : bridge(bridge) {
+USBBridge::RequestReader::RequestReader(twili::usb::USBBridge *bridge) : bridge(bridge) {
 }
 
-USBBridge::USBRequestReader::~USBRequestReader() {
+USBBridge::RequestReader::~RequestReader() {
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBRequestReader::Begin() {
+trn::Result<std::nullopt_t> USBBridge::RequestReader::Begin() {
 	meta_completion_wait =
 		bridge->twili->event_waiter.Add(
 			bridge->endpoint_request_meta->completion_event, [this]() {
@@ -178,9 +169,9 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::Begin() {
 	return PostMetaBuffer();
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBRequestReader::PostMetaBuffer() {
+trn::Result<std::nullopt_t> USBBridge::RequestReader::PostMetaBuffer() {
 	auto r = bridge->endpoint_request_meta->PostBufferAsync(
-		bridge->request_meta_buffer.data, sizeof(TransactionHeader));
+		bridge->request_meta_buffer.data, sizeof(protocol::MessageHeader));
 	if(r) {
 		meta_urb_id = *r;
 		return std::nullopt;
@@ -189,7 +180,7 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::PostMetaBuffer() {
 	}
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBRequestReader::PostDataBuffer() {
+trn::Result<std::nullopt_t> USBBridge::RequestReader::PostDataBuffer() {
 	size_t size = bridge->request_data_buffer.size;
 	if(current_header.payload_size - current_payload.size() < size) {
 		size = current_header.payload_size - current_payload.size();
@@ -205,7 +196,7 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::PostDataBuffer() {
 	}
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBRequestReader::MetadataTransactionCompleted() {
+trn::Result<std::nullopt_t> USBBridge::RequestReader::MetadataTransactionCompleted() {
 	usb_ds_report_t report;
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_meta, report, meta_urb_id);
 	if(entry->urb_status != 3) {
@@ -215,13 +206,12 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::MetadataTransactionComp
 	if(entry->transferred_size == 0) {
 		return std::nullopt;
 	}
-	if(entry->transferred_size != sizeof(TransactionHeader)) {
+	if(entry->transferred_size != sizeof(protocol::MessageHeader)) {
 		return std::nullopt;
 	}
-	memcpy(&current_header, bridge->request_meta_buffer.data, sizeof(TransactionHeader));
+	memcpy(&current_header, bridge->request_meta_buffer.data, sizeof(protocol::MessageHeader));
 	printf("got header, command %u, payload size 0x%lx\n", current_header.command_id, current_header.payload_size);
 	
-	//bridge->endpoint_request_data->Stall(); // TODO
 	current_payload.clear();
 	if(current_header.payload_size > 0) {
 		current_payload.reserve(current_header.payload_size);
@@ -232,7 +222,7 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::MetadataTransactionComp
 	}
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBRequestReader::DataTransactionCompleted() {
+trn::Result<std::nullopt_t> USBBridge::RequestReader::DataTransactionCompleted() {
 	usb_ds_report_t report;
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_data, report, data_urb_id);
 	if(entry->urb_status != 3) {
@@ -241,8 +231,8 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::DataTransactionComplete
 	}
 	if(current_payload.size() + entry->transferred_size > current_header.payload_size) {
 		printf("Overshot payload size\n");
-		USBResponseWriter r(bridge, current_header.client_id, current_header.tag);
-		r.BeginError(TWILI_ERR_USB_TRANSFER, 0);
+		ResponseOpener r(bridge, current_header.client_id, current_header.tag);
+		r.BeginError(TWILI_ERR_USB_TRANSFER, 0, [](auto &_) {});
 		return std::nullopt;
 	}
 	std::copy( // append data to current_payload
@@ -258,113 +248,103 @@ trn::Result<std::nullopt_t> USBBridge::USBRequestReader::DataTransactionComplete
 	}
 }
 
-void USBBridge::USBRequestReader::ProcessCommand() {
-	USBResponseWriter response(bridge, current_header.client_id, current_header.tag);
-	auto i = bridge->request_handlers.find(current_header.command_id);
-	if(i == bridge->request_handlers.end()) {
-		response.BeginError(TWILI_ERR_BAD_REQUEST, 0);
+void USBBridge::RequestReader::ProcessCommand() {
+	std::shared_ptr<ResponseOpener> opener = std::make_shared<ResponseOpener>(bridge, current_header.client_id, current_header.tag);
+	auto i = bridge->objects.find(current_header.object_id);
+	if(i == bridge->objects.end()) {
+		opener->BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT, 0, [](auto &_) {});
 		return;
 	}
 	trn::Result<std::nullopt_t> r = std::nullopt;
 	try {
-		r = (*i).second(current_payload, response);
+		i->second->HandleRequest(current_header.command_id, current_payload, opener);
 	} catch(trn::ResultError *e) {
-		r = tl::make_unexpected(e->code);
-	}
-	if(!response.HasBegun()) {
-		if(r) {
-			response.BeginOk(0);
-		} else {
-			response.BeginError(r.error(), 0);
-		}
+		opener->BeginError(e->code, 0, [](auto &_) {});
 	}
 }
 
-USBBridge::USBResponseWriter::USBResponseWriter(USBBridge *bridge, uint32_t client_id, uint32_t tag) :
+USBBridge::ResponseOpener::ResponseOpener(USBBridge *bridge, uint32_t client_id, uint32_t tag) :
 	bridge(bridge),
 	client_id(client_id),
 	tag(tag) {
 	
 }
 
-size_t USBBridge::USBResponseWriter::GetMaxTransferSize() {
-	return bridge->response_data_buffer.size;
+USBBridge::ResponseOpener::~ResponseOpener() {
+	if(!has_begun) {
+		BeginOk(0, [](ResponseWriter &_) {});
+	}
 }
 
-bool USBBridge::USBResponseWriter::HasBegun() {
-	return has_begun;
-}
-
-trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginOk(size_t payload_size) {
+trn::Result<std::nullopt_t> USBBridge::ResponseOpener::BeginError(ResultCode code, size_t payload_size, std::function<void(ResponseWriter&)> cb) {
+	if(bridge->is_writing_response) {
+		printf("[USBB] attempt to begin response while already writing a response?\n");
+		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
+	}
 	if(has_begun) {
 		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
-	TransactionHeader hdr;
-	hdr.client_id = client_id;
-	hdr.result_code = 0;
-	hdr.tag = tag;
-	hdr.payload_size = payload_size;
-	has_begun = true;
-
-	expected_size = payload_size;
 	
-	memcpy(bridge->response_meta_buffer.data, &hdr, sizeof(hdr));
-	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_meta, bridge->response_meta_buffer.data, sizeof(hdr));
-	if(!r) {
-		has_errored = true;
-	}
-	return r;
-}
-
-trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::BeginError(ResultCode code, size_t payload_size) {
-	if(has_begun) {
-		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
-	}
-	TransactionHeader hdr;
+	protocol::MessageHeader hdr;
 	hdr.client_id = client_id;
 	hdr.result_code = code.code;
 	hdr.tag = tag;
 	hdr.payload_size = payload_size;
 	has_begun = true;
-
-	expected_size = payload_size;
 	
 	memcpy(bridge->response_meta_buffer.data, &hdr, sizeof(hdr));
 	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_meta, bridge->response_meta_buffer.data, sizeof(hdr));
 	if(!r) {
-		has_errored = true;
+		status = r;
+		return r;
 	}
-	return r;
+
+	has_begun = true;
+	bridge->is_writing_response = true;
+	ResponseWriter writer(*this);
+	cb(writer);
+	bridge->is_writing_response = false;
+
+	if(status && transferred_size != payload_size) {
+		return tl::make_unexpected(TWILI_ERR_RESPONSE_SIZE_MISMATCH);
+	}
+	
+	return std::nullopt;
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(uint8_t *data, size_t size) {
-	auto max_size = bridge->response_data_buffer.size;
+trn::Result<std::nullopt_t> USBBridge::ResponseOpener::BeginOk(size_t payload_size, std::function<void(ResponseWriter&)> cb) {
+	return BeginError(ResultCode(0), payload_size, cb);
+}
+
+USBBridge::ResponseWriter::ResponseWriter(ResponseOpener &opener) : opener(opener) {
+}
+
+size_t USBBridge::ResponseWriter::GetMaxTransferSize() {
+	return opener.bridge->response_data_buffer.size;
+}
+
+trn::Result<std::nullopt_t> USBBridge::ResponseWriter::Write(uint8_t *data, size_t size) {
+	auto max_size = opener.bridge->response_data_buffer.size;
 	while(size > max_size) {
 		Write(data, max_size);
 		data+= max_size;
 		size-= max_size;
 	}
-	memcpy(bridge->response_data_buffer.data, data, size);
-	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_data, bridge->response_data_buffer.data, size);
+	memcpy(opener.bridge->response_data_buffer.data, data, size);
+	auto r = USBBridge::PostBufferSync(opener.bridge->endpoint_response_data, opener.bridge->response_data_buffer.data, size);
 	if(r) {
-		transferred_size+= size;
+		opener.transferred_size+= size;
 	} else {
-		has_errored = true;
+		opener.status = r;
 	}
 	return r;
 }
 
-trn::Result<std::nullopt_t> USBBridge::USBResponseWriter::Write(std::string str) {
+trn::Result<std::nullopt_t> USBBridge::ResponseWriter::Write(std::string str) {
 	return Write((uint8_t*) str.data(), str.size());
 }
 
-USBBridge::USBResponseWriter::~USBResponseWriter() {
-	if(!has_errored && transferred_size != expected_size) {
-		throw new ResultError(TWILI_ERR_RESPONSE_SIZE_MISMATCH);
-	}
-}
-
-USBBridge::USBBuffer::USBBuffer(size_t size) : size(size) {
+USBBuffer::USBBuffer(size_t size) : size(size) {
 	data = (uint8_t*) alloc_pages(size, size, nullptr);
 	if(data == NULL) {
 		throw new ResultError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
@@ -376,7 +356,7 @@ USBBridge::USBBuffer::USBBuffer(size_t size) : size(size) {
 	}
 }
 
-USBBridge::USBBuffer::~USBBuffer() {
+USBBuffer::~USBBuffer() {
 	ResultCode::AssertOk(svcSetMemoryAttribute(data, size, 0x0, 0x0));
 	free_pages(data);
 }

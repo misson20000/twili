@@ -11,7 +11,7 @@ namespace twili {
 Process::Process(uint64_t pid) : pid(pid) {
 }
 
-trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::USBResponseWriter &writer) {
+trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
 	trn::KDebug debug = ResultCode::AssertOk(
 		trn::svc::DebugActiveProcess(pid));
 	printf("  opened debug: 0x%x\n", debug.handle);
@@ -156,7 +156,7 @@ trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report,
 		vaddr = ((uint64_t) mi.base_addr) + mi.size;
 	} while(vaddr > 0);
 
-	return report.Generate(debug, writer);
+	return report.Generate(debug, opener);
 }
 
 } // namespace twili
