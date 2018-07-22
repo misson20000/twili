@@ -219,6 +219,8 @@ void ListProcesses(ITwibDeviceInterface &iface) {
 int connect_tcp(uint16_t port);
 int connect_unix(std::string path);
 
+void show(msgpack11::MsgPack const& blob);
+
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -292,6 +294,9 @@ int main(int argc, char *argv[]) {
 	terminate->add_option("pid", terminate_process_id, "Process ID")->required();
 	
 	CLI::App *ps = app.add_subcommand("ps", "List processes on the device");
+
+	CLI::App *identify = app.add_subcommand("identify", "Identify the device");
+	
 	app.require_subcommand(1);
 	
 	try {
@@ -383,6 +388,10 @@ int main(int argc, char *argv[]) {
 	if(ps->parsed()) {
 		ListProcesses(itdi);
 		return 0;
+	}
+
+	if(identify->parsed()) {
+		show(itdi.Identify());
 	}
 	
 	return 0;

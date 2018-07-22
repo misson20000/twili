@@ -2,6 +2,8 @@
 
 #include<vector>
 
+#include<msgpack11.hpp>
+
 #include "RemoteObject.hpp"
 
 namespace twili {
@@ -24,6 +26,7 @@ class ITwibDeviceInterface {
 	std::vector<uint8_t> CoreDump(uint64_t process_id);
 	void Terminate(uint64_t process_id);
 	std::vector<ProcessListEntry> ListProcesses();
+	msgpack11::MsgPack Identify();
  private:
 	RemoteObject obj;
 };

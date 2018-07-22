@@ -38,5 +38,11 @@ std::vector<ProcessListEntry> ITwibDeviceInterface::ListProcesses() {
 	return std::vector<ProcessListEntry>(first, first + (rs.payload.size() / sizeof(ProcessListEntry)));
 }
 
+msgpack11::MsgPack ITwibDeviceInterface::Identify() {
+	Response rs = obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::IDENTIFY);
+	std::string err;
+	return msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
+}
+
 } // namespace twib
 } // namespace twil
