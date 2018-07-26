@@ -65,7 +65,7 @@ class CrashReportThread {
 	uint64_t entrypoint;
 };
 
-trn::Result<std::nullopt_t> MonitoredProcess::GenerateCrashReport(ELFCrashReport &report, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+trn::Result<std::nullopt_t> MonitoredProcess::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
 	printf("generating crash report...\n");
 
 	std::vector<ELF::Note::elf_auxv_t> auxv;

@@ -28,7 +28,7 @@ namespace bridge {
 ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : Object(device_id), twili(twili) {
 }
 
-void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	trn::Result<std::nullopt_t> r = std::nullopt;
 	switch((protocol::ITwibDeviceInterface::Command) command_id) {
 	case protocol::ITwibDeviceInterface::Command::RUN:
@@ -57,17 +57,17 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 		break;
 	}
 	if(!r) {
-		opener->BeginError(r.error(), 0, [](auto &_) {});
+		opener.BeginError(r.error(), 0);
 	}
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	ResultCode::AssertOk(bpc_init());
 	ResultCode::AssertOk(bpc_reboot_system());
 	return std::nullopt;
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::Run(std::vector<uint8_t> nro, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::ResponseOpener opener) {
 	std::vector<uint32_t> caps = {
 		0b00011111111111111111111111101111, // SVC grants
 		0b00111111111111111111111111101111,
@@ -95,10 +95,13 @@ Result<std::nullopt_t> ITwibDeviceInterface::Run(std::vector<uint8_t> nro, std::
 	
 	auto mon = twili.monitored_processes.emplace_back(&twili, *proc, *target_addr);
 	mon.Launch();
-	return opener->BeginOk(sizeof(uint64_t), [&mon](auto &writer) { writer.template Write<uint64_t>(mon.pid); });
+	
+	auto writer = ResultCode::AssertOk(opener.BeginOk(sizeof(uint64_t)));
+	writer.Write<uint64_t>(mon.pid);
+	return std::nullopt;
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
     if (payload.size() != sizeof(uint64_t)) {
         return tl::make_unexpected(TWILI_ERR_BAD_REQUEST);
     }
@@ -114,7 +117,7 @@ Result<std::nullopt_t> ITwibDeviceInterface::CoreDump(std::vector<uint8_t> paylo
     }
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
    if(payload.size() != sizeof(uint64_t)) {
       return tl::make_unexpected(TWILI_ERR_BAD_REQUEST);
    }
@@ -127,7 +130,7 @@ Result<std::nullopt_t> ITwibDeviceInterface::Terminate(std::vector<uint8_t> payl
    }
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	uint64_t pids[256];
 	uint32_t num_pids;
 	auto r = ResultCode::ExpectOk(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
@@ -148,47 +151,45 @@ Result<std::nullopt_t> ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> 
 	if(!pr) { return tl::make_unexpected(r.error()); }
 	my_pid = *pr;
 	
-	return opener->BeginOk(
-		sizeof(ProcessReport) * num_pids,
-		[this, my_pid, num_pids, &pids](auto &writer) {
-			for(uint32_t i = 0; i < num_pids; i++) {
-				struct ProcessReport preport;
-				preport.process_id = pids[i];
-				preport.result = RESULT_OK;
-				preport.title_id = 0;
-				memset(preport.process_name, 0, sizeof(preport.process_name));
-				preport.mmu_flags = 0;
-				if(pids[i] == my_pid) {
-					preport.result = TWILI_ERR_WONT_DEBUG_SELF;
-				} else {
-					auto dr = trn::svc::DebugActiveProcess(pids[i]);
-					if(!dr) {
-						preport.result = dr.error().code;
-					} else {
-						trn::KDebug debug = std::move(*dr);
-						auto er = trn::svc::GetDebugEvent(debug);
-						while(er) {
-							if(er->event_type == DEBUG_EVENT_ATTACH_PROCESS) {
-								preport.title_id = er->attach_process.title_id;
-								memcpy(preport.process_name, er->attach_process.process_name, 12);
-								preport.mmu_flags = er->attach_process.mmu_flags;
-							}
-							er = trn::svc::GetDebugEvent(debug);
-						}
-						if(er.error().code != 0x8c01) {
-							preport.result = er.error().code;
-						}
+	auto writer = ResultCode::AssertOk(opener.BeginOk(sizeof(ProcessReport) * num_pids));
+	for(uint32_t i = 0; i < num_pids; i++) {
+		struct ProcessReport preport;
+		preport.process_id = pids[i];
+		preport.result = RESULT_OK;
+		preport.title_id = 0;
+		memset(preport.process_name, 0, sizeof(preport.process_name));
+		preport.mmu_flags = 0;
+		if(pids[i] == my_pid) {
+			preport.result = TWILI_ERR_WONT_DEBUG_SELF;
+		} else {
+			auto dr = trn::svc::DebugActiveProcess(pids[i]);
+			if(!dr) {
+				preport.result = dr.error().code;
+			} else {
+				trn::KDebug debug = std::move(*dr);
+				auto er = trn::svc::GetDebugEvent(debug);
+				while(er) {
+					if(er->event_type == DEBUG_EVENT_ATTACH_PROCESS) {
+						preport.title_id = er->attach_process.title_id;
+						memcpy(preport.process_name, er->attach_process.process_name, 12);
+						preport.mmu_flags = er->attach_process.mmu_flags;
 					}
+					er = trn::svc::GetDebugEvent(debug);
 				}
-				auto r = writer.Write(preport);
-				if(!r) {
-					break;
+				if(er.error().code != 0x8c01) {
+					preport.result = er.error().code;
 				}
 			}
-		});
+		}
+		auto r = writer.Write(preport);
+		if(!r) {
+			break;
+		}
+	}
+	return std::nullopt;
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	printf("identifying...\n");
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 	trn::ipc::client::Object set_sys = ResultCode::AssertOk(
@@ -237,10 +238,10 @@ Result<std::nullopt_t> ITwibDeviceInterface::Identify(std::vector<uint8_t> paylo
 		{"mii_author_id", mii_author_id}
 	};
 	std::string ser = ident.dump();
-	return opener->BeginOk(ser.size(), [ser](auto &writer) { writer.Write(ser); });
+	return ResultCode::AssertOk(opener.BeginOk(ser.size())).Write(ser);
 }
 
-Result<std::nullopt_t> ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, std::shared_ptr<usb::USBBridge::ResponseOpener> opener) {
+Result<std::nullopt_t> ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	printf("upgrading twili...\n");
 	ifilesystem_t user_ifs;
 	auto r = ResultCode::ExpectOk(fsp_srv_open_bis_filesystem(&user_ifs, 30, ""));

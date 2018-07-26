@@ -231,9 +231,7 @@ trn::Result<std::nullopt_t> USBBridge::RequestReader::DataTransactionCompleted()
 	}
 	if(current_payload.size() + entry->transferred_size > current_header.payload_size) {
 		printf("Overshot payload size\n");
-		ResponseOpener r(bridge, current_header.client_id, current_header.tag);
-		r.BeginError(TWILI_ERR_USB_TRANSFER, 0, [](auto &_) {});
-		return std::nullopt;
+		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	std::copy( // append data to current_payload
 		bridge->request_data_buffer.data,
@@ -249,93 +247,87 @@ trn::Result<std::nullopt_t> USBBridge::RequestReader::DataTransactionCompleted()
 }
 
 void USBBridge::RequestReader::ProcessCommand() {
-	std::shared_ptr<ResponseOpener> opener = std::make_shared<ResponseOpener>(bridge, current_header.client_id, current_header.tag);
+	std::shared_ptr<ResponseState> state = std::make_shared<ResponseState>(*bridge, current_header.client_id, current_header.tag);
+	ResponseOpener opener(state);
 	auto i = bridge->objects.find(current_header.object_id);
 	if(i == bridge->objects.end()) {
-		opener->BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT, 0, [](auto &_) {});
+		opener.BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT, 0);
 		return;
 	}
 	trn::Result<std::nullopt_t> r = std::nullopt;
 	try {
 		i->second->HandleRequest(current_header.command_id, current_payload, opener);
 	} catch(trn::ResultError *e) {
-		opener->BeginError(e->code, 0, [](auto &_) {});
+		opener.BeginError(e->code, 0);
 	}
 }
 
-USBBridge::ResponseOpener::ResponseOpener(USBBridge *bridge, uint32_t client_id, uint32_t tag) :
+USBBridge::ResponseState::ResponseState(USBBridge &bridge, uint32_t client_id, uint32_t tag) :
 	bridge(bridge),
 	client_id(client_id),
 	tag(tag) {
 	
 }
 
-USBBridge::ResponseOpener::~ResponseOpener() {
-	if(!has_begun) {
-		BeginOk(0, [](ResponseWriter &_) {});
-	}
+USBBridge::ResponseState::~ResponseState() {
 }
 
-trn::Result<std::nullopt_t> USBBridge::ResponseOpener::BeginError(ResultCode code, size_t payload_size, std::function<void(ResponseWriter&)> cb) {
-	if(bridge->is_writing_response) {
-		printf("[USBB] attempt to begin response while already writing a response?\n");
-		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
-	}
-	if(has_begun) {
+USBBridge::ResponseOpener::ResponseOpener(std::shared_ptr<ResponseState> state) : state(state) {
+}
+
+trn::Result<USBBridge::ResponseWriter> USBBridge::ResponseOpener::BeginError(ResultCode code, size_t payload_size) {
+	if(state->has_begun) {
 		return tl::make_unexpected(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	
 	protocol::MessageHeader hdr;
-	hdr.client_id = client_id;
+	hdr.client_id = state->client_id;
 	hdr.result_code = code.code;
-	hdr.tag = tag;
+	hdr.tag = state->tag;
 	hdr.payload_size = payload_size;
-	has_begun = true;
+	state->has_begun = true;
 	
-	memcpy(bridge->response_meta_buffer.data, &hdr, sizeof(hdr));
-	auto r = USBBridge::PostBufferSync(bridge->endpoint_response_meta, bridge->response_meta_buffer.data, sizeof(hdr));
+	memcpy(
+		state->bridge.response_meta_buffer.data,
+		&hdr,
+		sizeof(hdr));
+	auto r = USBBridge::PostBufferSync(
+		state->bridge.endpoint_response_meta,
+		state->bridge.response_meta_buffer.data,
+		sizeof(hdr));
 	if(!r) {
-		status = r;
-		return r;
+		state->status = r;
+		return tl::make_unexpected(r.error());
 	}
 
-	has_begun = true;
-	bridge->is_writing_response = true;
-	ResponseWriter writer(*this);
-	cb(writer);
-	bridge->is_writing_response = false;
-
-	if(status && transferred_size != payload_size) {
-		return tl::make_unexpected(TWILI_ERR_RESPONSE_SIZE_MISMATCH);
-	}
-	
-	return std::nullopt;
+	ResponseWriter writer(state);
+	return writer;
 }
 
-trn::Result<std::nullopt_t> USBBridge::ResponseOpener::BeginOk(size_t payload_size, std::function<void(ResponseWriter&)> cb) {
-	return BeginError(ResultCode(0), payload_size, cb);
+trn::Result<USBBridge::ResponseWriter> USBBridge::ResponseOpener::BeginOk(size_t payload_size) {
+	return BeginError(ResultCode(0), payload_size);
 }
 
-USBBridge::ResponseWriter::ResponseWriter(ResponseOpener &opener) : opener(opener) {
+USBBridge::ResponseWriter::ResponseWriter(std::shared_ptr<ResponseState> state) : state(state) {
 }
 
 size_t USBBridge::ResponseWriter::GetMaxTransferSize() {
-	return opener.bridge->response_data_buffer.size;
+	return state->bridge.response_data_buffer.size;
 }
 
 trn::Result<std::nullopt_t> USBBridge::ResponseWriter::Write(uint8_t *data, size_t size) {
-	auto max_size = opener.bridge->response_data_buffer.size;
+	auto max_size = state->bridge.response_data_buffer.size;
 	while(size > max_size) {
 		Write(data, max_size);
 		data+= max_size;
 		size-= max_size;
 	}
-	memcpy(opener.bridge->response_data_buffer.data, data, size);
-	auto r = USBBridge::PostBufferSync(opener.bridge->endpoint_response_data, opener.bridge->response_data_buffer.data, size);
+	memcpy(state->bridge.response_data_buffer.data, data, size);
+	auto r = USBBridge::PostBufferSync(state->bridge.endpoint_response_data, state->bridge.response_data_buffer.data, size);
 	if(r) {
-		opener.transferred_size+= size;
+		state->transferred_size+= size;
 	} else {
-		opener.status = r;
+		state->status = r;
 	}
 	return r;
 }

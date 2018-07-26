@@ -18,7 +18,7 @@ class MonitoredProcess : public Process {
 	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
 	
 	void Launch();
-	trn::Result<std::nullopt_t> GenerateCrashReport(ELFCrashReport &report, std::shared_ptr<usb::USBBridge::ResponseOpener> r);
+	trn::Result<std::nullopt_t> GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener r);
 	trn::Result<std::nullopt_t> Terminate();
    
 	std::shared_ptr<trn::KProcess> proc;

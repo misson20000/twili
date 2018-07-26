@@ -56,10 +56,11 @@ class USBBridge {
 		protocol::MessageHeader current_header;
 		std::vector<uint8_t> current_payload;
 	};
-	
+
+	class ResponseState;
 	class ResponseOpener;
 	class ResponseWriter;
-	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, std::shared_ptr<ResponseOpener>)>;
+	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, ResponseOpener)>;
 	
 	USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero);
 	~USBBridge();
@@ -88,8 +89,6 @@ class USBBridge {
 	USBBuffer request_data_buffer;
 	USBBuffer response_data_buffer;
 
-	bool is_writing_response = false;
-
 	trn::service::usb::ds::DS ds;
 	trn::KEvent usb_state_change_event;
 	
@@ -97,41 +96,43 @@ class USBBridge {
 	bool USBStateChangeCallback();
 };
 
-class USBBridge::ResponseOpener {
+class USBBridge::ResponseState {
  public:
-	ResponseOpener(USBBridge *bridge, uint32_t client_id, uint32_t tag);
-	~ResponseOpener();
+	ResponseState(USBBridge &bridge, uint32_t client_id, uint32_t tag);
+	~ResponseState();
 
-	trn::Result<std::nullopt_t> BeginOk(size_t payload_size, std::function<void(ResponseWriter&)> cb);
-	trn::Result<std::nullopt_t> BeginError(trn::ResultCode code, size_t payload_size, std::function<void(ResponseWriter&)> cb);
-	
-	template<typename T, typename... Args>
-	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
-		uint32_t object_id = bridge->object_id++;
-		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, args...);
-		bridge->objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(object_id, obj));
-		return obj;
-	}
-	
- private:
-	friend class ResponseWriter;
-	USBBridge *bridge;
+	USBBridge &bridge;
 	uint32_t client_id;
 	uint32_t tag;
-	
+
 	size_t transferred_size = 0;
 	trn::Result<std::nullopt_t> status = std::nullopt;
 	
 	bool has_begun = false;
 };
 
+class USBBridge::ResponseOpener {
+ public:
+	ResponseOpener(std::shared_ptr<ResponseState> state);
+
+	trn::Result<USBBridge::ResponseWriter> BeginOk(size_t payload_size);
+	trn::Result<USBBridge::ResponseWriter> BeginError(trn::ResultCode code, size_t payload_size);
+	
+	template<typename T, typename... Args>
+	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
+		uint32_t object_id = state->bridge.object_id++;
+		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, args...);
+		state->bridge.objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(object_id, obj));
+		return obj;
+	}
+	
+ private:
+	std::shared_ptr<ResponseState> state;
+};
+
 class USBBridge::ResponseWriter {
  public:
-	ResponseWriter(ResponseOpener &opener);
-
-	// don't extend my lifetime
-	ResponseWriter(const ResponseWriter&) = delete;
-	ResponseWriter &operator=(ResponseWriter const&) = delete;
+	ResponseWriter(std::shared_ptr<ResponseState> state);
 	
 	size_t GetMaxTransferSize();
 	trn::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
@@ -149,7 +150,7 @@ class USBBridge::ResponseWriter {
 		return Write((uint8_t*) &data, sizeof(data));
 	}
  private:
-	ResponseOpener &opener;
+	std::shared_ptr<ResponseState> state;
 };
 
 }
