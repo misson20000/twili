@@ -54,6 +54,10 @@ enum {
 	NT_PRPSINFO = 3,
 	NT_TASKSTRUCT = 4,
 	NT_AUXV = 6,
+
+	NT_TWILI_PROCESS = 6480,
+	NT_TWILI_THREAD = 6481,
+	NT_TWILI_NSO = 6482,
 };
 
 enum {
@@ -154,6 +158,25 @@ struct elf_auxv_t {
 	union {
 		uint64_t a_val;
 	} a_un;
+};
+
+struct twili_process {
+	uint64_t title_id;
+	uint64_t process_id;
+	char process_name[12];
+	uint32_t mmu_flags;
+};
+
+struct twili_thread {
+	uint64_t thread_id;
+	uint64_t tls_pointer;
+	uint64_t entrypoint;
+};
+
+struct twili_nso_info {
+	uint64_t addr;
+	uint64_t size;
+	uint8_t build_id[0x20];
 };
 
 }
