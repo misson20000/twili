@@ -18,8 +18,8 @@ Version | Support
 3.0.0 | Tested working
 3.0.1 - 4.0.1 | Unknown
 4.1.0 | Unknown
-5.0.0 - 5.0.1 | Unknown
-5.0.2 | Unknown
+5.0.0 - 5.0.1 | Expected broken due to usb:ds changes
+5.0.2 | Expected broken due to usb:ds changes
 
 # Installation
 
