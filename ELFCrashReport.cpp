@@ -39,7 +39,7 @@ ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
 	return &threads.find(thread_id)->second;
 }
 
-trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::ResponseOpener ro) {
+void ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::ResponseOpener ro) {
 	for(auto i = threads.begin(); i != threads.end(); i++) {
 		AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, i->second.GeneratePRSTATUS(debug));
 	}
@@ -64,8 +64,8 @@ trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::
 	size_t ph_offset = total_size;
 	total_size+= sizeof(ELF::Elf64_Phdr) * (1 + vmas.size());
 
-	usb::USBBridge::ResponseWriter r = ResultCode::AssertOk(ro.BeginOk(total_size));
-	r.template Write<ELF::Elf64_Ehdr>({
+	usb::USBBridge::ResponseWriter r = ro.BeginOk(total_size);
+	r.Write<ELF::Elf64_Ehdr>({
 			.e_ident = {
 				.ei_class = ELF::ELFCLASS64,
 				.ei_data = ELF::ELFDATALSB,
@@ -143,7 +143,6 @@ trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::
 			});
 	}
 	r.Write(phdrs);
-	return std::nullopt;
 }
 
 ELFCrashReport::Thread::Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint) :

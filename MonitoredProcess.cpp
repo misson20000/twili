@@ -65,7 +65,7 @@ class CrashReportThread {
 	uint64_t entrypoint;
 };
 
-trn::Result<std::nullopt_t> MonitoredProcess::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
+void MonitoredProcess::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
 	printf("generating crash report...\n");
 
 	std::vector<ELF::Note::elf_auxv_t> auxv;
@@ -73,13 +73,12 @@ trn::Result<std::nullopt_t> MonitoredProcess::GenerateCrashReport(ELFCrashReport
 	auxv.push_back({ELF::AT_NULL, 0});
 	report.AddNote("CORE", ELF::NT_AUXV, auxv);
 	
-	auto r = Process::GenerateCrashReport(report, opener);
+	Process::GenerateCrashReport(report, opener);
 	Terminate();
-	return r;
 }
 
-trn::Result<std::nullopt_t> MonitoredProcess::Terminate() {
-   return trn::svc::TerminateProcess(*this->proc);
+void MonitoredProcess::Terminate() {
+	ResultCode::AssertOk(trn::svc::TerminateProcess(*this->proc));
 }
 
 MonitoredProcess::~MonitoredProcess() {

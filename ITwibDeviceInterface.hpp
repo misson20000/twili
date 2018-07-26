@@ -12,13 +12,13 @@ class ITwibDeviceInterface : public bridge::Object {
  private:
 	Twili &twili;
 	
-	trn::Result<std::nullopt_t> Run(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> Reboot(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> Terminate(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
-	trn::Result<std::nullopt_t> Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void Run(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void Reboot(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void Terminate(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
 };
 
 } // namespace bridge

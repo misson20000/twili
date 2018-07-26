@@ -10,7 +10,7 @@ namespace twili {
 class Process {
 	public:
 	Process(uint64_t pid);
-	trn::Result<std::nullopt_t> GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener);
+	void GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener);
 
 	const uint64_t pid;
 	private:

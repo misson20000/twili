@@ -7,6 +7,7 @@
 #include<libtransistor/util.h>
 
 using trn::ResultCode;
+using trn::ResultError;
 
 namespace twili {
 
@@ -22,7 +23,7 @@ struct NsoInfo {
 	};
 };
 
-trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::USBResponseOpener opener) {
+void Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
 	// write nso info notes
 	{
 		trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
@@ -56,7 +57,7 @@ trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report,
 			if(r.error().code == 0x8c01) {
 				break;
 			} else {
-				throw new trn::ResultError(r.error());
+				throw trn::ResultError(r.error());
 			}
 		}
 
@@ -203,7 +204,7 @@ trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report,
 		vaddr = ((uint64_t) mi.base_addr) + mi.size;
 	} while(vaddr > 0);
 
-	return report.Generate(debug, opener);
+	report.Generate(debug, opener);
 }
 
 } // namespace twili

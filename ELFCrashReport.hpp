@@ -55,7 +55,7 @@ class ELFCrashReport {
 		AddNote(name, type, bytes);
 	}
 	
-	trn::Result<std::nullopt_t> Generate(trn::KDebug &debug, usb::USBBridge::ResponseOpener opener);
+	void Generate(trn::KDebug &debug, usb::USBBridge::ResponseOpener opener);
 	void AddNote(std::string name, uint32_t type, std::vector<uint8_t> desc);
 
 	template<typename T>

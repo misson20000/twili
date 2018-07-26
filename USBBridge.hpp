@@ -37,11 +37,11 @@ class USBBridge {
 		RequestReader(USBBridge *bridge);
 		~RequestReader();
 		
-		trn::Result<std::nullopt_t> Begin();
-		trn::Result<std::nullopt_t> MetadataTransactionCompleted();
-		trn::Result<std::nullopt_t> DataTransactionCompleted();
-		trn::Result<std::nullopt_t> PostMetaBuffer();
-		trn::Result<std::nullopt_t> PostDataBuffer();
+		void Begin();
+		void MetadataTransactionCompleted();
+		void DataTransactionCompleted();
+		void PostMetaBuffer();
+		void PostDataBuffer();
 		void ProcessCommand();
 		
 	 private:
@@ -69,7 +69,9 @@ class USBBridge {
 	USBBridge &operator=(USBBridge const&) = delete;
 	
 	static usb_ds_report_entry_t *FindReport(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, usb_ds_report_t &buffer, uint32_t urb_id);
-	static trn::Result<std::nullopt_t> PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size);
+	static void PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size);
+
+	void ResetInterface();
 	
  private:
 	Twili *twili;
@@ -92,7 +94,6 @@ class USBBridge {
 	trn::service::usb::ds::DS ds;
 	trn::KEvent usb_state_change_event;
 	
-	bool error_state = false;
 	bool USBStateChangeCallback();
 };
 
@@ -106,8 +107,6 @@ class USBBridge::ResponseState {
 	uint32_t tag;
 
 	size_t transferred_size = 0;
-	trn::Result<std::nullopt_t> status = std::nullopt;
-	
 	bool has_begun = false;
 };
 
@@ -115,8 +114,8 @@ class USBBridge::ResponseOpener {
  public:
 	ResponseOpener(std::shared_ptr<ResponseState> state);
 
-	trn::Result<USBBridge::ResponseWriter> BeginOk(size_t payload_size);
-	trn::Result<USBBridge::ResponseWriter> BeginError(trn::ResultCode code, size_t payload_size);
+	USBBridge::ResponseWriter BeginOk(size_t payload_size);
+	USBBridge::ResponseWriter BeginError(trn::ResultCode code, size_t payload_size);
 	
 	template<typename T, typename... Args>
 	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
@@ -135,17 +134,17 @@ class USBBridge::ResponseWriter {
 	ResponseWriter(std::shared_ptr<ResponseState> state);
 	
 	size_t GetMaxTransferSize();
-	trn::Result<std::nullopt_t> Write(uint8_t *data, size_t size);
-	trn::Result<std::nullopt_t> Write(std::string str);
+	void Write(uint8_t *data, size_t size);
+	void Write(std::string str);
 	
 	template<typename T>
-	trn::Result<std::nullopt_t> Write(std::vector<T> data) {
+	void Write(std::vector<T> data) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		return Write((uint8_t*) data.data(), data.size() * sizeof(T));
 	}
 	
 	template<typename T>
-	trn::Result<std::nullopt_t> Write(T data) {
+	void Write(T data) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		return Write((uint8_t*) &data, sizeof(data));
 	}
