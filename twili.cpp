@@ -4,7 +4,6 @@ typedef bool _Bool;
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
 #include<libtransistor/cpp/ipcclient.hpp>
-#include<libtransistor/thread.h>
 #include<libtransistor/ipc/fatal.h>
 #include<libtransistor/ipc/sm.h>
 #include<libtransistor/ipc.h>
@@ -29,22 +28,6 @@ using ResultCode = trn::ResultCode;
 template<typename T>
 using Result = trn::Result<T>;
 
-void server_thread(void *arg) {
-	twili::Twili *twili = (twili::Twili*) arg;
-	while(!twili->destroy_flag) {
-		ResultCode::AssertOk(twili->event_waiter.Wait(3000000000));
-		twili->monitored_processes.remove_if([](const auto &proc) {
-				return proc.destroy_flag;
-			});
-	}
-	printf("twili terminating...\n");
-	printf("terminating monitored processes...\n");
-	for(twili::MonitoredProcess &proc : twili->monitored_processes) {
-		proc.Terminate();
-	}
-	printf("twili server thread terminating\n");
-}
-
 int main() {
 	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
@@ -62,21 +45,25 @@ int main() {
 		dup2(usb_fd, STDIN_FILENO);
 		dbg_set_file(fd_file_get(usb_fd));
 		printf("brought up USB serial\n");
-
+		
 		// initialize twili
 		twili::Twili twili;
 		
-		trn_thread_t thread;
-		ResultCode::AssertOk(trn_thread_create(&thread, server_thread, &twili, 58, -2, 1024 * 64, NULL));
-		ResultCode::AssertOk(trn_thread_start(&thread));
+		while(!twili.destroy_flag) {
+			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
+			twili.monitored_processes.remove_if(
+				[](const auto &proc) {
+					return proc.destroy_flag;
+				});
+		}
 		
-		ResultCode::AssertOk(sm_init());
-		ipc_object_t sess;
-		ResultCode::AssertOk(sm_get_service(&sess, "twili"));
-
-		ResultCode::AssertOk(trn_thread_join(&thread, -1));
-		printf("server thread terminated\n");
-	} catch(trn::ResultError e) {
+		printf("twili terminating...\n");
+		printf("terminating monitored processes...\n");
+		for(twili::MonitoredProcess &proc : twili.monitored_processes) {
+			proc.Terminate();
+		}
+		printf("done\n");
+	} catch(trn::ResultError &e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
 		fatal_init();
 		fatal_transition_to_fatal_error(e.code.code, 0);

@@ -86,12 +86,12 @@ int main(int argc, char *argv[]) {
 			
 			
 			printf("Launched\n");
-#if false // enable to report twili crashes, disable to save the memory that twili_launcher takes up while running
+#if true // enable to report twili crashes, disable to save the memory that twili_launcher takes up while running
 			while(1) {
 				waiter.Wait(3000000000);
 			}
 #endif
-		} catch(trn::ResultError e) {
+		} catch(trn::ResultError &e) {
 			printf("caught ResultError: %s\n", e.what());
 			fatal_init();
 			fatal_transition_to_fatal_error(e.code.code, 0);
