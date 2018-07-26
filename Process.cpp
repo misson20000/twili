@@ -2,6 +2,8 @@
 
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/svc.hpp>
+#include<libtransistor/cpp/ipcclient.hpp>
+#include<libtransistor/cpp/ipc/sm.hpp>
 #include<libtransistor/util.h>
 
 using trn::ResultCode;
@@ -11,7 +13,39 @@ namespace twili {
 Process::Process(uint64_t pid) : pid(pid) {
 }
 
+struct NsoInfo {
+	uint64_t addr;
+	size_t size;
+	union {
+		uint8_t build_id[0x20];
+		uint64_t build_id_64[4];
+	};
+};
+
 trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::USBResponseWriter &writer) {
+	// write nso info notes
+	{
+		trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+		trn::ipc::client::Object ldr_dmnt = ResultCode::AssertOk(
+			sm.GetService("ldr:dmnt"));
+		std::vector<NsoInfo> nso_info(16, {0, 0, 0});
+		uint32_t num_nso_infos;
+		auto r = ldr_dmnt.SendSyncRequest<2>( // GetNsoInfos
+			trn::ipc::InRaw<uint64_t>(pid),
+			trn::ipc::OutRaw<uint32_t>(num_nso_infos),
+			trn::ipc::Buffer<NsoInfo, 0xA>(nso_info.data(), nso_info.size() * sizeof(NsoInfo)));
+		if(r) {
+			for(uint32_t i = 0; i < num_nso_infos; i++) {
+				ELF::Note::twili_nso_info twinso = {
+					.addr = nso_info[i].addr,
+					.size = nso_info[i].size,
+				};
+				memcpy(twinso.build_id, nso_info[i].build_id, sizeof(nso_info[i].build_id));
+				report.AddNote<ELF::Note::twili_nso_info>("Twili", ELF::NT_TWILI_NSO, twinso);
+			}
+		}
+	}
+	
 	trn::KDebug debug = ResultCode::AssertOk(
 		trn::svc::DebugActiveProcess(pid));
 	printf("  opened debug: 0x%x\n", debug.handle);
@@ -53,6 +87,13 @@ trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report,
 			};
 			memcpy(psinfo.pr_fname, r->attach_process.process_name, 12);
 			report.AddNote<ELF::Note::elf_prpsinfo>("CORE", ELF::NT_PRPSINFO, psinfo);
+			ELF::Note::twili_process twiproc = {
+				.title_id = r->attach_process.title_id,
+				.process_id = r->attach_process.process_id,
+				.mmu_flags = r->attach_process.mmu_flags,
+			};
+			memcpy(twiproc.process_name, r->attach_process.process_name, 12);
+			report.AddNote<ELF::Note::twili_process>("Twili", ELF::NT_TWILI_PROCESS, twiproc);
 			break; }
 		case DEBUG_EVENT_ATTACH_THREAD: {
 			printf("    AttachThread:\n");
@@ -60,6 +101,12 @@ trn::Result<std::nullopt_t> Process::GenerateCrashReport(ELFCrashReport &report,
 			printf("      TLS Pointer: 0x%lx\n", r->attach_thread.tls_pointer);
 			printf("      Entrypoint: 0x%lx\n", r->attach_thread.entrypoint);
 			report.AddThread(r->attach_thread.thread_id, r->attach_thread.tls_pointer, r->attach_thread.entrypoint);
+			ELF::Note::twili_thread twithread = {
+				.thread_id = r->attach_thread.thread_id,
+				.tls_pointer = r->attach_thread.tls_pointer,
+				.entrypoint = r->attach_thread.entrypoint,
+			};
+			report.AddNote<ELF::Note::twili_thread>("Twili", ELF::NT_TWILI_THREAD, twithread);
 			break; }
 		case DEBUG_EVENT_UNKNOWN:
 			printf("    Unknown:\n");
