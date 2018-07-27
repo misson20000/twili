@@ -1,6 +1,7 @@
 #include "RemoteObject.hpp"
 
 #include "Logger.hpp"
+#include "ResultError.hpp"
 
 namespace twili {
 namespace twib {
@@ -20,8 +21,7 @@ std::future<Response> RemoteObject::SendRequest(uint32_t command_id, std::vector
 Response RemoteObject::SendSyncRequest(uint32_t command_id, std::vector<uint8_t> payload) {
 	Response rs = SendRequest(command_id, payload).get();
 	if(rs.result_code != 0) {
-		LogMessage(Fatal, "got result code 0x%x from device", rs.result_code);
-		exit(1);
+		throw ResultError(rs.result_code);
 	}
 	return rs;
 }

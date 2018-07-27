@@ -17,6 +17,7 @@
 #include "twili.hpp"
 #include "err.hpp"
 #include "process_creation.hpp"
+#include "ITwibPipeReader.hpp"
 
 using trn::ResultCode;
 using trn::ResultError;
@@ -88,8 +89,20 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::Respons
 	
 	auto mon = twili.monitored_processes.emplace_back(&twili, proc, target_addr);
 	mon.Launch();
+
+	struct {
+		uint64_t pid;
+		uint32_t tp_stdin;
+		uint32_t tp_stdout;
+		uint32_t tp_stderr;
+	} response;
+
+	response.pid = mon.pid;
+	//response.tp_stdin = opener.MakeObject<>(mon.tp_stdin);
+	response.tp_stdout = opener.MakeObject<ITwibPipeReader>(mon.tp_stdout)->object_id;
+	response.tp_stderr = opener.MakeObject<ITwibPipeReader>(mon.tp_stderr)->object_id;
 	
-	opener.BeginOk(sizeof(uint64_t)).Write<uint64_t>(mon.pid);
+	opener.BeginOk(sizeof(response)).Write<decltype(response)>(response);
 }
 
 void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {

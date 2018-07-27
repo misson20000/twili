@@ -41,5 +41,12 @@ class ITwibDeviceInterface {
 	};
 };
 
+class ITwibPipeReader {
+ public:
+	enum class Command : uint32_t {
+		READ = 10,
+	};
+};
+
 } // namespace protocol
 } // namespace twili

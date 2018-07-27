@@ -8,6 +8,7 @@
 #include "Process.hpp"
 #include "USBBridge.hpp"
 #include "ELFCrashReport.hpp"
+#include "TwibPipe.hpp"
 
 namespace twili {
 
@@ -20,7 +21,11 @@ class MonitoredProcess : public Process {
 	void Launch();
 	void GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener r);
 	void Terminate();
-   
+
+	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
+	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
+	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
+	
 	std::shared_ptr<trn::KProcess> proc;
 	const uint64_t target_entry;
 	bool destroy_flag = false;

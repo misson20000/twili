@@ -12,11 +12,13 @@
 #include "CLI/CLI.hpp"
 
 #include "Logger.hpp"
+#include "ResultError.hpp"
 #include "config.hpp"
 #include "Protocol.hpp"
 #include "ITwibMetaInterface.hpp"
 #include "ITwibDeviceInterface.hpp"
 #include "util.hpp"
+#include "err.hpp"
 
 namespace twili {
 namespace twib {
@@ -352,7 +354,20 @@ int main(int argc, char *argv[]) {
 			LogMessage(Fatal, "could not read file");
 			return 1;
 		}
-		printf("Process ID: 0x%lx\n", itdi.Run(*v_opt));
+		twili::twib::RunResult rs = itdi.Run(*v_opt);
+		printf("PID: 0x%x\n", rs.pid);
+		try {
+			while(true) {
+				std::vector<uint8_t> str = rs.tp_stdout.ReadSync();
+				std::cout << std::string(str.begin(), str.end());
+			}
+		} catch(twili::twib::ResultError &e) {
+			if(e.code == TWILI_ERR_EOF) {
+				return 0;
+			} else {
+				throw e;
+			}
+		}
 		return 0;
 	}
 

@@ -9,13 +9,19 @@ namespace twib {
 ITwibDeviceInterface::ITwibDeviceInterface(RemoteObject obj) : obj(obj) {
 }
 
-uint64_t ITwibDeviceInterface::Run(std::vector<uint8_t> executable) {
+RunResult ITwibDeviceInterface::Run(std::vector<uint8_t> executable) {
 	Response rs = obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::RUN, executable);
 	if(rs.payload.size() < sizeof(uint64_t)) {
 		LogMessage(Fatal, "response size invalid");
 		exit(1);
 	}
-	return *(uint64_t*) rs.payload.data();
+	struct {
+		uint64_t pid;
+		uint32_t tp_stdin;
+		uint32_t tp_stdout;
+		uint32_t tp_stderr;
+	} rss = *(decltype(rss)*) rs.payload.data();
+	return {rss.pid, obj.CreateSiblingFromId(rss.tp_stdout), obj.CreateSiblingFromId(rss.tp_stderr)};
 }
 
 void ITwibDeviceInterface::Reboot() {
