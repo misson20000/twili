@@ -61,7 +61,7 @@ class ProcessBuilder {
 	const char *name;
 	std::vector<uint32_t> caps;
 	std::vector<Segment> segments;
-	uint64_t load_base = 0x7100000000;
+	uint64_t load_base;
 	size_t total_size = 0;
 };
 

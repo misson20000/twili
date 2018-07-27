@@ -1,6 +1,7 @@
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/svc.hpp>
 #include<libtransistor/util.h>
+#include<libtransistor/environment.h>
 #include<libtransistor/svc.h>
 
 #include "process_creation.hpp"
@@ -95,7 +96,11 @@ size_t ProcessBuilder::VectorDataReader::TotalSize() {
 
 ProcessBuilder::ProcessBuilder(const char *name, std::vector<uint32_t> caps) :
 	name(name), caps(caps) {
-	
+	if(env_get_kernel_version() >= KERNEL_VERSION_200) {
+		load_base = 0x7100000000;
+	} else {
+		load_base = 0x71000000;
+	}
 }
 
 trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
@@ -172,12 +177,34 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
 				trn::svc::LimitableResource::Sessions,
 				256));
 
+		enum {
+			PROCESS_FLAG_AARCH64 = 0b1,
+			PROCESS_FLAG_AS_32BIT = 0b0000,
+			PROCESS_FLAG_AS_36BIT = 0b0010,
+			PROCESS_FLAG_AS_32BIT_NO_MAP = 0b0100,
+			PROCESS_FLAG_AS_39BIT = 0b0110,
+			PROCESS_FLAG_ENABLE_DEBUG = 0b10000,
+			PROCESS_FLAG_ENABLE_ASLR = 0b100000,
+			PROCESS_FLAG_USE_SYSTEM_MEM_BLOCKS = 0b1000000,
+		};
+
+		uint32_t process_flags =
+			PROCESS_FLAG_AARCH64 |
+			PROCESS_FLAG_ENABLE_DEBUG |
+			PROCESS_FLAG_ENABLE_ASLR;
+
+		if(env_get_kernel_version() >= KERNEL_VERSION_200) {
+			process_flags|= PROCESS_FLAG_AS_39BIT;
+		} else {
+			process_flags|= PROCESS_FLAG_AS_36BIT;
+		}
+		
 		ProcessInfo process_info = {
 			.process_category = 0,
-			.title_id = 0x0100000000000036, // creport
+			.title_id = 0x0100000000006481,
 			.code_addr = load_base,
 			.code_num_pages = (uint32_t) ((total_size + 0xFFF) / 0x1000),
-			.process_flags = 0b110111, // ASLR, 39-bit address space, AArch64, bit4 (?)
+			.process_flags = process_flags,
 			.reslimit_h = resource_limit.handle,
 			.system_resource_num_pages = 0,
 			.personal_mm_heap_num_pages = 0,
@@ -186,7 +213,7 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
 		process_info.name[sizeof(process_info).name-1] = 0;
 		
 		// create process
-		printf("Making process\n");
+		printf("Making process (base addr 0x%lx)\n", load_base);
 		auto proc = std::make_shared<trn::KProcess>(
 			std::move(trn::ResultCode::AssertOk(
 									trn::svc::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
