@@ -112,8 +112,10 @@ bool USBBridge::USBStateChangeCallback() {
 		printf("finished USB bringup\n");
 		try {
 			request_reader.Begin();
+		} catch(ResultError &e) { // until libtransistor 2.0.1, we have to live with ResultError not inheriting publicly from std::runtime_error
+			ResetInterface();
 		} catch(std::exception &e) {
-			//ResetInterface();
+			ResetInterface();
 		}
 	} else {
 		// USB has gone down
@@ -143,8 +145,11 @@ void USBBridge::RequestReader::Begin() {
 					this->MetadataTransactionCompleted();
 					this->PostMetaBuffer();
 					return true;
+				} catch(ResultError &e) {
+					bridge->ResetInterface();
+					return false;
 				} catch(std::exception &e) {
-					//bridge->ResetInterface();
+					bridge->ResetInterface();
 					return false;
 				}
 			});
@@ -155,8 +160,11 @@ void USBBridge::RequestReader::Begin() {
 				try {
 					this->DataTransactionCompleted();
 					return true;
+				} catch(ResultError &e) {
+					bridge->ResetInterface();
+					return false;
 				} catch(std::exception &e) {
-					//bridge->ResetInterface();
+					bridge->ResetInterface();
 					return false;
 				}
 			});
