@@ -625,7 +625,9 @@ void USBBackend::event_thread_func() {
 			}
 			
 			if(d->deletion_flag) {
-				twibd->RemoveDevice(d);
+				if(d->added_flag) {
+					twibd->RemoveDevice(d);
+				}
 				i = devices.erase(i);
 			} else {
 				i++;
