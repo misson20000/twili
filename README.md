@@ -16,21 +16,21 @@ Version | Support
 2.0.0 | Expected working
 2.1.0 - 2.3.0 | Expected working
 3.0.0 | Tested working
-3.0.1 - 4.0.1 | Unknown
-4.1.0 | Unknown
+3.0.1 - 4.0.1 | Expected working
+4.1.0 | Tested working via Atmosphère-pm.boot2
 5.0.0 - 5.0.1 | Expected broken due to usb:ds changes
 5.0.2 | Expected broken due to usb:ds changes
 
 # Installation
 
-The currently recommended way to use Twili is to use Hekate to load `twili_launcher.kip`.
-I suggest that you build the latest version of Twili from source, but I understand that lots of people don't want to do that. You can download the latest version of `twili_launcher.kip` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t6).
+The currently recommended way to use Twili is to launch it via Atmosphère-pm.boot2. You will need a recent (after [b365965](https://github.com/Atmosphere-NX/Atmosphere/commit/b365065a2d9048eb4a3263690769bcf0ec34322d)) build of both Atmosphère-pm and Atmosphère-loader.
+I suggest that you [build](#building) the latest version of Twili from source, but I understand that lots of people don't want to do that. You can download the latest version of `twili.zip` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t7). Extract it to the root of your microSD card, letting the `atmosphere` directory tree merge with any existing directory tree.
 
 You will also need `twib` and `twibd`. These are somewhat easier to build than twili, if you don't have a libtransistor toolchain set up.
 
 If you're running Arch Linux, you can install [twib-git from the AUR](https://aur.archlinux.org/packages/twib-git/). This package installs twibd as a systemd service, so you're ready to launch Twili and start using `twib`.
 
-If you're not running Arch Linux, you can download `twib` and `twibd` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t6). Twibd will likely need to be run as root to grant permissions for USB devices and /var/run, but with udev rules, you can run it as a normal user. You will need to leave twibd running in the background.
+If you're not running Arch Linux, you can download `twib` and `twibd` from the [latest test build](https://github.com/misson20000/twili/releases/tag/t7). Twibd will likely need to be run as root to grant permissions for USB devices and /var/run, but with udev rules, you can run it as a normal user. You will need to leave twibd running in the background.
 
 Windows support is experimental.
 
@@ -64,7 +64,7 @@ Subcommands:
 
 ## Twili
 
-First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. In order to build KIP1 binaries, you will need to use elf2kip form the `elf2kip-segments` branch of [my switch-tools fork](https://github.com/misson20000/switch-tools/tree/elf2kip-segments). After that, building Twili should be as simple as running `make`.
+First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. In order to build KIP1 binaries, you will need to use elf2kip form the `elf2kip-segments` branch of [my switch-tools fork](https://github.com/misson20000/switch-tools/tree/elf2kip-segments). After that, building Twili should be as simple as running `make`. If you want to use twili_launcher, `twili_launcher.kip` will be available in `build/`. Otherwise, if you're using Atmosphère-boot2, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card.
 
 ## Twib
 
