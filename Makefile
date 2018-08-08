@@ -6,7 +6,11 @@ TWILI_CXX_FLAGS := -Werror-return-type -Og
 
 BUILD_PFS0 := build_pfs0
 
-all: build/twili_launcher.nsp build/twili.nro build/twili.nso build/twili.kip build/twili_launcher.kip
+TITLE_ID := 0100000000006480
+ATMOSPHERE_TITLE_DIR := build/atmosphere/titles/$(TITLE_ID)
+ATMOSPHERE_TARGETS := $(addprefix $(ATMOSPHERE_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
+
+all: build/twili_launcher.nsp build/twili.nro build/twili.nso build/twili.kip build/twili_launcher.kip $(ATMOSPHERE_TARGETS)
 
 build/twili_launcher.nsp: build/twili_launcher_exefs/main build/twili_launcher_exefs/main.npdm
 	mkdir -p $(@D)
@@ -19,6 +23,22 @@ build/twili_launcher_exefs/main: build/twili_launcher.nso
 build/twili_launcher_exefs/main.npdm: main.npdm
 	mkdir -p $(@D)
 	cp $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/main: build/twili.nso
+	mkdir -p $(@D)
+	cp $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/main.npdm: twili.json
+	mkdir -p $(@D)
+	npdmtool $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/rtld.stub:
+	mkdir -p $(@D)
+	touch $@
+
+$(ATMOSPHERE_TITLE_DIR)/boot2.flag:
+	mkdir -p $(@D)
+	touch $@
 
 clean:
 	rm -rf build

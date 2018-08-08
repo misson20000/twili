@@ -448,7 +448,7 @@ void USBBackend::AddDevice(libusb_device *device) {
 	LogMessage(Debug, "  bNumInterfaces: %d", config->bNumInterfaces);
 
 	const struct libusb_interface_descriptor *twili_interface = NULL;
-	for(int i = 0; i < config->bNumInterfaces && twili_interface == NULL; i++) {
+	for(int i = 0; i < config->bNumInterfaces; i++) {
 		const struct libusb_interface *iface = &config->interface[i];
 		LogMessage(Debug, "  interface %d:", i);
 		LogMessage(Debug, "    num_altsetting: %d", iface->num_altsetting);
