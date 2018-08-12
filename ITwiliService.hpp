@@ -17,6 +17,7 @@ class ITwiliService : public trn::ipc::server::Object {
 	trn::ResultCode OpenStdout(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &out);
 	trn::ResultCode OpenStderr(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &out);
 	trn::ResultCode OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IHBABIShim> &out);
+	trn::ResultCode CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0x5, 0> name_buffer, trn::ipc::OutObject<twili::IPipe> &val);
 	trn::ResultCode Destroy();
 
   private:

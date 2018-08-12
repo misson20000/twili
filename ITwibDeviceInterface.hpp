@@ -19,6 +19,8 @@ class ITwibDeviceInterface : public bridge::Object {
 	void ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
 	void UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
 	void Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void ListNamedPipes(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
+	void OpenNamedPipe(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener);
 };
 
 } // namespace bridge

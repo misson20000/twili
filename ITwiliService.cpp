@@ -1,4 +1,5 @@
 #include<unistd.h>
+#include<string.h>
 
 #include "twili.hpp"
 #include "ITwiliService.hpp"
@@ -19,6 +20,8 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
 	case 3:
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
+	case 10:
+		return trn::ipc::server::RequestHandler<&ITwiliService::CreateNamedOutputPipe>::Handle(this, msg);
 	case 999:
 		return trn::ipc::server::RequestHandler<&ITwiliService::Destroy>::Handle(this, msg);
 	}
@@ -54,16 +57,17 @@ trn::ResultCode ITwiliService::OpenPipe(trn::ipc::InPid pid, trn::ipc::OutObject
 }
 
 trn::ResultCode ITwiliService::OpenStdin(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
-   return OpenPipe(pid, val, STDIN_FILENO);
+	return OpenPipe(pid, val, STDIN_FILENO);
 }
 
 trn::ResultCode ITwiliService::OpenStdout(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
-   return OpenPipe(pid, val, STDOUT_FILENO);
+	return OpenPipe(pid, val, STDOUT_FILENO);
 }
 
 trn::ResultCode ITwiliService::OpenStderr(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IPipe> &val) {
-   return OpenPipe(pid, val, STDERR_FILENO);
+	return OpenPipe(pid, val, STDERR_FILENO);
 }
+
 trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IHBABIShim> &out) {
 	printf("opening HBABI shim for pid 0x%lx\n", pid.value);
    auto i = twili->FindMonitoredProcess(pid.value);
@@ -77,6 +81,18 @@ trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutO
 		return RESULT_OK;
 	} else {
 		return r.error().code;
+	}
+}
+
+trn::ResultCode ITwiliService::CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0x5, 0> name_buffer, trn::ipc::OutObject<twili::IPipe> &val) {
+	std::string name((char*) name_buffer.data, (char*) name_buffer.data + strnlen((char*) name_buffer.data, name_buffer.size));
+
+	auto r = twili->named_pipes.emplace(name, std::make_shared<TwibPipe>());
+	if(r.second) {
+		val.value = trn::ResultCode::AssertOk(server->CreateObject<twili::IPipeTwib>(this, r.first->second));
+		return RESULT_OK;
+	} else {
+		return TWILI_ERR_PIPE_ALREADY_EXISTS;
 	}
 }
 

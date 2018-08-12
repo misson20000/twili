@@ -38,6 +38,8 @@ class ITwibDeviceInterface {
 		LIST_PROCESSES = 14,
 		UPGRADE_TWILI = 15,
 		IDENTIFY = 16,
+		LIST_NAMED_PIPES = 17,
+		OPEN_NAMED_PIPE = 18,
 	};
 };
 

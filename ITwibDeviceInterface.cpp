@@ -54,6 +54,12 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 	case protocol::ITwibDeviceInterface::Command::IDENTIFY:
 		Identify(payload, opener);
 		break;
+	case protocol::ITwibDeviceInterface::Command::LIST_NAMED_PIPES:
+		ListNamedPipes(payload, opener);
+		break;
+	case protocol::ITwibDeviceInterface::Command::OPEN_NAMED_PIPE:
+		OpenNamedPipe(payload, opener);
+		break;
 	default:
 		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION), 0);
 		break;
@@ -242,6 +248,38 @@ void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge
 
 void ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	printf("no-op\n");
+}
+
+void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+	if(payload.size() != 0) {
+		throw ResultError(TWILI_ERR_BAD_REQUEST);
+	}
+
+	size_t size = 0;
+	size+= sizeof(uint32_t);
+	for(auto i : twili.named_pipes) {
+		size+= sizeof(uint32_t);
+		size+= i.first.size();
+	}
+
+	auto w = opener.BeginOk(size);
+	w.Write<uint32_t>(twili.named_pipes.size());
+	for(auto i : twili.named_pipes) {
+		w.Write<uint32_t>(i.first.size());
+		w.Write((uint8_t*) i.first.data(), i.first.size());
+	}
+}
+
+void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+	std::string name(payload.begin(), payload.end());
+
+	auto i = twili.named_pipes.find(name);
+	if(i == twili.named_pipes.end()) {
+		throw ResultError(TWILI_ERR_NO_SUCH_PIPE);
+	}
+	
+	uint32_t id = opener.MakeObject<ITwibPipeReader>(i->second)->object_id;
+	opener.BeginOk(sizeof(id)).Write(id);
 }
 
 } // namespace bridge

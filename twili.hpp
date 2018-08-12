@@ -19,8 +19,11 @@ class Twili {
 	twili::usb::USBBridge usb_bridge;
 	
 	std::list<twili::MonitoredProcess> monitored_processes;
-	std::vector<uint8_t> hbabi_shim_nro;
 	std::optional<twili::MonitoredProcess*> FindMonitoredProcess(uint64_t pid);
+
+	std::map<std::string, std::shared_ptr<TwibPipe>> named_pipes;
+	
+	std::vector<uint8_t> hbabi_shim_nro;
 };
 
 }

@@ -50,5 +50,30 @@ msgpack11::MsgPack ITwibDeviceInterface::Identify() {
 	return msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
 }
 
+std::vector<std::string> ITwibDeviceInterface::ListNamedPipes() {
+	Response rs = obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::LIST_NAMED_PIPES);
+	uint32_t count = *(uint32_t*) rs.payload.data();
+	std::vector<std::string> names;
+	
+	size_t pos = 4;
+	for(uint32_t i = 0; i < count; i++) {
+		uint32_t size = *(uint32_t*) (rs.payload.data() + pos);
+		pos+= 4;
+		names.emplace_back(rs.payload.data() + pos, rs.payload.data() + pos + size);
+		pos+= size;
+	}
+
+	return names;
+}
+
+ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
+	Response rs = obj.SendSyncRequest(protocol::ITwibDeviceInterface::Command::OPEN_NAMED_PIPE, std::vector<uint8_t>(name.begin(), name.end()));
+	if(rs.payload.size() < sizeof(uint32_t)) {
+		LogMessage(Fatal, "response size invalid");
+		exit(1);
+	}
+	return obj.CreateSiblingFromId(*(uint32_t*) rs.payload.data());
+}
+
 } // namespace twib
 } // namespace twil

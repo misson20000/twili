@@ -298,6 +298,12 @@ int main(int argc, char *argv[]) {
 	CLI::App *ps = app.add_subcommand("ps", "List processes on the device");
 
 	CLI::App *identify = app.add_subcommand("identify", "Identify the device");
+
+	CLI::App *list_named_pipes = app.add_subcommand("list-named-pipes", "List named pipes on the device");
+
+	CLI::App *open_named_pipe = app.add_subcommand("open-named-pipe", "Open a named pipe on the device");
+	std::string open_named_pipe_name;
+	open_named_pipe->add_option("name", open_named_pipe_name, "Name of pipe to open")->required();
 	
 	app.require_subcommand(1);
 	
@@ -416,6 +422,31 @@ int main(int argc, char *argv[]) {
 
 	if(identify->parsed()) {
 		show(itdi.Identify());
+		return 0;
+	}
+
+	if(list_named_pipes->parsed()) {
+		for(auto n : itdi.ListNamedPipes()) {
+			printf("%s\n", n.c_str());
+		}
+		return 0;
+	}
+
+	if(open_named_pipe->parsed()) {
+		auto reader = itdi.OpenNamedPipe(open_named_pipe_name);
+		try {
+			while(true) {
+				std::vector<uint8_t> str = reader.ReadSync();
+				std::cout << std::string(str.begin(), str.end());
+			}
+		} catch(twili::twib::ResultError &e) {
+			if(e.code == TWILI_ERR_EOF) {
+				return 0;
+			} else {
+				throw e;
+			}
+		}
+		return 0;
 	}
 	
 	return 0;

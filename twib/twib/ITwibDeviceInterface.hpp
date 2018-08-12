@@ -34,6 +34,8 @@ class ITwibDeviceInterface {
 	void Terminate(uint64_t process_id);
 	std::vector<ProcessListEntry> ListProcesses();
 	msgpack11::MsgPack Identify();
+	std::vector<std::string> ListNamedPipes();
+	ITwibPipeReader OpenNamedPipe(std::string name);
  private:
 	RemoteObject obj;
 };
