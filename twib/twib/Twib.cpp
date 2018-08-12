@@ -356,18 +356,27 @@ int main(int argc, char *argv[]) {
 		}
 		twili::twib::RunResult rs = itdi.Run(*v_opt);
 		printf("PID: 0x%x\n", rs.pid);
-		try {
-			while(true) {
-				std::vector<uint8_t> str = rs.tp_stdout.ReadSync();
-				std::cout << std::string(str.begin(), str.end());
-			}
-		} catch(twili::twib::ResultError &e) {
-			if(e.code == TWILI_ERR_EOF) {
-				return 0;
-			} else {
-				throw e;
-			}
-		}
+		volatile bool running = true;
+		auto pump_output =
+			[&running](twili::twib::ITwibPipeReader reader) {
+				try {
+					while(running) {
+						std::vector<uint8_t> str = reader.ReadSync();
+						std::cout << std::string(str.begin(), str.end());
+					}
+				} catch(twili::twib::ResultError &e) {
+					running = false;
+					if(e.code == TWILI_ERR_EOF) {
+						return;
+					} else {
+						throw e;
+					}
+				}
+			};
+		std::thread stdout_pump(pump_output, rs.tp_stdout);
+		std::thread stderr_pump(pump_output, rs.tp_stderr);
+		stdout_pump.join();
+		stderr_pump.join();
 		return 0;
 	}
 
