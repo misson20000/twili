@@ -41,8 +41,8 @@ trn::ResultCode IHBABIShim::Dispatch(trn::ipc::Message msg, uint32_t request_id)
 	return 1;
 }
 
-trn::ResultCode IHBABIShim::GetProcessHandle(trn::ipc::OutHandle<trn::KProcess, trn::ipc::copy> out) {
-	out = *process->proc;
+trn::ResultCode IHBABIShim::GetProcessHandle(trn::ipc::OutHandle<handle_t, trn::ipc::copy> out) {
+	out = process->proc->handle;
 	return RESULT_OK;
 }
 
