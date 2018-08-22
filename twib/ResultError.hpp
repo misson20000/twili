@@ -10,7 +10,7 @@ class ResultError : public std::runtime_error {
  public:
 	ResultError(uint32_t result);
 
-	const char *what() noexcept;
+	virtual const char *what() const noexcept override;
 	
 	const uint32_t code;
  private:
