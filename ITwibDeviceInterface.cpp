@@ -138,6 +138,7 @@ void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridg
 		throw ResultError(TWILI_ERR_UNRECOGNIZED_PID);
 	} else {
 		(*proc)->Terminate();
+		opener.BeginOk(0);
 	}
 }
 
