@@ -1,14 +1,4 @@
-#include<libtransistor/cpp/types.hpp>
-#include<libtransistor/cpp/ipcclient.hpp>
-#include<libtransistor/cpp/ipc/sm.hpp>
-#include<libtransistor/runtime_config.h>
-#include<libtransistor/ipc/sm.h>
-#include<libtransistor/ipc/twili.h>
-#include<libtransistor/ipc.h>
-#include<libtransistor/loader_config.h>
-#include<libtransistor/err.h>
-#include<libtransistor/tls.h>
-#include<libtransistor/svc.h>
+#include<libtransistor/cpp/nx.hpp>
 
 #include<stdio.h>
 #include<unistd.h>
@@ -38,7 +28,7 @@ int main(int argc, char *argv[]) {
 		trn::ResultCode::AssertOk(twili_init());
 		trn::ResultCode::AssertOk(twili_open_stdout(&twili_out));
 		int fd = twili_pipe_fd(&twili_out);
-		dup2(fd, STDOUT_FILENO);
+		dup2(fd, STDOUT_FILENO); // stdout is available for debugging
 		close(fd);
 
 		ResultCode::AssertOk(sm_init()); // make sure there's a reference by the time we reach sm_force_finalize()
@@ -47,17 +37,35 @@ int main(int argc, char *argv[]) {
 	
 		{
 			service::SM sm = ResultCode::AssertOk(service::SM::Initialize());
+
+			// connect to twili
 			ipc::client::Object itwiliservice = 
 				ResultCode::AssertOk(sm.GetService("twili"));
-			
-			printf("got its: 0x%x\n", itwiliservice.object.session);
-			
+
+			// open our IHBABIShim
 			ResultCode::AssertOk(
 				itwiliservice.SendSyncRequest<3>(
 					ipc::InPid(),
 					ipc::OutObject<ipc::client::Object>(shimservice)));
+
+			// connect to fsp-pr
+			ipc::client::Object fsppr =
+				ResultCode::AssertOk(sm.GetService("fsp-pr"));
+
+			// set our filesystem permissions
+			static uint32_t fah[] = {0x1, 0xFFFFFFFF, 0xFFFFFFFF, 0x1C, 0, 0x1C, 0};
+			static uint32_t fac[] = {0x1, 0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF};
+			ResultCode::AssertOk(
+				fsppr.SendSyncRequest<0>( // RegisterProgram
+					ipc::InRaw<uint8_t>(3), // Storage ID
+					ipc::InRaw<uint64_t>( // Process ID
+						ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001))),
+					ipc::InRaw<uint64_t>(0x100000000006481), // Title ID
+					ipc::InRaw<uint64_t>(sizeof(fah)), // FAH Size
+					ipc::InRaw<uint64_t>(sizeof(fac)), // FAC Size
+					ipc::Buffer<uint32_t, 0x5>(fah, sizeof(fah)),
+					ipc::Buffer<uint32_t, 0x5>(fac, sizeof(fac))));
 			
-			printf("got shim: 0x%x\n", shimservice.object.session);
 		} // at this point we no longer need SM or ITwiliService
 		sm_force_finalize();
 		
@@ -142,8 +150,6 @@ int main(int argc, char *argv[]) {
 			shimservice.SendSyncRequest<5>(
 				ipc::OutRaw<uint64_t>(target_entry_addr)));
 
-		printf("determined target entry point to be 0x%lx\n", target_entry_addr);
-		
 		result_t (*target_entry)(loader_config_entry_t*, thread_h) = (result_t (*)(loader_config_entry_t*, thread_h)) target_entry_addr;
 		
 		// Run the application
@@ -152,8 +158,6 @@ int main(int argc, char *argv[]) {
 		result_t ret = target_thunk(target_entry, entries.data(), loader_config.main_thread);
 		memcpy(get_tls(), tls_backup, 0x200);
 
-		printf("application returned 0x%x\n", ret);
-		
 		ResultCode::AssertOk(
 			shimservice.SendSyncRequest<4>( // SetNextLoadPath
 				ipc::Buffer<uint8_t, 0x5>(next_load_path, sizeof(next_load_path)),
