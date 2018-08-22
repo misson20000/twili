@@ -161,11 +161,12 @@ void USBBackend::Device::MetaOutTransferCompleted() {
 			return;
 		}
 	}
-	
+
 	transferring_meta = false;
 	if(!transferring_meta && !transferring_data) {
 		LogMessage(Debug, "entering AVAILABLE state");
 		state = State::AVAILABLE;
+		state_cv.notify_one();
 	}
 }
 
@@ -196,6 +197,7 @@ void USBBackend::Device::DataOutTransferCompleted() {
 		if(!transferring_meta && !transferring_data) {
 			LogMessage(Debug, "entering AVAILABLE state");
 			state = State::AVAILABLE;
+			state_cv.notify_one();
 		}
 	}
 }
