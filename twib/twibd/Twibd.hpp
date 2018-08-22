@@ -49,7 +49,7 @@ class Twibd {
 	std::mutex client_map_mutex;
 	std::map<uint32_t, std::weak_ptr<Client>> clients;
 
-	std::mt19937 rng;
+	std::random_device rng;
 
 	std::shared_ptr<LocalClient> local_client;
 };

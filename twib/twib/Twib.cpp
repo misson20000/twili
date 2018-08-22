@@ -126,7 +126,7 @@ std::future<Response> Client::SendRequest(Request rq) {
 	std::future<Response> future;
 	{
 		std::lock_guard<std::mutex> lock(response_map_mutex);
-		std::mt19937 rng;
+		static std::random_device rng;
 		
 		uint32_t tag = rng();
 		rq.tag = tag;
