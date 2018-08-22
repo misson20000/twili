@@ -394,7 +394,10 @@ int main(int argc, char *argv[]) {
 					std::vector<uint8_t> buffer(4096, 0);
 					while(running) {
 						buffer.resize(4096);
-						ssize_t r = read(STDIN_FILENO, buffer.data(), buffer.size());
+						// fread won't return until it fills the buffer or errors.
+						// this is not what we want; we want to send data over the
+						// pipe as soon as it comes in.
+						ssize_t r = read(fileno(stdin), buffer.data(), buffer.size());
 						if(r > 0) {
 							buffer.resize(r);
 							writer.WriteSync(buffer);
