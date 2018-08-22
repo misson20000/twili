@@ -50,5 +50,13 @@ class ITwibPipeReader {
 	};
 };
 
+class ITwibPipeWriter {
+ public:
+	enum class Command : uint32_t {
+		WRITE = 10,
+		CLOSE = 11,
+	};
+};
+
 } // namespace protocol
 } // namespace twili

@@ -364,11 +364,15 @@ int main(int argc, char *argv[]) {
 		printf("PID: 0x%x\n", rs.pid);
 		volatile bool running = true;
 		auto pump_output =
-			[&running](twili::twib::ITwibPipeReader reader, std::ostream *stream) {
+			[&running](twili::twib::ITwibPipeReader reader, FILE *stream) {
 				try {
 					while(running) {
 						std::vector<uint8_t> str = reader.ReadSync();
-						*stream << std::string(str.begin(), str.end());
+						size_t r = fwrite(str.data(), sizeof(str[0]), str.size(), stream);
+						if(r < str.size() && str.size() > 0) {
+							throw std::system_error(errno, std::generic_category());
+						}
+						fflush(stream);
 					}
 				} catch(twili::twib::ResultError &e) {
 					running = false;
@@ -377,12 +381,48 @@ int main(int argc, char *argv[]) {
 					} else {
 						throw e;
 					}
+				} catch(...) {
+					running = false;
+					throw;
 				}
 			};
-		std::thread stdout_pump(pump_output, rs.tp_stdout, &std::cout);
-		std::thread stderr_pump(pump_output, rs.tp_stderr, &std::cerr);
+		std::thread stdout_pump(pump_output, rs.tp_stdout, stdout);
+		std::thread stderr_pump(pump_output, rs.tp_stderr, stderr);
+		std::thread stdin_pump(
+			[&running](twili::twib::ITwibPipeWriter writer) {
+				try {
+					std::vector<uint8_t> buffer(4096, 0);
+					while(running) {
+						buffer.resize(4096);
+						ssize_t r = read(STDIN_FILENO, buffer.data(), buffer.size());
+						if(r > 0) {
+							buffer.resize(r);
+							writer.WriteSync(buffer);
+						} else if(r == 0) {
+							writer.Close();
+							break;
+						} else {
+							throw std::system_error(errno, std::generic_category());
+						}
+					}
+				} catch(twili::twib::ResultError &e) {
+					running = false;
+					if(e.code == TWILI_ERR_EOF) {
+						return;
+					} else {
+						throw e;
+					}
+				} catch(...) {
+					running = false;
+					throw;
+				}
+			}, rs.tp_stdin);
 		stdout_pump.join();
 		stderr_pump.join();
+		if(!running) {
+			fclose(stdin); // try to wake up stdin pump
+		}
+		stdin_pump.join();
 		return 0;
 	}
 

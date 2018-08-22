@@ -7,11 +7,12 @@
 namespace twili {
 namespace twib {
 
-class ITwibPipeReader {
+class ITwibPipeWriter {
  public:
-	ITwibPipeReader(RemoteObject obj);
+	ITwibPipeWriter(RemoteObject obj);
 
-	std::vector<uint8_t> ReadSync();
+	void WriteSync(std::vector<uint8_t> data);
+	void Close();
  private:
 	RemoteObject obj;
 };

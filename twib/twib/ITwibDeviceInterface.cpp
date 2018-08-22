@@ -21,7 +21,12 @@ RunResult ITwibDeviceInterface::Run(std::vector<uint8_t> executable) {
 		uint32_t tp_stdout;
 		uint32_t tp_stderr;
 	} rss = *(decltype(rss)*) rs.payload.data();
-	return {rss.pid, obj.CreateSiblingFromId(rss.tp_stdout), obj.CreateSiblingFromId(rss.tp_stderr)};
+	return {
+		rss.pid,
+		obj.CreateSiblingFromId(rss.tp_stdin),
+		obj.CreateSiblingFromId(rss.tp_stdout),
+		obj.CreateSiblingFromId(rss.tp_stderr)
+	};
 }
 
 void ITwibDeviceInterface::Reboot() {

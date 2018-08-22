@@ -2,6 +2,8 @@
 
 #include "IPipe.hpp"
 
+#include "err.hpp"
+
 namespace twili {
 
 IPipe::IPipe(trn::ipc::server::IPCServer *server) : trn::ipc::server::Object(server) {
@@ -60,19 +62,23 @@ trn::ResultCode IPipeTwib::Dispatch(trn::ipc::Message msg, uint32_t request_id) 
 }
 
 trn::ResultCode IPipeTwib::Read(std::function<void(trn::ResultCode)> cb, trn::ipc::OutRaw<uint64_t> size, trn::ipc::Buffer<uint8_t, 0x6, 0> buffer) {
-	/*pipe->Read(
+	pipe->Read(
 		[cb, size, buffer](void *data, size_t data_size) mutable {
+			if(data_size > buffer.size) {
+				data_size = buffer.size;
+			}
 			size = data_size;
 			memcpy(buffer.data, data, data_size);
 			cb(RESULT_OK);
-			}, buffer.size);*/
+			return data_size;
+		});
 	return RESULT_OK;
 }
 
 trn::ResultCode IPipeTwib::Write(std::function<void(trn::ResultCode)> cb, trn::ipc::Buffer<uint8_t, 0x5, 0> buffer) {
 	pipe->Write(
 		buffer.data, buffer.size,
-		[cb]() { cb(RESULT_OK);	});
+		[cb](bool is_closed) { cb(is_closed ? TWILI_ERR_EOF : RESULT_OK); });
 	return RESULT_OK;
 }
 

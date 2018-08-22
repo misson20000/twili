@@ -4,13 +4,14 @@
 
 namespace twili {
 
-// output-only
 class TwibPipe {
  public:
 	TwibPipe();
 	~TwibPipe();
-	void Read(std::function<void(uint8_t *data, size_t actual_size)> cb);
-	void Write(uint8_t *data, size_t size, std::function<void()> cb);
+	// callback returns how much data was read
+	void Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
+	void Write(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
+	void Close();
  private:
 	class IdleState {
 	 public:
@@ -19,16 +20,17 @@ class TwibPipe {
 	 public:
 		uint8_t *data;
 		size_t size;
-		std::function<void()> cb;
+		std::function<void(bool eof)> cb;
 	};
 	class ReadPendingState {
 	 public:
-		std::function<void(uint8_t *data, size_t actual_size)> cb;
+		std::function<size_t(uint8_t *data, size_t actual_size)> cb;
 	};
 	enum class State {
 		Idle,
 		WritePending,
 		ReadPending,
+		Closed,
 	};
 	State current_state_id = State::Idle;
 	IdleState state_idle;

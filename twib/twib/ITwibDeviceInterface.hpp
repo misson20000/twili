@@ -5,6 +5,7 @@
 #include<msgpack11.hpp>
 
 #include "RemoteObject.hpp"
+#include "ITwibPipeWriter.hpp"
 #include "ITwibPipeReader.hpp"
 
 namespace twili {
@@ -20,6 +21,7 @@ struct ProcessListEntry {
 
 struct RunResult {
 	uint64_t pid;
+	ITwibPipeWriter tp_stdin;
 	ITwibPipeReader tp_stdout;
 	ITwibPipeReader tp_stderr;
 };

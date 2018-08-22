@@ -35,6 +35,7 @@ void ITwibPipeReader::Read(std::vector<uint8_t> payload, usb::USBBridge::Respons
 				} else {
 					opener.BeginOk(actual_size).Write(data, actual_size);
 				}
+				return actual_size;
 			});
 	} else {
 		opener.BeginError(TWILI_ERR_EOF, 0);

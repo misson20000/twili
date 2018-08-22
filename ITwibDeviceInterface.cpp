@@ -18,6 +18,7 @@
 #include "err.hpp"
 #include "process_creation.hpp"
 #include "ITwibPipeReader.hpp"
+#include "ITwibPipeWriter.hpp"
 
 using trn::ResultCode;
 using trn::ResultError;
@@ -104,7 +105,7 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::Respons
 	} response;
 
 	response.pid = mon.pid;
-	//response.tp_stdin = opener.MakeObject<>(mon.tp_stdin);
+	response.tp_stdin  = opener.MakeObject<ITwibPipeWriter>(mon.tp_stdin )->object_id;
 	response.tp_stdout = opener.MakeObject<ITwibPipeReader>(mon.tp_stdout)->object_id;
 	response.tp_stderr = opener.MakeObject<ITwibPipeReader>(mon.tp_stderr)->object_id;
 	
