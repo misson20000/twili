@@ -74,7 +74,9 @@ void Twibd::RemoveDevice(std::shared_ptr<Device> device) {
 
 void Twibd::Process() {
 	std::variant<Request, Response> v;
+	LogMessage(Debug, "Process: dequeueing job...");
 	dispatch_queue.wait_dequeue(v);
+	LogMessage(Debug, "Process: dequeued job: %d", v.index());
 
 	if(v.index() == 0) {
 		Request rq = std::get<Request>(v);
@@ -102,7 +104,9 @@ void Twibd::Process() {
 					return;
 				}
 			}
+			LogMessage(Debug, "sending request via device");
 			device->SendRequest(std::move(rq));
+			LogMessage(Debug, "sent request via device");
 		}
 	} else if(v.index() == 1) {
 		Response rs = std::get<Response>(v);
@@ -132,6 +136,7 @@ void Twibd::Process() {
 		}
 		client->PostResponse(rs);
 	}
+	LogMessage(Debug, "finished process loop");
 }
 
 Response Twibd::HandleRequest(Request &rq) {

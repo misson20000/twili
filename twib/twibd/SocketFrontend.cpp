@@ -250,6 +250,7 @@ SocketFrontend::Client::~Client() {
 }
 
 void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload) {
+	LogMessage(Debug, "posting request");
 	twibd->PostRequest(
 		Request(
 			client_id,
@@ -258,6 +259,7 @@ void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::
 			mh.command_id,
 			mh.tag,
 			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable())));
+	LogMessage(Debug, "posted request");
 }
 
 void SocketFrontend::Client::PostResponse(Response &r) {
