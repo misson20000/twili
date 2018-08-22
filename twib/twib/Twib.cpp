@@ -364,11 +364,11 @@ int main(int argc, char *argv[]) {
 		printf("PID: 0x%x\n", rs.pid);
 		volatile bool running = true;
 		auto pump_output =
-			[&running](twili::twib::ITwibPipeReader reader) {
+			[&running](twili::twib::ITwibPipeReader reader, std::ostream *stream) {
 				try {
 					while(running) {
 						std::vector<uint8_t> str = reader.ReadSync();
-						std::cout << std::string(str.begin(), str.end());
+						*stream << std::string(str.begin(), str.end());
 					}
 				} catch(twili::twib::ResultError &e) {
 					running = false;
@@ -379,8 +379,8 @@ int main(int argc, char *argv[]) {
 					}
 				}
 			};
-		std::thread stdout_pump(pump_output, rs.tp_stdout);
-		std::thread stderr_pump(pump_output, rs.tp_stderr);
+		std::thread stdout_pump(pump_output, rs.tp_stdout, &std::cout);
+		std::thread stderr_pump(pump_output, rs.tp_stderr, &std::cerr);
 		stdout_pump.join();
 		stderr_pump.join();
 		return 0;
