@@ -36,6 +36,8 @@ class TwibPipe {
 	IdleState state_idle;
 	WritePendingState state_write_pending;
 	ReadPendingState state_read_pending;
+
+	static const char *StateName(State state);
 };
 
 }
