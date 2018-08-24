@@ -27,13 +27,16 @@ void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> pa
 
 void ITwibPipeWriter::Write(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
 	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
-		observe->Write(payload.data(), payload.size(),
-			[opener](bool eof) mutable {
+		// we need this so that payload will stay alive until our callback gets called
+		std::shared_ptr<std::vector<uint8_t>> payload_copy = std::make_shared<std::vector<uint8_t>>(payload);
+		observe->Write(payload_copy->data(), payload_copy->size(),
+			[opener, payload_copy](bool eof) mutable {
 				if(eof) {
 					opener.BeginError(TWILI_ERR_EOF, 0);
 				} else {
 					opener.BeginOk(0);
 				}
+				payload_copy.reset();
 			});
 	} else {
 		opener.BeginError(TWILI_ERR_EOF, 0);
