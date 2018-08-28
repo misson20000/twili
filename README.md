@@ -92,29 +92,36 @@ Twib is the workstation-side tool, consisting of two parts: `twibd`, and `twib`.
 
 The frontend and backend each run in their own threads to simplify synchronization.
 
-### Protocol
+## Protocol Overview
 
 Twili will provide a USB interface with class 0xFF, subclass 0x01, and protocol 0x00.
 This interface shall have four bulk endpoints, two IN, and two OUT.
 Communication happens as requests and responses over these endpoints.
 
-A request contains an address for the remote object that should handle the request,
+A request contains an id for the remote bridge object that should handle the request,
 a command id to determine which function the remote object is to perform,
 a tag to associate the request with its response,
 and an arbitrarily sized payload containing any additional data needed for the operation.
 
-The request header is sent over the first OUT endpoint as a single transfer,
-and then, if the request header indicates that a payload is present, the data is sent
+The request header is sent over the first OUT endpoint as a single transfer.
+Next, if the request header indicates that a payload is present, the data is sent
 over the second OUT endpoint.
+Finally, if the request header indicates that there are objects being sent, the
+IDs of each object are sent over the same (second) OUT endpoint in a single transfer.
 
-Once the request is processed, a response header is sent over the first IN endpoint, and
-data is sent over the second IN endpoint.
+Once the request is processed, a response header is sent over the first IN endpoint.
+If the response header indicates that a payload is present, it is sent over the second
+IN endpoint. If the response header indicates that there are objects being sent,
+the IDs of each object are sent over the same (second) IN endpoint in a single transfer.
 
 Upon receiving a request, the specified function is invoked on the specified object.
 When the operation completes, as either a success or a failure, a response is sent.
 The response's `tag` field must match the tag of the request that started the operation.
 Any operation may be executed asynchronously, meaning that responses may be sent in a
 different order from the requests that caused them.
+
+If a response includes any references to bridge objects, their IDs are encoded in the
+payload as indexes into the array of object IDs sent with the response.
 
 Requests and responses share a similar format.
 
@@ -132,17 +139,28 @@ struct message {
 	};
 	u32 tag;
 	u64 payload_size;
+	u32 object_count;
 	
 	// payload
 	u8 payload[payload_size];
+
+	// object IDs
+	u32 object_ids[object_count];
 };
 ```
 
-Initially, only the pipe with id 0 exists on the device. It represents `ITwibInterface`, which responds to the following commands:
+Initially, only the object with id 0 exists on the device. It represents `ITwibDeviceInterface`.
+Every object responds to command `0xffffffff`, which destroys the object, except for
+`ITwibDeviceInterface` which handles this command by destroying every object except itself.
+This is invoked when a device is first detected by twibd, to indicate to the device that
+any objects that may have previously existed have had their references lost and should be
+cleaned up.
+
+### ITwibDeviceInterface
 
 #### Command ID 10: `RUN`
 
-The request payload for this command is a complete executable file, in either `NRO` format. Upon successful completion, the response payload is a `u64 process_id`.
+The request payload for this command is a complete executable file, in `NRO` format. Upon successful completion, the response payload is a `u64 process_id`, followed by three object IDs corresponding to one [ITwibPipeWriter](#ITwibPipeWriter) and two [ITwibPipeReaders](#ITwibPipeReader).
 
 ##### Request
 ```
@@ -152,6 +170,9 @@ u8 executable[];
 ##### Response
 ```
 u64 process_id;
+u32 stdin_object_index; // ITwibPipeWriter
+u32 stdout_object_index; // ITwibPipeReader
+u32 stderr_object_index; // ITwibPipeReader
 ```
 
 #### Command ID 11: `REBOOT`
@@ -160,7 +181,17 @@ This request has no payload, and does not send any response on success, because 
 
 #### Command ID 12: `COREDUMP`
 
-TBD
+Takes a PID, sends an ELF core dump file as a response.
+
+##### Request
+```
+u64 pid;
+```
+
+##### Response
+```
+u8 elf_file[];
+```
 
 #### Command ID 13: `TERMINATE`
 
@@ -188,7 +219,7 @@ struct ProcessReport {
 
 #### Command ID 15: `UPGRADE_TWILI`
 
-TBD
+Stubbed.
 
 #### Command ID 16: `IDENTIFY`
 
@@ -206,3 +237,30 @@ MessagePack object containing these keys:
 - `wireless_lan_mac_address` (binary data fetched from `set:cal`#6)
 - `device_nickname` (string fetched from `set:sys`#77)
 - `mii_author_id` (binary data fetched from `set:sys`#90)
+
+#### Command ID 17: `LIST_NAMED_PIPES`
+
+Takes empty request payload, reponds with a list of pipe names.
+
+##### Response
+```
+u32 pipe_count;
+struct pipe_name {
+  u32 length;
+	char name[length];
+} pipe_names[pipe_count];
+```
+
+#### Command ID 18: `OPEN_NAMED_PIPE`
+
+Takes the name of a pipe, returns an [ITwibPipeReader](#ITwibPipeReader).
+
+##### Request
+```
+char pipe_name[];
+```
+
+##### Response
+```
+u32 reader_object_index; // ITwibPipeReader
+```
