@@ -2,6 +2,7 @@
 
 #include "platform.hpp"
 
+#include<memory>
 #include<array>
 #include<thread>
 #include<future>
@@ -21,11 +22,11 @@ class ITwibDeviceInterface;
 
 class Twib;
 
-class Client {
+class Client : public std::enable_shared_from_this<Client> {
 	public:
 	Client(twibc::MessageConnection<Client> &mc, Twib *twib);
 
-	void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &buffer);
+	void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &buffer, util::Buffer &object_ids);
 	std::future<Response> SendRequest(Request rq);
 	
 	bool deletion_flag;

@@ -37,7 +37,9 @@ class Twibd {
 	
 	void Process();
 	Response HandleRequest(Request &request);
-	
+	std::shared_ptr<Client> GetClient(uint32_t client_id);
+
+	std::shared_ptr<LocalClient> local_client;
  private:
 	backend::USBBackend usb;
 
@@ -50,8 +52,6 @@ class Twibd {
 	std::map<uint32_t, std::weak_ptr<Client>> clients;
 
 	std::random_device rng;
-
-	std::shared_ptr<LocalClient> local_client;
 };
 
 } // namespace twibd

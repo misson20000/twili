@@ -17,12 +17,10 @@ class RemoteObject {
 	Response SendSyncRequest(T command_id, std::vector<uint8_t> payload = std::vector<uint8_t>()) {
 		return SendSyncRequest((uint32_t) command_id, payload);
 	}
-	
-	RemoteObject CreateSiblingFromId(uint32_t object_id);
  private:
-	std::shared_ptr<Client> client;
-	uint32_t device_id;
-	uint32_t object_id;
+	const std::shared_ptr<Client> client;
+	const uint32_t device_id;
+	const uint32_t object_id;
 };
 
 } // namespace twib

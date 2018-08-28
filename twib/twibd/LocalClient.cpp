@@ -16,7 +16,7 @@ std::future<Response> LocalClient::SendRequest(Request rq) {
 		
 		uint32_t tag = rng();
 		rq.tag = tag;
-		rq.client_id = client_id;
+		rq.client = shared_from_this();
 		
 		std::promise<Response> promise;
 		future = promise.get_future();

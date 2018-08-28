@@ -190,6 +190,18 @@ void USBBridge::RequestReader::PostDataBuffer() {
 			bridge->request_data_buffer.data, size));
 }
 
+void USBBridge::RequestReader::PostObjectBuffer() {
+	size_t size = current_header.object_count * sizeof(uint32_t);
+	if(size > bridge->request_data_buffer.size) {
+		printf("Too many object IDs in request\n");
+		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+	}
+	
+	object_urb_id = ResultCode::AssertOk(
+		bridge->endpoint_request_data->PostBufferAsync(
+			bridge->request_data_buffer.data, size));
+}
+
 void USBBridge::RequestReader::MetadataTransactionCompleted() {
 	usb_ds_report_t report;
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_meta, report, meta_urb_id);
@@ -207,9 +219,12 @@ void USBBridge::RequestReader::MetadataTransactionCompleted() {
 	printf("got header, command %u, payload size 0x%lx\n", current_header.command_id, current_header.payload_size);
 	
 	current_payload.clear();
+	object_ids.clear();
 	if(current_header.payload_size > 0) {
 		current_payload.reserve(current_header.payload_size);
 		PostDataBuffer();
+	} else if(current_header.object_count > 0) {
+		PostObjectBuffer();
 	} else {
 		ProcessCommand();
 	}
@@ -217,6 +232,26 @@ void USBBridge::RequestReader::MetadataTransactionCompleted() {
 
 void USBBridge::RequestReader::DataTransactionCompleted() {
 	usb_ds_report_t report;
+
+	// we've finished receiving the payload, so this must be object IDs
+	if(current_payload.size() == current_header.payload_size) {
+		auto entry = USBBridge::FindReport(bridge->endpoint_request_data, report, object_urb_id);
+		if(entry->urb_status != 3) {
+			printf("Object URB status (%d) != 3\n", entry->urb_status);
+			throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		}
+		if(entry->transferred_size != current_header.object_count * sizeof(uint32_t)) {
+			printf("Didn't receive enough object IDs\n");
+			throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+			std::copy( // copy object IDs
+				((uint32_t*) bridge->request_data_buffer.data),
+				((uint32_t*) bridge->request_data_buffer.data) + current_header.object_count,
+				object_ids.insert(object_ids.end(), current_header.object_count, 0));
+			ProcessCommand();
+		}
+		return;
+	}
+	
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_data, report, data_urb_id);
 	if(entry->urb_status != 3) {
 		printf("Data URB status (%d) != 3\n", entry->urb_status);
@@ -234,6 +269,8 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 	
 	if(current_payload.size() < current_header.payload_size) {
 		PostDataBuffer();
+	} else if(current_header.object_count > 0) {
+		PostObjectBuffer();
 	} else {
 		ProcessCommand();
 	}
@@ -244,14 +281,36 @@ void USBBridge::RequestReader::ProcessCommand() {
 	ResponseOpener opener(state);
 	auto i = bridge->objects.find(current_header.object_id);
 	if(i == bridge->objects.end()) {
-		opener.BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT, 0);
+		opener.BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT).Finalize();
 		return;
 	}
+	
+	// check for a close object request
+	if(current_header.command_id == 0xffffffff) {
+		printf("got close command for %d\n", current_header.object_id);
+		if(current_header.object_id == 0) {
+			// closing object 0 closes everything except object 0
+			for(auto i = bridge->objects.begin(); i != bridge->objects.end();) {
+				if(i->first != 0) { // if object id !=0
+					printf("  closing %d\n", i->first);
+					i = bridge->objects.erase(i); // delete it
+				} else {
+					i++;
+				}
+			}
+		} else {
+			// delete it
+			bridge->objects.erase(current_header.object_id);
+		}
+		opener.BeginOk().Finalize();
+		return;
+	}
+	
 	try {
 		i->second->HandleRequest(current_header.command_id, current_payload, opener);
 	} catch(trn::ResultError &e) {
 		if(!state->has_begun) {
-			opener.BeginError(e.code, 0);
+			opener.BeginError(e.code).Finalize();
 		} else {
 			throw e;
 		}
@@ -265,14 +324,32 @@ USBBridge::ResponseState::ResponseState(USBBridge &bridge, uint32_t client_id, u
 	
 }
 
-USBBridge::ResponseState::~ResponseState() {
+void USBBridge::ResponseState::Finalize() {
+	if(transferred_size != total_size) {
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+	}
+	if(objects.size() != object_count) {
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+	}
+
+	if(object_count > 0) {
+		// send object IDs
+		uint32_t *out = (uint32_t*) bridge.response_data_buffer.data;
+		for(auto p : objects) {
+			*(out++) = p->object_id;
+		}
+		USBBridge::PostBufferSync(bridge.endpoint_response_data, bridge.response_data_buffer.data, object_count * sizeof(uint32_t));
+	}
 }
 
 USBBridge::ResponseOpener::ResponseOpener(std::shared_ptr<ResponseState> state) : state(state) {
 }
 
-USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginError(ResultCode code, size_t payload_size) {
+USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginError(ResultCode code, size_t payload_size, uint32_t object_count) {
 	if(state->has_begun) {
+		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+	}
+	if(object_count * sizeof(uint32_t) > state->bridge.response_data_buffer.size) {
 		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	
@@ -281,7 +358,10 @@ USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginError(ResultCode code,
 	hdr.result_code = code.code;
 	hdr.tag = state->tag;
 	hdr.payload_size = payload_size;
+	hdr.object_count = object_count;
 	state->has_begun = true;
+	state->total_size = payload_size;
+	state->object_count = object_count;
 	
 	memcpy(
 		state->bridge.response_meta_buffer.data,
@@ -297,8 +377,8 @@ USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginError(ResultCode code,
 	return writer;
 }
 
-USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginOk(size_t payload_size) {
-	return BeginError(ResultCode(0), payload_size);
+USBBridge::ResponseWriter USBBridge::ResponseOpener::BeginOk(size_t payload_size, uint32_t object_count) {
+	return BeginError(ResultCode(0), payload_size, object_count);
 }
 
 USBBridge::ResponseWriter::ResponseWriter(std::shared_ptr<ResponseState> state) : state(state) {
@@ -322,6 +402,16 @@ void USBBridge::ResponseWriter::Write(uint8_t *data, size_t size) {
 
 void USBBridge::ResponseWriter::Write(std::string str) {
 	Write((uint8_t*) str.data(), str.size());
+}
+
+uint32_t USBBridge::ResponseWriter::Object(std::shared_ptr<bridge::Object> object) {
+	size_t index = state->objects.size();
+	state->objects.push_back(object);
+	return index;
+}
+
+void USBBridge::ResponseWriter::Finalize() {
+	state->Finalize();
 }
 
 USBBuffer::USBBuffer(size_t size) : size(size) {

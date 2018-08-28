@@ -3,6 +3,7 @@
 #include<future>
 #include<map>
 #include<mutex>
+#include<memory>
 
 #include "Messages.hpp"
 

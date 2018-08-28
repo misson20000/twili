@@ -20,7 +20,7 @@ void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> pa
 		Close(payload, opener);
 		break;
 	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION), 0);
+		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
 		break;
 	}
 }
@@ -32,14 +32,14 @@ void ITwibPipeWriter::Write(std::vector<uint8_t> payload, usb::USBBridge::Respon
 		observe->Write(payload_copy->data(), payload_copy->size(),
 			[opener, payload_copy](bool eof) mutable {
 				if(eof) {
-					opener.BeginError(TWILI_ERR_EOF, 0);
+					opener.BeginError(TWILI_ERR_EOF).Finalize();
 				} else {
-					opener.BeginOk(0);
+					opener.BeginOk().Finalize();
 				}
 				payload_copy.reset();
 			});
 	} else {
-		opener.BeginError(TWILI_ERR_EOF, 0);
+		opener.BeginError(TWILI_ERR_EOF).Finalize();
 	}
 }
 

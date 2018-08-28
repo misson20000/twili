@@ -39,6 +39,10 @@ void Twibd::AddDevice(std::shared_ptr<Device> device) {
 	std::lock_guard<std::mutex> lock(device_map_mutex);
 	LogMessage(Info, "adding device with id %08x", device->device_id);
 	devices[device->device_id] = device;
+	
+	LogMessage(Debug, "resetting objects on new device");
+	local_client->SendRequest(
+		Request(nullptr, device->device_id, 0, 0xffffffff, 0)); // we don't care about the response
 }
 
 void Twibd::AddClient(std::shared_ptr<Client> client) {
@@ -65,11 +69,13 @@ void Twibd::PostResponse(Response &&response) {
 void Twibd::RemoveClient(std::shared_ptr<Client> client) {
 	std::lock_guard<std::mutex> lock(client_map_mutex);
 	clients.erase(clients.find(client->client_id));
+	LogMessage(Info, "removing client %08x", client->client_id);
 }
 
 void Twibd::RemoveDevice(std::shared_ptr<Device> device) {
 	std::lock_guard<std::mutex> lock(device_map_mutex);
 	devices.erase(devices.find(device->device_id));
+	LogMessage(Info, "removing device %08x", device->device_id);
 }
 
 void Twibd::Process() {
@@ -80,8 +86,8 @@ void Twibd::Process() {
 
 	if(v.index() == 0) {
 		Request rq = std::get<Request>(v);
-		LogMessage(Debug, "dispatching request");
-		LogMessage(Debug, "  client id: %08x", rq.client_id);
+		LogMessage(Info, "dispatching request");
+		LogMessage(Debug, "  client id: %08x", rq.client->client_id);
 		LogMessage(Debug, "  device id: %08x", rq.device_id);
 		LogMessage(Debug, "  object id: %08x", rq.object_id);
 		LogMessage(Debug, "  command id: %08x", rq.command_id);
@@ -104,36 +110,52 @@ void Twibd::Process() {
 					return;
 				}
 			}
+			if(rq.command_id == 0xffffffff) {
+				LogMessage(Debug, "detected close request for 0x%x", rq.object_id);
+				std::shared_ptr<Client> client = rq.client;
+				if(client) {
+					// disown the object that's being closed
+					for(auto i = client->owned_objects.begin(); i != client->owned_objects.end(); ){
+						if((*i)->object_id == rq.object_id) {
+							// need to mark this so that it doesn't send another close request
+							(*i)->valid = false;
+							i = client->owned_objects.erase(i);
+							LogMessage(Debug, "  disowned from client");
+						} else {
+							i++;
+						}
+					}
+				} else {
+					LogMessage(Warning, "failed to locate client for disownership");
+				}
+			}
 			LogMessage(Debug, "sending request via device");
 			device->SendRequest(std::move(rq));
 			LogMessage(Debug, "sent request via device");
 		}
 	} else if(v.index() == 1) {
 		Response rs = std::get<Response>(v);
-		LogMessage(Debug, "dispatching response");
+		LogMessage(Info, "dispatching response");
 		LogMessage(Debug, "  client id: %08x", rs.client_id);
 		LogMessage(Debug, "  object id: %08x", rs.object_id);
 		LogMessage(Debug, "  result code: %08x", rs.result_code);
 		LogMessage(Debug, "  tag: %08x", rs.tag);
-
-		std::shared_ptr<Client> client;
-		{
-			std::lock_guard<std::mutex> lock(client_map_mutex);
-			auto i = clients.find(rs.client_id);
-			if(i == clients.end()) {
-				LogMessage(Info, "dropping response destined for unknown client %08x", rs.client_id);
-				return;
-			}
-			client = i->second.lock();
-			if(!client) {
-				LogMessage(Info, "dropping response destined for destroyed client %08x", rs.client_id);
-				return;
-			}
-			if(client->deletion_flag) {
-				LogMessage(Info, "dropping response destined for client flagged for deletion %08x", rs.client_id);
-				return;
-			}
+		LogMessage(Debug, "  objects:");
+		for(auto o : rs.objects) {
+			LogMessage(Debug, "    0x%x", o->object_id);
 		}
+		
+		std::shared_ptr<Client> client = GetClient(rs.client_id);
+		if(!client) {
+			LogMessage(Info, "dropping response for bad client: 0x%x", rs.client_id);
+			return;
+		}
+		// add any objects this response included to the client's
+		// owned object list, to keep the BridgeObject object alive
+		client->owned_objects.insert(
+			client->owned_objects.end(),
+			rs.objects.begin(),
+			rs.objects.end());
 		client->PostResponse(rs);
 	}
 	LogMessage(Debug, "finished process loop");
@@ -167,6 +189,28 @@ Response Twibd::HandleRequest(Request &rq) {
 	default:
 		return rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT);
 	}
+}
+
+std::shared_ptr<Client> Twibd::GetClient(uint32_t client_id) {
+	std::shared_ptr<Client> client;
+	{
+		std::lock_guard<std::mutex> lock(client_map_mutex);
+		auto i = clients.find(client_id);
+		if(i == clients.end()) {
+			LogMessage(Debug, "client id 0x%x is not in map", client_id);
+			return std::shared_ptr<Client>();
+		}
+		client = i->second.lock();
+		if(!client) {
+			LogMessage(Debug, "client id 0x%x weak pointer expired", client_id);
+			return std::shared_ptr<Client>();
+		}
+		if(client->deletion_flag) {
+			LogMessage(Debug, "client id 0x%x deletion flag set", client_id);
+			return std::shared_ptr<Client>();
+		}
+	}
+	return client;
 }
 
 #if TWIB_TCP_FRONTEND_ENABLED == 1

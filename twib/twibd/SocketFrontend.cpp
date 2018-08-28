@@ -247,13 +247,14 @@ SocketFrontend::Client::Client(twibc::MessageConnection<Client> &mc, SocketFront
 }
 
 SocketFrontend::Client::~Client() {
+	LogMessage(Debug, "destroying client 0x%x", client_id);
 }
 
-void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload) {
+void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids) {
 	LogMessage(Debug, "posting request");
 	twibd->PostRequest(
 		Request(
-			client_id,
+			shared_from_this(),
 			mh.device_id,
 			mh.object_id,
 			mh.command_id,
@@ -270,9 +271,17 @@ void SocketFrontend::Client::PostResponse(Response &r) {
 	mh.result_code = r.result_code;
 	mh.tag = r.tag;
 	mh.payload_size = r.payload.size();
-
+	mh.object_count = r.objects.size();
+	
 	connection.out_buffer.Write(mh);
 	connection.out_buffer.Write(r.payload);
+	std::vector<uint32_t> object_ids(r.objects.size(), 0);
+	std::transform(
+		r.objects.begin(), r.objects.end(), object_ids.begin(),
+		[](auto const &object) {
+			return object->object_id;
+		});
+	connection.out_buffer.Write(object_ids);
 
 	frontend->NotifyEventThread();
 }

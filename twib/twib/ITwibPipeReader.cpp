@@ -5,12 +5,12 @@
 namespace twili {
 namespace twib {
 
-ITwibPipeReader::ITwibPipeReader(RemoteObject obj) : obj(obj) {
+ITwibPipeReader::ITwibPipeReader(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 	
 }
 
 std::vector<uint8_t> ITwibPipeReader::ReadSync() {
-	return obj.SendSyncRequest(protocol::ITwibPipeReader::Command::READ).payload;
+	return obj->SendSyncRequest(protocol::ITwibPipeReader::Command::READ).payload;
 }
 
 } // namespace twib

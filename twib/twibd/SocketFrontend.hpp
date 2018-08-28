@@ -32,7 +32,7 @@ class SocketFrontend {
 		Client(twibc::MessageConnection<Client> &mc, SocketFrontend *frontend);
 		~Client();
 
-		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload);
+		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
 		virtual void PostResponse(Response &r);
 
 		twibc::MessageConnection<Client> &connection;

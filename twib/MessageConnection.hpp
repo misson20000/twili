@@ -53,18 +53,30 @@ class MessageConnection {
 			if(!has_current_mh) {
 				if(in_buffer.Read(current_mh)) {
 					has_current_mh = true;
+					current_payload.Clear();
+					has_current_payload = false;
 				} else {
 					in_buffer.Reserve(sizeof(protocol::MessageHeader));
 					return;
 				}
 			}
-			
-			current_payload.Clear();
-			if(in_buffer.Read(current_payload, current_mh.payload_size)) {
-				obj->IncomingMessage(current_mh, current_payload);
+
+			if(!has_current_payload) {
+				if(in_buffer.Read(current_payload, current_mh.payload_size)) {
+					has_current_payload = true;
+					current_object_ids.Clear();
+				} else {
+					in_buffer.Reserve(current_mh.payload_size);
+					return;
+				}
+			}
+
+			if(in_buffer.Read(current_object_ids, current_mh.object_count * sizeof(uint32_t))) {
+				obj->IncomingMessage(current_mh, current_payload, current_object_ids);
 				has_current_mh = false;
+				has_current_payload = false;
 			} else {
-				in_buffer.Reserve(current_mh.payload_size);
+				in_buffer.Reserve(current_mh.object_count * sizeof(uint32_t));
 				return;
 			}
 		}
@@ -78,8 +90,10 @@ class MessageConnection {
 	util::Buffer out_buffer;
 
 	bool has_current_mh = false;
+	bool has_current_payload = false;
 	protocol::MessageHeader current_mh;
 	util::Buffer current_payload;
+	util::Buffer current_object_ids;
 };
 
 }

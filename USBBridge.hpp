@@ -42,6 +42,7 @@ class USBBridge {
 		void DataTransactionCompleted();
 		void PostMetaBuffer();
 		void PostDataBuffer();
+		void PostObjectBuffer();
 		void ProcessCommand();
 		
 	 private:
@@ -52,9 +53,11 @@ class USBBridge {
 		
 		uint32_t meta_urb_id;
 		uint32_t data_urb_id;
+		uint32_t object_urb_id;
 		
 		protocol::MessageHeader current_header;
 		std::vector<uint8_t> current_payload;
+		std::vector<uint32_t> object_ids;
 	};
 
 	class ResponseState;
@@ -100,13 +103,16 @@ class USBBridge {
 class USBBridge::ResponseState {
  public:
 	ResponseState(USBBridge &bridge, uint32_t client_id, uint32_t tag);
-	~ResponseState();
+	void Finalize();
 
 	USBBridge &bridge;
 	uint32_t client_id;
 	uint32_t tag;
 
+	std::vector<std::shared_ptr<bridge::Object>> objects;
 	size_t transferred_size = 0;
+	size_t total_size = 0;
+	uint32_t object_count;
 	bool has_begun = false;
 };
 
@@ -114,8 +120,8 @@ class USBBridge::ResponseOpener {
  public:
 	ResponseOpener(std::shared_ptr<ResponseState> state);
 
-	USBBridge::ResponseWriter BeginOk(size_t payload_size);
-	USBBridge::ResponseWriter BeginError(trn::ResultCode code, size_t payload_size);
+	USBBridge::ResponseWriter BeginOk(size_t payload_size=0, uint32_t object_count=0);
+	USBBridge::ResponseWriter BeginError(trn::ResultCode code, size_t payload_size=0, uint32_t object_count=0);
 	
 	template<typename T, typename... Args>
 	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
@@ -148,6 +154,10 @@ class USBBridge::ResponseWriter {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		return Write((uint8_t*) &data, sizeof(data));
 	}
+
+	uint32_t Object(std::shared_ptr<bridge::Object> object);
+
+	void Finalize();
  private:
 	std::shared_ptr<ResponseState> state;
 };

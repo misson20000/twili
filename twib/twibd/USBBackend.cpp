@@ -106,7 +106,7 @@ void USBBackend::Device::Begin() {
 	ResubmitMetaInTransfer();
 
 	// request identification
-	SendRequest(Request(0xFFFFFFFF, 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
+	SendRequest(Request(std::shared_ptr<Client>(), 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
 }
 
 void USBBackend::Device::SendRequest(const Request &&request) {
@@ -116,22 +116,25 @@ void USBBackend::Device::SendRequest(const Request &&request) {
 	}
 	state = State::BUSY;
 	
+	/*
 	LogMessage(Debug, "sending request");
-	LogMessage(Debug, "  client id 0x%x", request.client_id);
+	LogMessage(Debug, "  client id 0x%x", request.client ? request.client->client_id : 0xffffffff);
 	LogMessage(Debug, "  object id 0x%x", request.object_id);
 	LogMessage(Debug, "  command id 0x%x", request.command_id);
 	LogMessage(Debug, "  tag 0x%x", request.tag);
 	LogMessage(Debug, "  payload size 0x%lx", request.payload.size());
+	*/
 	
-	mhdr.client_id = request.client_id;
+	mhdr.client_id = request.client ? request.client->client_id : 0xffffffff;
 	mhdr.object_id = request.object_id;
 	mhdr.command_id = request.command_id;
 	mhdr.tag = request.tag;
 	mhdr.payload_size = request.payload.size();
+	mhdr.object_count = 0;
 
-	pending_requests.push_back(request);
+	request_out = request.Weak();
+	pending_requests.push_back(request_out);
 
-	request_out = request;
 	libusb_fill_bulk_transfer(tfer_meta_out, handle, endp_meta_out, (uint8_t*) &mhdr, sizeof(mhdr), &Device::MetaOutTransferShim, SharedPtrForTransfer(), 5000);
 	transferring_meta = true;
 	int r = libusb_submit_transfer(tfer_meta_out);
@@ -203,12 +206,15 @@ void USBBackend::Device::DataOutTransferCompleted() {
 }
 
 void USBBackend::Device::MetaInTransferCompleted() {
-	LogMessage(Debug, "got response header");
+	/*
+  LogMessage(Debug, "got response header");
 	LogMessage(Debug, "  client id: 0x%x", mhdr_in.client_id);
 	LogMessage(Debug, "  object_id: 0x%x", mhdr_in.object_id);
 	LogMessage(Debug, "  result_code: 0x%x", mhdr_in.result_code);
 	LogMessage(Debug, "  tag: 0x%x", mhdr_in.tag);
 	LogMessage(Debug, "  payload_size: 0x%lx", mhdr_in.payload_size);
+	LogMessage(Debug, "  object_count: %d", mhdr_in.object_count);
+  */
 
 	response_in.device_id = device_id;
 	response_in.client_id = mhdr_in.client_id;
@@ -216,10 +222,18 @@ void USBBackend::Device::MetaInTransferCompleted() {
 	response_in.result_code = mhdr_in.result_code;
 	response_in.tag = mhdr_in.tag;
 	response_in.payload.resize(mhdr_in.payload_size);
-	LogMessage(Debug, "  payload.size(): 0x%lx", response_in.payload.size());
+	object_ids_in.resize(mhdr_in.object_count);
 	
 	if(mhdr_in.payload_size > 0) {
 		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, response_in.payload.data(), LimitTransferSize(response_in.payload.size()), &Device::DataInTransferShim, SharedPtrForTransfer(), 5000);
+		int r = libusb_submit_transfer(tfer_data_in);
+		if(r != 0) {
+			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+	} else if(mhdr_in.object_count > 0) {
+		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, (uint8_t*) object_ids_in.data(), object_ids_in.size() * sizeof(uint32_t), &Device::ObjectInTransferShim, SharedPtrForTransfer(), 5000);
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
@@ -235,7 +249,7 @@ void USBBackend::Device::DataInTransferCompleted() {
 	size_t beg_off = (tfer_data_in->buffer - response_in.payload.data());
 	size_t read = beg_off + tfer_data_in->actual_length;
 	size_t remaining = mhdr_in.payload_size - read;
-	
+
 	if(remaining > 0) {
 		// continue transferring
 		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in,
@@ -251,11 +265,40 @@ void USBBackend::Device::DataInTransferCompleted() {
 		return;
 	}
 
+	if(mhdr_in.object_count > 0) {
+		libusb_fill_bulk_transfer(tfer_data_in, handle, endp_data_in, (uint8_t*) object_ids_in.data(), object_ids_in.size() * sizeof(uint32_t), &Device::ObjectInTransferShim, SharedPtrForTransfer(), 5000);
+		int r = libusb_submit_transfer(tfer_data_in);
+		if(r != 0) {
+			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
+			deletion_flag = true;
+			return;
+		}
+	} else {
+		DispatchResponse();
+	}
+}
+
+void USBBackend::Device::ObjectInTransferCompleted() {
+	if(tfer_data_in->actual_length != mhdr_in.object_count * sizeof(uint32_t)) {
+		LogMessage(Debug, "invalid object ID transfer\n");
+		deletion_flag = true;
+		return;
+	}
+
 	DispatchResponse();
 }
 
 void USBBackend::Device::DispatchResponse() {
-	pending_requests.remove_if([this](Request &r) {
+	// create BridgeObjects
+	response_in.objects.resize(object_ids_in.size());
+	std::transform(
+		object_ids_in.begin(), object_ids_in.end(), response_in.objects.begin(),
+		[this](uint32_t id) {
+			return std::make_shared<BridgeObject>(*backend->twibd, response_in.device_id, id);
+		});
+
+	// remove from pending requests
+	pending_requests.remove_if([this](WeakRequest &r) {
 			return r.tag == response_in.tag;
 		});
 	
@@ -351,6 +394,14 @@ void USBBackend::Device::DataInTransferShim(libusb_transfer *tfer) {
 	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
 	if(!(*d)->CheckTransfer(tfer)) {
 		(*d)->DataInTransferCompleted();
+	}
+	delete d;
+}
+
+void USBBackend::Device::ObjectInTransferShim(libusb_transfer *tfer) {
+	std::shared_ptr<Device> *d = (std::shared_ptr<Device> *) tfer->user_data;
+	if(!(*d)->CheckTransfer(tfer)) {
+		(*d)->ObjectInTransferCompleted();
 	}
 	delete d;
 }

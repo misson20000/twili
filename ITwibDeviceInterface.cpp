@@ -62,7 +62,7 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 		OpenNamedPipe(payload, opener);
 		break;
 	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION), 0);
+		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
 		break;
 	}
 }
@@ -104,12 +104,16 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::Respons
 		uint32_t tp_stderr;
 	} response;
 
-	response.pid = mon.pid;
-	response.tp_stdin  = opener.MakeObject<ITwibPipeWriter>(mon.tp_stdin )->object_id;
-	response.tp_stdout = opener.MakeObject<ITwibPipeReader>(mon.tp_stdout)->object_id;
-	response.tp_stderr = opener.MakeObject<ITwibPipeReader>(mon.tp_stderr)->object_id;
+	auto w = opener.BeginOk(sizeof(response), 3);
 	
-	opener.BeginOk(sizeof(response)).Write<decltype(response)>(response);
+	response.pid = mon.pid;
+	response.tp_stdin  = w.Object(opener.MakeObject<ITwibPipeWriter>(mon.tp_stdin ));
+	response.tp_stdout = w.Object(opener.MakeObject<ITwibPipeReader>(mon.tp_stdout));
+	response.tp_stderr = w.Object(opener.MakeObject<ITwibPipeReader>(mon.tp_stderr));
+	
+	w.Write<decltype(response)>(response);
+	
+	w.Finalize();
 }
 
 void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
@@ -138,7 +142,7 @@ void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridg
 		throw ResultError(TWILI_ERR_UNRECOGNIZED_PID);
 	} else {
 		(*proc)->Terminate();
-		opener.BeginOk(0);
+		opener.BeginOk().Finalize();
 	}
 }
 
@@ -194,6 +198,7 @@ void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, usb::USBB
 		}
 		writer.Write(preport);
 	}
+	writer.Finalize();
 }
 
 void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
@@ -245,11 +250,13 @@ void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge
 		{"mii_author_id", mii_author_id}
 	};
 	std::string ser = ident.dump();
-	opener.BeginOk(ser.size()).Write(ser);
+	auto w = opener.BeginOk(ser.size());
+	w.Write(ser);
+	w.Finalize();
 }
 
 void ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
-	printf("no-op\n");
+	throw ResultError(LIBTRANSISTOR_ERR_UNSPECIFIED);
 }
 
 void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
@@ -270,6 +277,7 @@ void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, usb::USB
 		w.Write<uint32_t>(i.first.size());
 		w.Write((uint8_t*) i.first.data(), i.first.size());
 	}
+	w.Finalize();
 }
 
 void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
@@ -280,8 +288,10 @@ void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBB
 		throw ResultError(TWILI_ERR_NO_SUCH_PIPE);
 	}
 	
-	uint32_t id = opener.MakeObject<ITwibPipeReader>(i->second)->object_id;
-	opener.BeginOk(sizeof(id)).Write(id);
+	auto reader = opener.MakeObject<ITwibPipeReader>(i->second);
+	auto w = opener.BeginOk(sizeof(uint32_t), 1);
+	w.Write(w.Object(reader));
+	w.Finalize();
 }
 
 } // namespace bridge

@@ -17,6 +17,7 @@ struct MessageHeader {
 	};
 	uint32_t tag;
 	uint64_t payload_size;
+	uint32_t object_count;
 };
 
 const int VERSION = 2;

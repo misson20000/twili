@@ -28,7 +28,7 @@ struct RunResult {
 
 class ITwibDeviceInterface {
  public:
-	ITwibDeviceInterface(RemoteObject obj);
+	ITwibDeviceInterface(std::shared_ptr<RemoteObject> obj);
 
 	RunResult Run(std::vector<uint8_t> executable);
 	void Reboot();
@@ -39,7 +39,7 @@ class ITwibDeviceInterface {
 	std::vector<std::string> ListNamedPipes();
 	ITwibPipeReader OpenNamedPipe(std::string name);
  private:
-	RemoteObject obj;
+	std::shared_ptr<RemoteObject> obj;
 };
 
 } // namespace twib

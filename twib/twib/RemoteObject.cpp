@@ -12,6 +12,10 @@ RemoteObject::RemoteObject(std::shared_ptr<Client> client, uint32_t device_id, u
 }
 
 RemoteObject::~RemoteObject() {
+	// send close request if we're not object 0
+	if(object_id != 0) {
+		client->SendRequest(Request(device_id, object_id, 0xffffffff, 0, std::vector<uint8_t>()));
+	}
 }
 
 std::future<Response> RemoteObject::SendRequest(uint32_t command_id, std::vector<uint8_t> payload) {
@@ -24,10 +28,6 @@ Response RemoteObject::SendSyncRequest(uint32_t command_id, std::vector<uint8_t>
 		throw ResultError(rs.result_code);
 	}
 	return rs;
-}
-
-RemoteObject RemoteObject::CreateSiblingFromId(uint32_t object_id) {
-	return RemoteObject(client, device_id, object_id);
 }
 
 } // namespace twib

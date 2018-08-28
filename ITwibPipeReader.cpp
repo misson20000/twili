@@ -17,7 +17,7 @@ void ITwibPipeReader::HandleRequest(uint32_t command_id, std::vector<uint8_t> pa
 		Read(payload, opener);
 		break;
 	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION), 0);
+		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
 		break;
 	}
 }
@@ -31,14 +31,16 @@ void ITwibPipeReader::Read(std::vector<uint8_t> payload, usb::USBBridge::Respons
 		observe->Read(
 			[opener](uint8_t *data, size_t actual_size) mutable {
 				if(actual_size == 0) {
-					opener.BeginError(TWILI_ERR_EOF, 0);
+					opener.BeginError(TWILI_ERR_EOF).Finalize();
 				} else {
-					opener.BeginOk(actual_size).Write(data, actual_size);
+					auto r = opener.BeginOk(actual_size);
+					r.Write(data, actual_size);
+					r.Finalize();
 				}
 				return actual_size;
 			});
 	} else {
-		opener.BeginError(TWILI_ERR_EOF, 0);
+		opener.BeginError(TWILI_ERR_EOF).Finalize();
 	}
 }
 

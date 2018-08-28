@@ -9,12 +9,12 @@ namespace twib {
 
 class ITwibPipeWriter {
  public:
-	ITwibPipeWriter(RemoteObject obj);
+	ITwibPipeWriter(std::shared_ptr<RemoteObject> obj);
 
 	void WriteSync(std::vector<uint8_t> data);
 	void Close();
  private:
-	RemoteObject obj;
+	std::shared_ptr<RemoteObject> obj;
 };
 
 } // namespace twib

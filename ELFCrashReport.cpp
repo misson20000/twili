@@ -143,6 +143,7 @@ void ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::Respons
 			});
 	}
 	r.Write(phdrs);
+	r.Finalize();
 }
 
 ELFCrashReport::Thread::Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint) :

@@ -101,7 +101,18 @@ Client::Client(twibc::MessageConnection<Client> &mc, Twib *twib) : mc(mc), twib(
 	
 }
 
-void Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload) {
+void Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids) {
+	// create RAII objects for remote objects
+	std::vector<std::shared_ptr<RemoteObject>> objects(mh.object_count);
+	for(uint32_t i = 0; i < mh.object_count; i++) {
+		uint32_t id;
+		if(!object_ids.Read(id)) {
+			LogMessage(Error, "not enough object IDs");
+			return;
+		}
+		objects[i] = std::make_shared<RemoteObject>(shared_from_this(), mh.device_id, id);
+	}
+	
 	std::promise<Response> promise;
 	{
 		std::lock_guard<std::mutex> lock(response_map_mutex);
@@ -113,13 +124,16 @@ void Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload)
 		promise.swap(it->second);
 		response_map.erase(it);
 	}
+	
 	promise.set_value(
 		Response(
+			shared_from_this(),
 			mh.device_id,
 			mh.object_id,
 			mh.result_code,
 			mh.tag,
-			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable())));
+			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable()),
+			objects));
 }
 
 std::future<Response> Client::SendRequest(Request rq) {
@@ -143,6 +157,7 @@ std::future<Response> Client::SendRequest(Request rq) {
 		mh.command_id = rq.command_id;
 		mh.tag = rq.tag;
 		mh.payload_size = rq.payload.size();
+		mh.object_count = 0;
 
 		mc.out_buffer.Write(mh);
 		mc.out_buffer.Write(rq.payload);
@@ -352,7 +367,7 @@ int main(int argc, char *argv[]) {
 		}
 		device_id = devices[0]["device_id"].uint32_value();
 	}
-	twili::twib::ITwibDeviceInterface itdi(twili::twib::RemoteObject(twib.mc.obj, device_id, 0));
+	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(twib.mc.obj, device_id, 0));
 	
 	if(run->parsed()) {
 		auto v_opt = twili::util::ReadFile(run_file.c_str());

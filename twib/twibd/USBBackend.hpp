@@ -63,15 +63,17 @@ class USBBackend {
 		std::condition_variable state_cv;
 		protocol::MessageHeader mhdr;
 		protocol::MessageHeader mhdr_in;
-		Request request_out;
+		WeakRequest request_out;
 		Response response_in;
-		std::list<Request> pending_requests;
+		std::vector<uint32_t> object_ids_in;
+		std::list<WeakRequest> pending_requests;
 
 		std::shared_ptr<Device> *SharedPtrForTransfer();
 		void MetaOutTransferCompleted();
 		void DataOutTransferCompleted();
 		void MetaInTransferCompleted();
 		void DataInTransferCompleted();
+		void ObjectInTransferCompleted();
 		void DispatchResponse();
 		void Identified(Response &r);
 		void ResubmitMetaInTransfer();
@@ -81,6 +83,7 @@ class USBBackend {
 		static void DataOutTransferShim(libusb_transfer *tfer);
 		static void MetaInTransferShim(libusb_transfer *tfer);
 		static void DataInTransferShim(libusb_transfer *tfer);
+		static void ObjectInTransferShim(libusb_transfer *tfer);
 	};
 
 	void Probe();
