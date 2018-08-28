@@ -392,6 +392,7 @@ int main(int argc, char *argv[]) {
 				} catch(twili::twib::ResultError &e) {
 					running = false;
 					if(e.code == TWILI_ERR_EOF) {
+						running = false;
 						return;
 					} else {
 						throw e;
@@ -426,6 +427,7 @@ int main(int argc, char *argv[]) {
 				} catch(twili::twib::ResultError &e) {
 					running = false;
 					if(e.code == TWILI_ERR_EOF) {
+						running = false;
 						return;
 					} else {
 						throw e;
@@ -437,11 +439,7 @@ int main(int argc, char *argv[]) {
 			}, rs.tp_stdin);
 		stdout_pump.join();
 		stderr_pump.join();
-		if(!running) {
-			fclose(stdin); // try to wake up stdin pump
-		}
-		stdin_pump.join();
-		return 0;
+		exit(0); // skip calling stdin_pump thread destructor, since it will std::terminate
 	}
 
 	if(reboot->parsed()) {
