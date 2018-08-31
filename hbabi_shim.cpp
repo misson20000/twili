@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
 		// Run the application
 		uint8_t tls_backup[0x200];
 		memcpy(tls_backup, get_tls(), 0x200);
-		result_t ret = target_thunk(target_entry, entries.data(), loader_config.main_thread);
+		result_t ret = target_thunk(target_entry, entries.data(), 0xFFFFFFFF);
 		memcpy(get_tls(), tls_backup, 0x200);
 
 		ResultCode::AssertOk(
