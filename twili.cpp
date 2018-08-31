@@ -4,6 +4,7 @@ typedef bool _Bool;
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
 #include<libtransistor/cpp/ipcclient.hpp>
+#include<libtransistor/cpp/ipc/sm.hpp>
 #include<libtransistor/ipc/fatal.h>
 #include<libtransistor/ipc/sm.h>
 #include<libtransistor/ipc.h>
@@ -11,6 +12,7 @@ typedef bool _Bool;
 #include<libtransistor/loader_config.h>
 #include<libtransistor/runtime_config.h>
 #include<libtransistor/usb_serial.h>
+#include<libtransistor/svc.h>
 
 #include<unistd.h>
 #include<stdio.h>
@@ -24,9 +26,7 @@ typedef bool _Bool;
 #include "USBBridge.hpp"
 #include "err.hpp"
 
-using ResultCode = trn::ResultCode;
-template<typename T>
-using Result = trn::Result<T>;
+using namespace trn;
 
 int main() {
 	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
@@ -78,6 +78,14 @@ Twili::Twili() :
 	event_waiter(),
 	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
 	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
+
+	{
+		trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+
+		services.pm_shell = twili::service::pm::IShellService(
+			ResultCode::AssertOk(
+				sm.GetService("pm:shell")));
+	}
 	
 	server.CreateService("twili", [this](auto s) {
 			return new twili::ITwiliService(this);

@@ -7,6 +7,8 @@
 
 #include<list>
 
+#include "service/pm/IShellService.hpp"
+
 namespace twili {
 
 class Twili {
@@ -24,6 +26,10 @@ class Twili {
 	std::map<std::string, std::shared_ptr<TwibPipe>> named_pipes;
 	
 	std::vector<uint8_t> hbabi_shim_nro;
+
+	struct {
+		service::pm::IShellService pm_shell;
+	} services;
 };
 
 }

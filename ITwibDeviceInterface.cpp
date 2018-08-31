@@ -137,13 +137,25 @@ void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridg
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
 	uint64_t pid = *((uint64_t*) payload.data());
+
+	// try to kill a monitored process
 	auto proc = twili.FindMonitoredProcess(pid);
-	if(!proc) {
-		throw ResultError(TWILI_ERR_UNRECOGNIZED_PID);
-	} else {
+	if(proc) {
 		(*proc)->Terminate();
 		opener.BeginOk().Finalize();
+		return;
 	}
+	
+	// try to terminate a process via pm:shell
+	if(twili.services.pm_shell.TerminateProcessByPid(pid)) {
+		opener.BeginOk().Finalize();
+		return;
+	}
+
+	// try to terminate a process via svcTerminateDebugProcess as a last resort
+	trn::KDebug debug = ResultCode::AssertOk(trn::svc::DebugActiveProcess(pid));
+	ResultCode::AssertOk(svcTerminateDebugProcess(debug.handle));
+	opener.BeginOk().Finalize();
 }
 
 void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
