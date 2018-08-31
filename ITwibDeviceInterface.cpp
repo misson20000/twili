@@ -255,7 +255,7 @@ void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge
 		{"service", "twili"},
 		{"protocol", protocol::VERSION},
 		{"firmware_version", firmware_version},
-		{"serial_number", serial_number},
+		{"serial_number", std::string((char*) serial_number.data())},
 		{"bluetooth_bd_address", bluetooth_bd_address},
 		{"wireless_lan_mac_address", wireless_lan_mac_address},
 		{"device_nickname", std::string((char*) device_nickname.data())},
