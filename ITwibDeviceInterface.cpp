@@ -19,6 +19,7 @@
 #include "process_creation.hpp"
 #include "ITwibPipeReader.hpp"
 #include "ITwibPipeWriter.hpp"
+#include "ITwibDebugger.hpp"
 
 using trn::ResultCode;
 using trn::ResultError;
@@ -60,6 +61,9 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 		break;
 	case protocol::ITwibDeviceInterface::Command::OPEN_NAMED_PIPE:
 		OpenNamedPipe(payload, opener);
+		break;
+	case protocol::ITwibDeviceInterface::Command::OPEN_ACTIVE_DEBUGGER:
+		OpenActiveDebugger(payload, opener);
 		break;
 	default:
 		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
@@ -303,6 +307,21 @@ void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBB
 	auto reader = opener.MakeObject<ITwibPipeReader>(i->second);
 	auto w = opener.BeginOk(sizeof(uint32_t), 1);
 	w.Write(w.Object(reader));
+	w.Finalize();
+}
+
+void ITwibDeviceInterface::OpenActiveDebugger(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+	if(payload.size() != sizeof(uint64_t)) {
+		throw ResultError(TWILI_ERR_BAD_REQUEST);
+	}
+	uint64_t pid = *((uint64_t*) payload.data());
+
+	trn::KDebug debug = ResultCode::AssertOk(
+		trn::svc::DebugActiveProcess(pid));
+
+	auto debugger = opener.MakeObject<ITwibDebugger>(twili, std::move(debug));
+	auto w = opener.BeginOk(sizeof(uint32_t), 1);
+	w.Write(w.Object(debugger));
 	w.Finalize();
 }
 

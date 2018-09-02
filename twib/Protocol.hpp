@@ -41,6 +41,7 @@ class ITwibDeviceInterface {
 		IDENTIFY = 16,
 		LIST_NAMED_PIPES = 17,
 		OPEN_NAMED_PIPE = 18,
+		OPEN_ACTIVE_DEBUGGER = 19,
 	};
 };
 
@@ -56,6 +57,23 @@ class ITwibPipeWriter {
 	enum class Command : uint32_t {
 		WRITE = 10,
 		CLOSE = 11,
+	};
+};
+
+class ITwibDebugger {
+ public:
+	enum class Command : uint32_t {
+		QUERY_MEMORY = 10,
+		READ_MEMORY = 11,
+		WRITE_MEMORY = 12,
+		LIST_THREADS = 13,
+		GET_DEBUG_EVENT = 14,
+		GET_THREAD_CONTEXT = 15,
+		BREAK_PROCESS = 16,
+		CONTINUE_DEBUG_EVENT = 17,
+		SET_THREAD_CONTEXT = 18,
+		GET_NSO_INFOS = 19,
+		WAIT_EVENT = 20,
 	};
 };
 
