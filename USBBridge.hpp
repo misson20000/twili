@@ -124,9 +124,9 @@ class USBBridge::ResponseOpener {
 	USBBridge::ResponseWriter BeginError(trn::ResultCode code, size_t payload_size=0, uint32_t object_count=0);
 	
 	template<typename T, typename... Args>
-	std::shared_ptr<bridge::Object> MakeObject(Args... args) {
+	std::shared_ptr<bridge::Object> MakeObject(Args &&... args) {
 		uint32_t object_id = state->bridge.object_id++;
-		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, args...);
+		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, (std::forward<Args>(args))...);
 		state->bridge.objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(object_id, obj));
 		return obj;
 	}

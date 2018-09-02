@@ -9,7 +9,7 @@ namespace pm {
 IShellService::IShellService(ipc_object_t object) : object(object) {
 }
 
-IShellService::IShellService(ipc::client::Object object) : object(std::move(object)) {
+IShellService::IShellService(ipc::client::Object &&object) : object(std::move(object)) {
 }
 
 trn::Result<std::nullopt_t> IShellService::TerminateProcessByPid(uint64_t pid) {
