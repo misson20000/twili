@@ -125,7 +125,7 @@ void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge
 	ELFCrashReport report;
 	if (!proc) {
 		printf("generating crash report for non-monitored process 0x%lx...\n", pid);
-		Process(pid).GenerateCrashReport(report, opener);
+		Process(twili, pid).GenerateCrashReport(report, opener);
 	} else {
 		printf("generating crash report for monitored process 0x%lx...\n", pid);
 		(*proc)->GenerateCrashReport(report, opener);

@@ -85,6 +85,10 @@ Twili::Twili() :
 		services.pm_shell = twili::service::pm::IShellService(
 			ResultCode::AssertOk(
 				sm.GetService("pm:shell")));
+
+		services.ldr_dmnt = twili::service::ldr::IDebugMonitorInterface(
+			ResultCode::AssertOk(
+				sm.GetService("ldr:dmnt")));
 	}
 	
 	server.CreateService("twili", [this](auto s) {

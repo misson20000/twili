@@ -1,4 +1,4 @@
-OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o msgpack11/msgpack11.o Process.o ITwibDeviceInterface.o BridgeObject.o ITwibPipeReader.o TwibPipe.o ITwibPipeWriter.o service/pm/IShellService.o
+OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o msgpack11/msgpack11.o Process.o ITwibDeviceInterface.o BridgeObject.o ITwibPipeReader.o TwibPipe.o ITwibPipeWriter.o service/pm/IShellService.o service/ldr/IDebugMonitorInterface.o
 LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o util.o
 HBABI_SHIM_OBJECTS := hbabi_shim.o
 

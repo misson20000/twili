@@ -6,42 +6,27 @@
 #include<libtransistor/cpp/ipc/sm.hpp>
 #include<libtransistor/util.h>
 
-using trn::ResultCode;
-using trn::ResultError;
+#include "twili.hpp"
+
+using namespace trn;
 
 namespace twili {
 
-Process::Process(uint64_t pid) : pid(pid) {
+Process::Process(Twili &twili, uint64_t pid) : twili(twili), pid(pid) {
 }
-
-struct NsoInfo {
-	uint64_t addr;
-	size_t size;
-	union {
-		uint8_t build_id[0x20];
-		uint64_t build_id_64[4];
-	};
-};
 
 void Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
 	// write nso info notes
 	{
-		trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-		trn::ipc::client::Object ldr_dmnt = ResultCode::AssertOk(
-			sm.GetService("ldr:dmnt"));
-		std::vector<NsoInfo> nso_info(16, {0, 0, 0});
-		uint32_t num_nso_infos;
-		auto r = ldr_dmnt.SendSyncRequest<2>( // GetNsoInfos
-			trn::ipc::InRaw<uint64_t>(pid),
-			trn::ipc::OutRaw<uint32_t>(num_nso_infos),
-			trn::ipc::Buffer<NsoInfo, 0xA>(nso_info.data(), nso_info.size() * sizeof(NsoInfo)));
+		Result<std::vector<service::ldr::NsoInfo>> r = twili.services.ldr_dmnt.GetNsoInfos(pid);
 		if(r) {
-			for(uint32_t i = 0; i < num_nso_infos; i++) {
+			std::vector<service::ldr::NsoInfo> infos;
+			for(auto &info : infos) {
 				ELF::Note::twili_nso_info twinso = {
-					.addr = nso_info[i].addr,
-					.size = nso_info[i].size,
+					.addr = info.addr,
+					.size = info.size,
 				};
-				memcpy(twinso.build_id, nso_info[i].build_id, sizeof(nso_info[i].build_id));
+				memcpy(twinso.build_id, info.build_id, sizeof(info.build_id));
 				report.AddNote<ELF::Note::twili_nso_info>("Twili", ELF::NT_TWILI_NSO, twinso);
 			}
 		}

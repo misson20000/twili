@@ -15,7 +15,7 @@ MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> 
 	twili(twili),
 	proc(proc),
 	target_entry(target_entry),
-	Process(ResultCode::AssertOk(trn::svc::GetProcessId(proc->handle))) {
+	Process(*twili, ResultCode::AssertOk(trn::svc::GetProcessId(proc->handle))) {
 
 	printf("created monitored process: 0x%x, pid 0x%x\n", proc->handle, pid);
 	wait = twili->event_waiter.Add(*proc, [this]() {

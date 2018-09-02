@@ -8,6 +8,7 @@
 #include<list>
 
 #include "service/pm/IShellService.hpp"
+#include "service/ldr/IDebugMonitorInterface.hpp"
 
 namespace twili {
 
@@ -29,6 +30,7 @@ class Twili {
 
 	struct {
 		service::pm::IShellService pm_shell;
+		service::ldr::IDebugMonitorInterface ldr_dmnt;
 	} services;
 };
 
