@@ -23,7 +23,6 @@ typedef bool _Bool;
 #include "Process.hpp"
 #include "ITwiliService.hpp"
 #include "ITwibDeviceInterface.hpp"
-#include "USBBridge.hpp"
 #include "err.hpp"
 
 using namespace trn;

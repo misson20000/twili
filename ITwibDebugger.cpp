@@ -14,7 +14,7 @@ ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&deb
 	
 }
 
-void ITwibDebugger::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibDebugger::Command) command_id) {
 	case protocol::ITwibDebugger::Command::QUERY_MEMORY:
 		QueryMemory(payload, opener);
@@ -55,7 +55,7 @@ void ITwibDebugger::HandleRequest(uint32_t command_id, std::vector<uint8_t> payl
 	}
 }
 
-void ITwibDebugger::QueryMemory(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::QueryMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -70,7 +70,7 @@ void ITwibDebugger::QueryMemory(std::vector<uint8_t> payload, usb::USBBridge::Re
 	w.Finalize();
 }
 
-void ITwibDebugger::ReadMemory(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::ReadMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != 2 * sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -89,7 +89,7 @@ void ITwibDebugger::ReadMemory(std::vector<uint8_t> payload, usb::USBBridge::Res
 	w.Finalize();
 }
 
-void ITwibDebugger::WriteMemory(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::WriteMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() < sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -102,11 +102,11 @@ void ITwibDebugger::WriteMemory(std::vector<uint8_t> payload, usb::USBBridge::Re
 	opener.BeginOk().Finalize();
 }
 
-void ITwibDebugger::ListThreads(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::ListThreads(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	throw ResultError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
 }
 
-void ITwibDebugger::GetDebugEvent(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::GetDebugEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() > 0) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -119,7 +119,7 @@ void ITwibDebugger::GetDebugEvent(std::vector<uint8_t> payload, usb::USBBridge::
 	w.Finalize();
 }
 
-void ITwibDebugger::GetThreadContext(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::GetThreadContext(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != sizeof(trn::svc::ThreadId)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -133,7 +133,7 @@ void ITwibDebugger::GetThreadContext(std::vector<uint8_t> payload, usb::USBBridg
 	w.Finalize();
 }
 
-void ITwibDebugger::BreakProcess(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::BreakProcess(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() > 0) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -144,7 +144,7 @@ void ITwibDebugger::BreakProcess(std::vector<uint8_t> payload, usb::USBBridge::R
 	opener.BeginOk().Finalize();
 }
 
-void ITwibDebugger::ContinueDebugEvent(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::ContinueDebugEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	struct RQFmt {
 		uint32_t flags;
 		trn::svc::ThreadId thread_ids[];
@@ -160,11 +160,11 @@ void ITwibDebugger::ContinueDebugEvent(std::vector<uint8_t> payload, usb::USBBri
 	opener.BeginOk().Finalize();
 }
 
-void ITwibDebugger::SetThreadContext(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::SetThreadContext(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	throw ResultError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
 }
 
-void ITwibDebugger::GetNsoInfos(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::GetNsoInfos(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 	
 	std::vector<service::ldr::NsoInfo> nso_info = ResultCode::AssertOk(
@@ -176,7 +176,7 @@ void ITwibDebugger::GetNsoInfos(std::vector<uint8_t> payload, usb::USBBridge::Re
 	w.Finalize();
 }
 
-void ITwibDebugger::WaitEvent(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDebugger::WaitEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(wait_handle) {
 		throw ResultError(TWILI_ERR_ALREADY_WAITING);
 	}

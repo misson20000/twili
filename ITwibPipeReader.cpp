@@ -11,7 +11,7 @@ namespace bridge {
 ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe) {
 }
 
-void ITwibPipeReader::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibPipeReader::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibPipeReader::Command) command_id) {
 	case protocol::ITwibPipeReader::Command::READ:
 		Read(payload, opener);
@@ -22,7 +22,7 @@ void ITwibPipeReader::HandleRequest(uint32_t command_id, std::vector<uint8_t> pa
 	}
 }
 
-void ITwibPipeReader::Read(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibPipeReader::Read(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != 0) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}

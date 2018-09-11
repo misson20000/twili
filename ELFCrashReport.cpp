@@ -2,7 +2,6 @@
 #include<libtransistor/util.h>
 
 #include "ELFCrashReport.hpp"
-#include "USBBridge.hpp"
 
 #include<vector>
 #include<string>
@@ -39,7 +38,7 @@ ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
 	return &threads.find(thread_id)->second;
 }
 
-void ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::ResponseOpener ro) {
+void ELFCrashReport::Generate(trn::KDebug &debug, twili::bridge::ResponseOpener ro) {
 	for(auto i = threads.begin(); i != threads.end(); i++) {
 		AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, i->second.GeneratePRSTATUS(debug));
 	}
@@ -64,7 +63,7 @@ void ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::Respons
 	size_t ph_offset = total_size;
 	total_size+= sizeof(ELF::Elf64_Phdr) * (1 + vmas.size());
 
-	usb::USBBridge::ResponseWriter r = ro.BeginOk(total_size);
+	bridge::ResponseWriter r = ro.BeginOk(total_size);
 	r.Write<ELF::Elf64_Ehdr>({
 			.e_ident = {
 				.ei_class = ELF::ELFCLASS64,

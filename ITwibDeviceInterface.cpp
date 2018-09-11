@@ -33,7 +33,7 @@ namespace bridge {
 ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : Object(device_id), twili(twili) {
 }
 
-void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibDeviceInterface::Command) command_id) {
 	case protocol::ITwibDeviceInterface::Command::RUN:
 		Run(payload, opener);
@@ -71,12 +71,12 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 	}
 }
 
-void ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	ResultCode::AssertOk(bpc_init());
 	ResultCode::AssertOk(bpc_reboot_system());
 }
 
-void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener opener) {
 	std::vector<uint32_t> caps = {
 		0b00011111111111111111111111101111, // SVC grants
 		0b00111111111111111111111111101111,
@@ -120,7 +120,7 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, usb::USBBridge::Respons
 	w.Finalize();
 }
 
-void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -136,7 +136,7 @@ void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, usb::USBBridge
 	}
 }
 
-void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -162,7 +162,7 @@ void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, usb::USBBridg
 	opener.BeginOk().Finalize();
 }
 
-void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	uint64_t pids[256];
 	uint32_t num_pids;
 	ResultCode::AssertOk(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
@@ -217,7 +217,7 @@ void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, usb::USBB
 	writer.Finalize();
 }
 
-void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	printf("identifying...\n");
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 	trn::ipc::client::Object set_sys = ResultCode::AssertOk(
@@ -271,11 +271,11 @@ void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, usb::USBBridge
 	w.Finalize();
 }
 
-void ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	throw ResultError(LIBTRANSISTOR_ERR_UNSPECIFIED);
 }
 
-void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != 0) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
@@ -296,7 +296,7 @@ void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, usb::USB
 	w.Finalize();
 }
 
-void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	std::string name(payload.begin(), payload.end());
 
 	auto i = twili.named_pipes.find(name);
@@ -310,7 +310,7 @@ void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, usb::USBB
 	w.Finalize();
 }
 
-void ITwibDeviceInterface::OpenActiveDebugger(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibDeviceInterface::OpenActiveDebugger(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != sizeof(uint64_t)) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}

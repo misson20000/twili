@@ -11,7 +11,7 @@ namespace bridge {
 ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe) {
 }
 
-void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibPipeWriter::Command) command_id) {
 	case protocol::ITwibPipeWriter::Command::WRITE:
 		Write(payload, opener);
@@ -25,7 +25,7 @@ void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> pa
 	}
 }
 
-void ITwibPipeWriter::Write(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibPipeWriter::Write(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
 		// we need this so that payload will stay alive until our callback gets called
 		std::shared_ptr<std::vector<uint8_t>> payload_copy = std::make_shared<std::vector<uint8_t>>(payload);
@@ -43,7 +43,7 @@ void ITwibPipeWriter::Write(std::vector<uint8_t> payload, usb::USBBridge::Respon
 	}
 }
 
-void ITwibPipeWriter::Close(std::vector<uint8_t> payload, usb::USBBridge::ResponseOpener opener) {
+void ITwibPipeWriter::Close(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	if(payload.size() != 0) {
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}

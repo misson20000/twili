@@ -1,4 +1,4 @@
-#include "BridgeObject.hpp"
+#include "bridge/Object.hpp"
 
 namespace twili {
 namespace bridge {

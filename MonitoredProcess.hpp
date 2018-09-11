@@ -6,7 +6,6 @@
 #include<memory>
 
 #include "Process.hpp"
-#include "USBBridge.hpp"
 #include "ELFCrashReport.hpp"
 #include "TwibPipe.hpp"
 
@@ -19,7 +18,7 @@ class MonitoredProcess : public Process {
 	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
 	
 	void Launch();
-	void GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener r);
+	void GenerateCrashReport(ELFCrashReport &report, bridge::ResponseOpener r);
 	void Terminate();
 
 	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();

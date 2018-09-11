@@ -9,6 +9,7 @@
 #include<functional>
 
 #include "twib/Protocol.hpp"
+#include "bridge/ResponseOpener.hpp"
 
 namespace twili {
 
@@ -17,8 +18,6 @@ class Twili;
 namespace bridge {
 
 class Object;
-
-} // namespace bridge
 
 namespace usb {
 
@@ -61,8 +60,6 @@ class USBBridge {
 	};
 
 	class ResponseState;
-	class ResponseOpener;
-	class ResponseWriter;
 	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, ResponseOpener)>;
 	
 	USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero);
@@ -100,67 +97,20 @@ class USBBridge {
 	bool USBStateChangeCallback();
 };
 
-class USBBridge::ResponseState {
+class USBBridge::ResponseState : public bridge::detail::ResponseState {
  public:
 	ResponseState(USBBridge &bridge, uint32_t client_id, uint32_t tag);
-	void Finalize();
+
+	virtual size_t GetMaxTransferSize() override;
+	virtual void SendHeader(protocol::MessageHeader &hdr) override;
+	virtual void SendData(uint8_t *data, size_t size) override;
+	virtual void Finalize() override;
+	virtual uint32_t ReserveObjectId() override;
+	virtual void InsertObject(std::pair<uint32_t, std::shared_ptr<Object>> &&pair) override;
 
 	USBBridge &bridge;
-	uint32_t client_id;
-	uint32_t tag;
-
-	std::vector<std::shared_ptr<bridge::Object>> objects;
-	size_t transferred_size = 0;
-	size_t total_size = 0;
-	uint32_t object_count;
-	bool has_begun = false;
 };
 
-class USBBridge::ResponseOpener {
- public:
-	ResponseOpener(std::shared_ptr<ResponseState> state);
-
-	USBBridge::ResponseWriter BeginOk(size_t payload_size=0, uint32_t object_count=0);
-	USBBridge::ResponseWriter BeginError(trn::ResultCode code, size_t payload_size=0, uint32_t object_count=0);
-	
-	template<typename T, typename... Args>
-	std::shared_ptr<bridge::Object> MakeObject(Args &&... args) {
-		uint32_t object_id = state->bridge.object_id++;
-		std::shared_ptr<bridge::Object> obj = std::make_shared<T>(object_id, (std::forward<Args>(args))...);
-		state->bridge.objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(object_id, obj));
-		return obj;
-	}
-	
- private:
-	std::shared_ptr<ResponseState> state;
-};
-
-class USBBridge::ResponseWriter {
- public:
-	ResponseWriter(std::shared_ptr<ResponseState> state);
-	
-	size_t GetMaxTransferSize();
-	void Write(uint8_t *data, size_t size);
-	void Write(std::string str);
-	
-	template<typename T>
-	void Write(std::vector<T> data) {
-		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
-		return Write((uint8_t*) data.data(), data.size() * sizeof(T));
-	}
-	
-	template<typename T>
-	void Write(T data) {
-		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
-		return Write((uint8_t*) &data, sizeof(data));
-	}
-
-	uint32_t Object(std::shared_ptr<bridge::Object> object);
-
-	void Finalize();
- private:
-	std::shared_ptr<ResponseState> state;
-};
-
-}
-}
+} // namespace usb
+} // namespace bridge
+} // namespace twili

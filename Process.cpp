@@ -15,7 +15,7 @@ namespace twili {
 Process::Process(Twili &twili, uint64_t pid) : twili(twili), pid(pid) {
 }
 
-void Process::GenerateCrashReport(ELFCrashReport &report, usb::USBBridge::ResponseOpener opener) {
+void Process::GenerateCrashReport(ELFCrashReport &report, bridge::ResponseOpener opener) {
 	// write nso info notes
 	{
 		Result<std::vector<service::ldr::NsoInfo>> r = twili.services.ldr_dmnt.GetNsoInfos(pid);

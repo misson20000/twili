@@ -9,7 +9,7 @@
 #include<map>
 
 #include "Elf.hpp"
-#include "USBBridge.hpp"
+#include "bridge/ResponseOpener.hpp"
 
 namespace twili {
 
@@ -55,7 +55,7 @@ class ELFCrashReport {
 		AddNote(name, type, bytes);
 	}
 	
-	void Generate(trn::KDebug &debug, usb::USBBridge::ResponseOpener opener);
+	void Generate(trn::KDebug &debug, bridge::ResponseOpener opener);
 	void AddNote(std::string name, uint32_t type, std::vector<uint8_t> desc);
 
 	template<typename T>
