@@ -32,7 +32,7 @@ class ResponseState {
 	std::vector<std::shared_ptr<bridge::Object>> objects;
 	size_t transferred_size = 0;
 	size_t total_size = 0;
-	uint32_t object_count;
+	uint32_t object_count = 0;
 	bool has_begun = false;
 };
 
@@ -44,7 +44,7 @@ class ResponseWriter {
 	
 	inline size_t GetMaxTransferSize() { return state->GetMaxTransferSize(); }
 	void Write(uint8_t *data, size_t size);
-	void Write(const std::string &&str);
+	void Write(std::string str);
 	
 	template<typename T>
 	void Write(std::vector<T> data) {

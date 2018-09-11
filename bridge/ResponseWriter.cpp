@@ -15,7 +15,7 @@ void ResponseWriter::Write(uint8_t *data, size_t size) {
 	state->SendData(data, size);
 }
 
-void ResponseWriter::Write(const std::string &&str) {
+void ResponseWriter::Write(std::string str) {
 	Write((uint8_t*) str.data(), str.size());
 }
 
