@@ -15,21 +15,6 @@ namespace twili {
 namespace twibd {
 namespace frontend {
 
-#ifdef _WIN32
-static inline char *NetErrStr() {
-	char *s = NULL;
-	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL, WSAGetLastError(),
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			(LPTSTR)&s, 0, NULL);
-	return s;
-}
-#else
-static inline char *NetErrStr() {
-	return strerror(errno);
-}
-#endif
-
 SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
 	twibd(twibd),
 	address_family(address_family),
@@ -200,13 +185,14 @@ void SocketFrontend::event_thread_func() {
 		}
 
 		for(auto i = connections.begin(); i != connections.end(); ) {
+			(*i)->Process();
+			
 			if((*i)->obj->deletion_flag) {
 				twibd->RemoveClient((*i)->obj);
 				i = connections.erase(i);
 				continue;
 			}
 
-			(*i)->Process();
 			i++;
 		}
 	}

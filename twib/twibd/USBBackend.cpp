@@ -316,6 +316,7 @@ void USBBackend::Device::Identified(Response &r) {
 	if(r.result_code != 0) {
 		LogMessage(Warning, "device identification error: 0x%x", r.result_code);
 		deletion_flag = true;
+		return;
 	}
 	std::string err;
 	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin(), r.payload.end()), err);

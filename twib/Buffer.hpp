@@ -69,6 +69,8 @@ public:
 	
 	size_t ReadAvailable();
 	size_t WriteAvailableHint();
+
+	std::vector<uint8_t> GetData();
 	
 private:
 	std::vector<uint8_t> data;

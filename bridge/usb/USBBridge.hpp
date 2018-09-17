@@ -108,6 +108,7 @@ class USBBridge::ResponseState : public bridge::detail::ResponseState {
 	virtual uint32_t ReserveObjectId() override;
 	virtual void InsertObject(std::pair<uint32_t, std::shared_ptr<Object>> &&pair) override;
 
+ private:
 	USBBridge &bridge;
 };
 

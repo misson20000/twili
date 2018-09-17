@@ -16,6 +16,16 @@
 #include<WS2tcpip.h>
 #include<io.h>
 typedef signed long long ssize_t;
+
+static inline char *NetErrStr() {
+	char *s = NULL;
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, WSAGetLastError(),
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPTSTR)&s, 0, NULL);
+	return s;
+}
+
 #else
 
 #include<sys/socket.h>
@@ -23,9 +33,14 @@ typedef signed long long ssize_t;
 #include<sys/un.h>
 #include<netinet/in.h>
 #include<unistd.h>
+#include<errno.h>
 
 typedef int SOCKET;
 #define INVALID_SOCKET -1
 #define closesocket close
+
+static inline char *NetErrStr() {
+	return strerror(errno);
+}
 
 #endif

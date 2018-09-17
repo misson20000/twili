@@ -26,9 +26,11 @@
 namespace twili {
 namespace twibd {
 
-Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)), usb(this) {
+Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)),
+								 //usb(this),
+								 tcp(this) {
 	AddClient(local_client);
-	usb.Probe();
+	//usb.Probe();
 }
 
 Twibd::~Twibd() {

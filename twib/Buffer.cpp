@@ -68,5 +68,9 @@ void Buffer::Compact() {
 	read_head = 0;
 }
 
+std::vector<uint8_t> Buffer::GetData() {
+	return std::vector<uint8_t>(data.begin() + read_head, data.end());
+}
+
 } // namespace util
 } // namespace twili

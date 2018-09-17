@@ -14,6 +14,7 @@
 #include "blockingconcurrentqueue.h"
 
 #include "USBBackend.hpp"
+#include "TCPBackend.hpp"
 
 #include "Logger.hpp"
 #include "Messages.hpp"
@@ -41,7 +42,8 @@ class Twibd {
 
 	std::shared_ptr<LocalClient> local_client;
  private:
-	backend::USBBackend usb;
+	//backend::USBBackend usb;
+	backend::TCPBackend tcp;
 
 	moodycamel::BlockingConcurrentQueue<std::variant<Request, Response>> dispatch_queue;
 	

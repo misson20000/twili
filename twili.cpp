@@ -46,7 +46,7 @@ int main() {
 		printf("brought up USB serial\n");
 		
 		// initialize twili
-		twili::Twili twili;
+		static twili::Twili twili;
 		
 		while(!twili.destroy_flag) {
 			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
@@ -76,20 +76,9 @@ namespace twili {
 Twili::Twili() :
 	event_waiter(),
 	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
-	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
+	//usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
+	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
 
-	{
-		trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-
-		services.pm_shell = twili::service::pm::IShellService(
-			ResultCode::AssertOk(
-				sm.GetService("pm:shell")));
-
-		services.ldr_dmnt = twili::service::ldr::IDebugMonitorInterface(
-			ResultCode::AssertOk(
-				sm.GetService("ldr:dmnt")));
-	}
-	
 	server.CreateService("twili", [this](auto s) {
 			return new twili::ITwiliService(this);
 		});
@@ -114,6 +103,27 @@ std::optional<twili::MonitoredProcess*> Twili::FindMonitoredProcess(uint64_t pid
    } else {
       return &(*i);
    }
+}
+
+Twili::Services::Services() {
+	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+	
+	pm_shell = twili::service::pm::IShellService(
+		ResultCode::AssertOk(
+			sm.GetService("pm:shell")));
+	
+	ldr_dmnt = twili::service::ldr::IDebugMonitorInterface(
+		ResultCode::AssertOk(
+			sm.GetService("ldr:dmnt")));
+	
+	ipc::client::Object nifm_static = ResultCode::AssertOk(
+		sm.GetService("nifm:s"));
+	
+	ResultCode::AssertOk(
+		nifm_static.SendSyncRequest<4>( // CreateGeneralService
+			ipc::OutObject(nifm)));
+
+	printf("acquired services\n");
 }
 
 }
