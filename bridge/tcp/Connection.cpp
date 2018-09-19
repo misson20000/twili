@@ -12,14 +12,12 @@ namespace tcp {
 TCPBridge::Connection::Connection(TCPBridge &bridge, util::Socket &&socket) :
 	bridge(bridge),
 	socket(std::move(socket)) {
-	printf("constructing connection\n");
 	objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(0, bridge.object_zero));
 }
 
 void TCPBridge::Connection::PumpInput() {
 	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
 	ssize_t r = bsd_recv(socket.fd, (void*) std::get<0>(target), std::get<1>(target), 0);
-	printf("pumped in 0x%lx bytes\n", r);
 	if(r <= 0) {
 		deletion_flag = true;
 		return;
@@ -32,7 +30,6 @@ void TCPBridge::Connection::Process() {
 	while(in_buffer.ReadAvailable() > 0) {
 		if(!has_current_mh) {
 			if(in_buffer.Read(current_mh)) {
-				printf("read header\n");
 				has_current_mh = true;
 				current_payload.Clear();
 				has_current_payload = false;
@@ -43,7 +40,6 @@ void TCPBridge::Connection::Process() {
 
 		if(!has_current_payload) {
 			if(in_buffer.Read(current_payload, current_mh.payload_size)) {
-				printf("read payload\n");
 				has_current_payload = true;
 				current_object_ids.Clear();
 			} else {
@@ -54,7 +50,6 @@ void TCPBridge::Connection::Process() {
 
 		if(in_buffer.Read(current_object_ids, current_mh.object_count * sizeof(uint32_t))) {
 			// we've read all the components of the message
-			printf("read entire message\n");
 			ProcessCommand();
 			has_current_mh = false;
 			has_current_payload = false;

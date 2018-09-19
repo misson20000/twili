@@ -52,7 +52,6 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 }
 
 void TCPBridge::ThreadEntryShim(void *arg) {
-	printf("ThreadEntryShim: %p\n", arg);
 	((TCPBridge*) arg)->SocketThread();
 }
 
@@ -109,7 +108,6 @@ void TCPBridge::SocketThread() {
 			fds.push_back({c->socket.fd, POLLIN});
 		}
 
-		printf("polling on %ld sockets\n", fds.size());
 		if(bsd_poll(fds.data(), fds.size(), -1) < 0) {
 			printf("poll failure\n");
 			thread_destroy = 1;
@@ -154,7 +152,6 @@ void TCPBridge::SocketThread() {
 				continue;
 			}
 			if(fds[fdi].revents & POLLIN) {
-				printf("got input\n");
 				(*ci)->PumpInput();
 			}
 			ci++;
