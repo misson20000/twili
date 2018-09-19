@@ -188,6 +188,7 @@ void TCPBackend::Device::SendRequest(const Request &&r) {
 void TCPBackend::event_thread_func() {
 	fd_set readfds;
 	fd_set writefds;
+	fd_set errorfds;
 	SOCKET max_fd = 0;
 	while(!event_thread_destroy) {
 		LogMessage(Debug, "tcp backend event thread loop");
@@ -207,6 +208,7 @@ void TCPBackend::event_thread_func() {
 			}
 			
 			max_fd = std::max(max_fd, c->fd);
+			FD_SET(c->fd, &errorfds);
 			FD_SET(c->fd, &readfds);
 			
 			if(c->out_buffer.ReadAvailable() > 0) { // only add to writefds if we need to write
@@ -214,7 +216,7 @@ void TCPBackend::event_thread_func() {
 			}
 		}
 
-		if(select(max_fd + 1, &readfds, &writefds, NULL, NULL) < 0) {
+		if(select(max_fd + 1, &readfds, &writefds, &errorfds, NULL) < 0) {
 			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
 			exit(1);
 		}
@@ -242,6 +244,11 @@ void TCPBackend::event_thread_func() {
 		// pump i/o
 		for(auto mci = connections.begin(); mci != connections.end(); mci++) {
 			std::shared_ptr<twibc::MessageConnection<Device>> &mc = *mci;
+			if(FD_ISSET(mc->fd, &errorfds)) {
+				LogMessage(Info, "detected connection error");
+				mc->obj->deletion_flag = true;
+				continue;
+			}
 			if(FD_ISSET(mc->fd, &writefds)) {
 				mc->PumpOutput();
 			}
