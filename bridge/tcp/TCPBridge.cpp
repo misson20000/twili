@@ -6,6 +6,7 @@
 #include<system_error>
 
 #include "twili.hpp"
+#include "MutexShim.hpp"
 
 namespace twili {
 namespace bridge {
@@ -13,16 +14,6 @@ namespace tcp {
 
 using trn::ResultCode;
 using trn::ResultError;
-
-class MutexShim {
- public:
-	MutexShim(trn_mutex_t &mutex) : mutex(mutex) {}
-	void lock() { trn_mutex_lock(&mutex); }
-	bool try_lock() { return trn_mutex_try_lock(&mutex); }
-	void unlock() { trn_mutex_unlock(&mutex); }
- private:
-	trn_mutex_t &mutex;
-};
 
 TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
@@ -40,8 +31,8 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			printf("received network state event notification\n");
 			network_state_event.ResetSignal();
 
-			MutexShim mutex_shim(network_state_mutex);
-			std::unique_lock<MutexShim> lock(mutex_shim);
+			util::MutexShim mutex_shim(network_state_mutex);
+			std::unique_lock<util::MutexShim> lock(mutex_shim);
 			
 			network_state = network.GetRequestState();
 			printf("network state changed: %d\n", network_state);
@@ -58,6 +49,26 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 	network.SetConnectionConfirmationOption(2);
 	network.SetPersistent(true);
 	network.Submit();
+
+	request_processing_signal_wh = twili.event_waiter.AddSignal(
+		[this]() {
+			util::MutexShim shim(request_processing_mutex); // I/O thread can't mess with us now
+			std::unique_lock<util::MutexShim> lock(shim);
+
+			request_processing_signal_wh->ResetSignal();
+			try {
+				request_processing_connection->ProcessCommand();
+			} catch(ResultError &e) {
+				printf("caught 0x%x while processing request\n", e.code.code);
+				request_processing_connection->deletion_flag = true;
+			}
+			request_processing_connection->processing_message = false;
+			request_processing_connection.reset();
+			
+			trn_condvar_signal(&request_processing_condvar, -1); // resume I/O thread after we unlock
+
+			return true;
+		});
 	
 	ResultCode::AssertOk(trn_thread_create(&thread, TCPBridge::ThreadEntryShim, this, -1, -2, 0x4000, nullptr));
 	ResultCode::AssertOk(trn_thread_start(&thread));
@@ -71,8 +82,8 @@ void TCPBridge::SocketThread() {
 	while(!thread_destroy) {
 		{ // scope for lock
 			// wait for network connection
-			MutexShim mutex_shim(network_state_mutex);
-			std::unique_lock<MutexShim> lock(mutex_shim);
+			util::MutexShim mutex_shim(network_state_mutex);
+			std::unique_lock<util::MutexShim> lock(mutex_shim);
 			if(network_state != service::nifm::IRequest::State::Connected) {
 				printf("network is down\n");
 				connections.clear(); // kill all our connections

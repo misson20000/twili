@@ -55,6 +55,11 @@ class TCPBridge {
 	trn_mutex_t network_state_mutex = TRN_MUTEX_STATIC_INITIALIZER;
 	trn_condvar_t network_state_condvar = TRN_CONDVAR_STATIC_INITIALIZER;
 	std::shared_ptr<trn::WaitHandle> network_state_wh;
+
+	trn_mutex_t request_processing_mutex = TRN_MUTEX_STATIC_INITIALIZER;
+	trn_condvar_t request_processing_condvar = TRN_CONDVAR_STATIC_INITIALIZER;
+	std::shared_ptr<trn::WaitHandle> request_processing_signal_wh;
+	std::shared_ptr<Connection> request_processing_connection;
 };
 
 class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Connection> {
@@ -65,8 +70,10 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 
 	void PumpInput();
 	void Process();
+	void SynchronizeCommand();
 	void ProcessCommand();
 	bool deletion_flag = false;
+	volatile bool processing_message = false;
 
 	util::Socket socket;
  private:

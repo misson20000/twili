@@ -2,8 +2,11 @@
 
 #include<libtransistor/ipc/bsd.h>
 
+#include<mutex>
+
 #include "err.hpp"
 #include "bridge/Object.hpp"
+#include "MutexShim.hpp"
 
 namespace twili {
 namespace bridge {
@@ -27,7 +30,7 @@ void TCPBridge::Connection::PumpInput() {
 }
 
 void TCPBridge::Connection::Process() {
-	while(in_buffer.ReadAvailable() > 0) {
+	while(!deletion_flag && in_buffer.ReadAvailable() > 0) {
 		if(!has_current_mh) {
 			if(in_buffer.Read(current_mh)) {
 				has_current_mh = true;
@@ -50,13 +53,34 @@ void TCPBridge::Connection::Process() {
 
 		if(in_buffer.Read(current_object_ids, current_mh.object_count * sizeof(uint32_t))) {
 			// we've read all the components of the message
-			ProcessCommand();
+			SynchronizeCommand();
 			has_current_mh = false;
 			has_current_payload = false;
 		} else {
 			in_buffer.Reserve(current_mh.object_count * sizeof(uint32_t));
 			return;
 		}
+	}
+}
+
+/*
+ * Request that the main thread process the message we've just read,
+ * and then block until the main thread finishes. I know that this
+ * isn't very parallel, but I'm only using threads here to work around
+ * bad socket synchronization primitives so I don't really care.
+ * The faster we can block this (the I/O) thread and keep it from breaking
+ * things, the better.
+ */
+void TCPBridge::Connection::SynchronizeCommand() {
+	util::MutexShim shim(bridge.request_processing_mutex);
+	std::unique_lock<util::MutexShim> lock(shim);
+	
+	processing_message = true;
+	// request that the main thread service us
+	bridge.request_processing_connection = shared_from_this();
+	bridge.request_processing_signal_wh->Signal();
+	while(processing_message) {
+		trn_condvar_wait(&bridge.request_processing_condvar, &bridge.request_processing_mutex, -1);
 	}
 }
 
