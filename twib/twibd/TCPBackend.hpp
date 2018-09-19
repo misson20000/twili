@@ -56,6 +56,7 @@ class TCPBackend {
 	bool event_thread_destroy = false;
 	void event_thread_func();
 	std::thread event_thread;
+	void NotifyEventThread();
 };
 
 } // namespace backend

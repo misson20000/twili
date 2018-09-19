@@ -67,6 +67,7 @@ std::string TCPBackend::Connect(std::string hostname, std::string port) {
 	freeaddrinfo(res);
 
 	connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
+	NotifyEventThread();
 	return "Ok";
 }
 
@@ -90,6 +91,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 
 		connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
 		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
+		NotifyEventThread();
 	} else {
 		LogMessage(Info, "not an IPv4 address");
 	}
@@ -271,6 +273,20 @@ void TCPBackend::event_thread_func() {
 
 			i++;
 		}
+	}
+}
+
+void TCPBackend::NotifyEventThread() {
+	sockaddr_storage addr;
+	socklen_t len = sizeof(addr);
+	if(getsockname(listen_fd, (sockaddr*) &addr, &len) != 0) {
+		LogMessage(Error, "failed to get listen socket address");
+		exit(1);
+	}
+	char msg[] = "notify";
+	if(sendto(listen_fd, msg, sizeof(msg)-1, 0, (sockaddr*) &addr, len) != sizeof(msg)-1) {
+		LogMessage(Error, "failed to notify event thread");
+		exit(1);
 	}
 }
 
