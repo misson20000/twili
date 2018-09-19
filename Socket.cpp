@@ -35,7 +35,7 @@ Socket &Socket::operator=(Socket &&other) {
 
 void Socket::Close() {
 	if(fd != -1) {
-		bsd_close(fd);
+		closesocket(fd);
 		fd = -1;
 	}
 }
