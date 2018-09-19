@@ -46,7 +46,9 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			network_state = network.GetRequestState();
 			printf("network state changed: %d\n", network_state);
 			if(network_state != service::nifm::IRequest::State::Connected) {
-				server_socket.Close(); // signal event thread if it's blocked in poll
+				// signal event thread if it's blocked in poll
+				announce_socket.Close();
+				server_socket.Close();
 			}
 			
 			trn_condvar_signal(&network_state_condvar, -1);
@@ -82,32 +84,7 @@ void TCPBridge::SocketThread() {
 				}
 				printf("network is up\n");
 
-				// recreate server socket
-				server_socket = {bsd_socket(AF_INET, SOCK_STREAM, 0)};
-				if(server_socket.fd == -1) {
-					printf("failed to create socket\n");
-					trn_mutex_unlock(&network_state_mutex);
-					throw std::system_error(bsd_errno, std::generic_category());
-				}
-				
-				struct sockaddr_in addr;
-				memset(&addr, 0, sizeof(addr));
-				addr.sin_family = AF_INET;
-				addr.sin_port = htons(15152);
-				addr.sin_addr = {INADDR_ANY};
-				
-				if(bsd_bind(server_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
-					printf("failed to bind socket\n");
-					trn_mutex_unlock(&network_state_mutex);
-					throw std::system_error(bsd_errno, std::generic_category());
-				}
-				
-				if(bsd_listen(server_socket.fd, 20) < 0) {
-					printf("failed to listen on socket\n");
-					trn_mutex_unlock(&network_state_mutex);
-					throw std::system_error(bsd_errno, std::generic_category());
-				}
-				printf("server socket created\n");
+				ResetSockets();
 			}
 		} // end lock scope
 		
@@ -184,6 +161,54 @@ void TCPBridge::SocketThread() {
 		}
 	}
 	printf("socket thread exiting\n");
+}
+
+void TCPBridge::ResetSockets() {
+	// recreate server socket
+	server_socket = {bsd_socket(AF_INET, SOCK_STREAM, 0)};
+	if(server_socket.fd == -1) {
+		printf("failed to create socket\n");
+		trn_mutex_unlock(&network_state_mutex);
+		throw std::system_error(bsd_errno, std::generic_category());
+	}
+				
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(15152);
+	addr.sin_addr = {INADDR_ANY};
+				
+	if(bsd_bind(server_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+		printf("failed to bind socket\n");
+		throw std::system_error(bsd_errno, std::generic_category());
+	}
+				
+	if(bsd_listen(server_socket.fd, 20) < 0) {
+		printf("failed to listen on socket\n");
+		throw std::system_error(bsd_errno, std::generic_category());
+	}
+
+	// recreate announce socket
+	announce_socket = {bsd_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)};
+	if(announce_socket.fd == -1) {
+		printf("failed to create announce socket\n");
+		throw std::system_error(bsd_errno, std::generic_category());
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(15153);
+	addr.sin_addr = {INADDR_ANY};
+	if(bsd_bind(announce_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+		printf("failed to bind announce socket\n");
+		throw std::system_error(bsd_errno, std::generic_category());
+	}
+
+	uint8_t group_addr[] = {224, 0, 53, 55};
+	addr.sin_addr.s_addr = *(uint32_t*) group_addr;
+	char message[] = "twili-announce";
+	ssize_t r = bsd_sendto(announce_socket.fd, message, strlen(message), 0, (sockaddr*) &addr, sizeof(addr));
+	printf("sendto result: %ld\n", r);
 }
 
 TCPBridge::~TCPBridge() {

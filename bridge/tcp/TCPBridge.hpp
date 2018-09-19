@@ -37,6 +37,7 @@ class TCPBridge {
  private:
 	Twili &twili;
 
+	util::Socket announce_socket;
 	util::Socket server_socket;
 	std::list<std::shared_ptr<Connection>> connections;
 	std::shared_ptr<bridge::Object> object_zero;
@@ -48,6 +49,7 @@ class TCPBridge {
 	static void ThreadEntryShim(void *arg);
 	void SocketThread();
 
+	void ResetSockets();
 	service::nifm::IRequest::State network_state = service::nifm::IRequest::State::Error;
 	trn::KEvent network_state_event;
 	trn_mutex_t network_state_mutex = TRN_MUTEX_STATIC_INITIALIZER;
