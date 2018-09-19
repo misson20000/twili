@@ -26,6 +26,7 @@ class ITwibMetaInterface {
  public:
 	enum class Command : uint32_t {
 		LIST_DEVICES = 10,
+		CONNECT_TCP = 11,
 	};
 };
 

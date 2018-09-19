@@ -294,6 +294,12 @@ int main(int argc, char *argv[]) {
 	
 	CLI::App *ld = app.add_subcommand("list-devices", "List devices");
 	
+	CLI::App *cmd_connect_tcp = app.add_subcommand("connect-tcp", "Connect to a device over TCP");
+	std::string connect_tcp_hostname;
+	std::string connect_tcp_port = "15152";
+	cmd_connect_tcp->add_option("hostname", connect_tcp_hostname, "Hostname to connect to")->required();
+	cmd_connect_tcp->add_option("port", connect_tcp_port, "Port to connect to");
+	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
 	std::string run_file;
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
@@ -349,6 +355,11 @@ int main(int argc, char *argv[]) {
 	
 	if(ld->parsed()) {
 		ListDevices(itmi);
+		return 0;
+	}
+
+	if(cmd_connect_tcp->parsed()) {
+		printf("%s\n", itmi.ConnectTcp(connect_tcp_hostname, connect_tcp_port).c_str());
 		return 0;
 	}
 

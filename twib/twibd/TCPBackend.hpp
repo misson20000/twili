@@ -25,6 +25,9 @@ class TCPBackend {
  public:
 	TCPBackend(Twibd *twibd);
 	~TCPBackend();
+
+	std::string Connect(std::string hostname, std::string port);
+	void Connect(sockaddr *sockaddr, socklen_t addr_len);
 	
 	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
 	 public:

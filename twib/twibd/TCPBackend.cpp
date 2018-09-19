@@ -13,36 +13,63 @@ namespace backend {
 TCPBackend::TCPBackend(Twibd *twibd) :
 	twibd(twibd) {
 
-	struct addrinfo hints;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = 0;
-	struct addrinfo *res = 0;
-	int err = getaddrinfo("10.0.0.195", "15152", &hints, &res);
-	if(err != 0) {
-		LogMessage(Error, "failed to resolve remote socket address");
-		exit(1);
-	}
-	int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if(fd == -1) {
-		LogMessage(Error, "%s", strerror(errno));
-		exit(1);
-	}
-	if(connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
-		LogMessage(Error, "%s", strerror(errno));
-		exit(1);
-	}
-	freeaddrinfo(res);
-
-	connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
-
 	event_thread = std::thread(&TCPBackend::event_thread_func, this);
 }
 
 TCPBackend::~TCPBackend() {
 	event_thread_destroy = true;
 	event_thread.join();
+}
+
+std::string TCPBackend::Connect(std::string hostname, std::string port) {
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	struct addrinfo *res = 0;
+	int err = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &res);
+	if(err != 0) {
+		return gai_strerror(err);
+	}
+	
+	int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if(fd == -1) {
+		return NetErrStr();
+	}
+	if(connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
+		closesocket(fd);
+		return NetErrStr();
+	}
+	freeaddrinfo(res);
+
+	connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
+	return "Ok";
+}
+
+void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
+	if(addr->sa_family == AF_INET) {
+		sockaddr_in *addr_in = (sockaddr_in*) addr;
+		LogMessage(Info, "  from %s", inet_ntoa(addr_in->sin_addr));
+		addr_in->sin_port = htons(15152); // force port number
+		
+		int fd = socket(addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
+		if(fd == -1) {
+			LogMessage(Error, "could not create socket: %s", NetErrStr());
+			return;
+		}
+
+		if(connect(fd, addr, addr_len) == -1) {
+			LogMessage(Error, "could not connect: %s", NetErrStr());
+			closesocket(fd);
+			return;
+		}
+
+		connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
+		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
+	} else {
+		LogMessage(Info, "not an IPv4 address");
+	}
 }
 
 TCPBackend::Device::Device(twibc::MessageConnection<Device> &mc, TCPBackend *backend) :

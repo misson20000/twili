@@ -185,6 +185,24 @@ Response Twibd::HandleRequest(Request &rq) {
 			r.payload = std::vector<uint8_t>(ser.begin(), ser.end());
 			
 			return r; }
+		case protocol::ITwibMetaInterface::Command::CONNECT_TCP: {
+			LogMessage(Debug, "command 1 issued to twibd meta object: CONNECT_TCP");
+
+			util::Buffer buffer(rq.payload);
+			size_t hostname_len, port_len;
+			std::string hostname, port;
+			if(!buffer.Read(hostname_len) ||
+				 !buffer.Read(port_len) ||
+				 !buffer.Read(hostname, hostname_len) ||
+				 !buffer.Read(port, port_len)) {
+				return rq.RespondError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
+			}
+			LogMessage(Info, "requested to connect to %s:%s", hostname.c_str(), port.c_str());
+
+			Response r = rq.RespondOk();
+			std::string msg = tcp.Connect(hostname, port);
+			r.payload = std::vector<uint8_t>(msg.begin(), msg.end());
+			return r; }
 		default:
 			return rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION);
 		}

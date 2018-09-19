@@ -14,6 +14,7 @@ class ITwibMetaInterface {
 	ITwibMetaInterface(RemoteObject obj);
 
 	std::vector<msgpack11::MsgPack> ListDevices();
+	std::string ConnectTcp(std::string hostname, std::string port);
  private:
 	RemoteObject obj;
 };
