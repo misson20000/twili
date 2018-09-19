@@ -50,6 +50,8 @@ class TCPBackend {
  private:
 	Twibd *twibd;
 	std::list<std::shared_ptr<twibc::MessageConnection<Device>>> connections;
+
+	SOCKET listen_fd;
 	
 	bool event_thread_destroy = false;
 	void event_thread_func();

@@ -12,12 +12,35 @@ namespace backend {
 
 TCPBackend::TCPBackend(Twibd *twibd) :
 	twibd(twibd) {
+	listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(listen_fd == -1) {
+		LogMessage(Error, "Failed to create listening socket: %s", NetErrStr());
+		exit(1);
+	}
+
+	sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(15153);
+	if(bind(listen_fd, (sockaddr*) &addr, sizeof(addr)) != 0) {
+		LogMessage(Error, "Failed to bind listening socket: %s", NetErrStr());
+		exit(1);
+	}
+
+	ip_mreq mreq;
+	mreq.imr_multiaddr.s_addr = inet_addr("224.0.53.55");
+	mreq.imr_interface.s_addr = INADDR_ANY;
+	if(setsockopt(listen_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0) {
+		LogMessage(Error, "Failed to join multicast group");
+		exit(1);
+	}
 
 	event_thread = std::thread(&TCPBackend::event_thread_func, this);
 }
 
 TCPBackend::~TCPBackend() {
 	event_thread_destroy = true;
+	closesocket(listen_fd);
 	event_thread.join();
 }
 
@@ -171,6 +194,10 @@ void TCPBackend::event_thread_func() {
 		
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
+
+		// add listen socket
+		max_fd = std::max(max_fd, listen_fd);
+		FD_SET(listen_fd, &readfds);
 		
 		// add device connections
 		for(auto &c : connections) {
@@ -190,6 +217,26 @@ void TCPBackend::event_thread_func() {
 		if(select(max_fd + 1, &readfds, &writefds, NULL, NULL) < 0) {
 			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
 			exit(1);
+		}
+
+		// check for announcements or thread notifications
+		if(FD_ISSET(listen_fd, &readfds)) {
+			char buffer[256];
+			sockaddr_storage addr_storage;
+			sockaddr *addr = (sockaddr*) &addr_storage;
+			socklen_t addr_len = sizeof(addr);
+			ssize_t r = recvfrom(listen_fd, buffer, sizeof(buffer)-1, 0, addr, &addr_len);
+			LogMessage(Debug, "got 0x%x bytes from listen socket", r);
+			if(r < 0) {
+				LogMessage(Fatal, "listen socket error: %s", NetErrStr());
+				exit(1);
+			} else {
+				buffer[r] = 0;
+				if(!strcmp(buffer, "twili-announce")) {
+					LogMessage(Info, "received twili device announcement");
+					Connect(addr, addr_len);
+				}
+			}
 		}
 		
 		// pump i/o
