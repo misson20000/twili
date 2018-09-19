@@ -1,5 +1,6 @@
 #pragma once
 
+#include<string>
 #include<vector>
 #include<type_traits>
 #include<optional>
@@ -13,6 +14,7 @@ namespace util {
 class Buffer {
 public:
 	Buffer();
+	Buffer(std::vector<uint8_t> data);
 	~Buffer();
 
 	// reserves at least `size` bytes, returns a tuple of
@@ -29,6 +31,8 @@ public:
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		Write((uint8_t*) data.data(), sizeof(T) * data.size());
 	}
+
+	void Write(std::string &str);
 	
 	template<typename T>
 	void Write(T t) {
@@ -48,12 +52,14 @@ public:
 	}
 
 	template<typename T>
-	bool Read(std::vector<T> vec) {
+	bool Read(std::vector<T> &vec) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
 		T temp;
 		return Read((uint8_t*) vec.data(), sizeof(T) * vec.size());
 	}
 
+	bool Read(std::string &str, size_t size);
+	
 	bool Read(Buffer &other, size_t size) {
 		if(Read(std::get<0>(other.Reserve(size)), size)) {
 			other.MarkWritten(size);

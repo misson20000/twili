@@ -9,6 +9,10 @@ Buffer::Buffer() :
 	data(2 * 1024 * 1024, 0) {
 }
 
+Buffer::Buffer(std::vector<uint8_t> data) :
+	data(data), write_head(data.size()) {
+}
+
 Buffer::~Buffer() {
 }
 
@@ -16,6 +20,10 @@ void Buffer::Write(const uint8_t *io, size_t size) {
 	EnsureSpace(size);
 	std::copy_n(io, size, data.begin() + write_head);
 	write_head+= size;
+}
+
+void Buffer::Write(std::string &string) {
+	Write((uint8_t*) string.data(), string.size());
 }
 
 std::tuple<uint8_t*, size_t> Buffer::Reserve(size_t size) {
@@ -33,6 +41,15 @@ bool Buffer::Read(uint8_t *io, size_t size) {
 	}
 	std::copy_n(data.begin() + read_head, size, io);
 	read_head+= size;
+	return true;
+}
+
+bool Buffer::Read(std::string &str, size_t len) {
+	if(ReadAvailable() < len) {
+		return false;
+	}
+	str = std::string(Read(), Read() + len);
+	MarkRead(len);
 	return true;
 }
 
