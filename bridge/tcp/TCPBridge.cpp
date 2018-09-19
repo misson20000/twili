@@ -14,6 +14,16 @@ namespace tcp {
 using trn::ResultCode;
 using trn::ResultError;
 
+class MutexShim {
+ public:
+	MutexShim(trn_mutex_t &mutex) : mutex(mutex) {}
+	void lock() { trn_mutex_lock(&mutex); }
+	bool try_lock() { return trn_mutex_try_lock(&mutex); }
+	void unlock() { trn_mutex_unlock(&mutex); }
+ private:
+	trn_mutex_t &mutex;
+};
+
 TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
 	network(twili.services.nifm.CreateRequest(2)),
@@ -29,7 +39,9 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 		[this]() {
 			printf("received network state event notification\n");
 			network_state_event.ResetSignal();
-			trn_mutex_lock(&network_state_mutex);
+
+			MutexShim mutex_shim(network_state_mutex);
+			std::unique_lock<MutexShim> lock(mutex_shim);
 			
 			network_state = network.GetRequestState();
 			printf("network state changed: %d\n", network_state);
@@ -38,8 +50,6 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			}
 			
 			trn_condvar_signal(&network_state_condvar, -1);
-			
-			trn_mutex_unlock(&network_state_mutex);
 			return true;
 		});
 
@@ -59,7 +69,8 @@ void TCPBridge::SocketThread() {
 	while(!thread_destroy) {
 		{ // scope for lock
 			// wait for network connection
-			trn_mutex_lock(&network_state_mutex);
+			MutexShim mutex_shim(network_state_mutex);
+			std::unique_lock<MutexShim> lock(mutex_shim);
 			if(network_state != service::nifm::IRequest::State::Connected) {
 				printf("network is down\n");
 				connections.clear(); // kill all our connections
@@ -98,7 +109,6 @@ void TCPBridge::SocketThread() {
 				}
 				printf("server socket created\n");
 			}
-			trn_mutex_unlock(&network_state_mutex);
 		} // end lock scope
 		
 		std::vector<pollfd> fds;
