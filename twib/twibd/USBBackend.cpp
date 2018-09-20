@@ -330,8 +330,7 @@ void USBBackend::Device::Identified(Response &r) {
 	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin(), r.payload.end()), err);
 	identification = obj;
 	device_nickname = obj["device_nickname"].string_value();
-	std::vector<uint8_t> sn = obj["serial_number"].binary_items();
-	serial_number = std::string(sn.begin(), sn.end());
+	serial_number = obj["serial_number"].string_value();
 
 	LogMessage(Info, "nickname: %s", device_nickname.c_str());
 	LogMessage(Info, "serial number: %s", serial_number.c_str());
