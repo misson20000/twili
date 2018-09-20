@@ -88,7 +88,7 @@ void Twibd::Process() {
 
 	if(v.index() == 0) {
 		Request rq = std::get<Request>(v);
-		LogMessage(Info, "dispatching request");
+		LogMessage(Debug, "dispatching request");
 		LogMessage(Debug, "  client id: %08x", rq.client->client_id);
 		LogMessage(Debug, "  device id: %08x", rq.device_id);
 		LogMessage(Debug, "  object id: %08x", rq.object_id);
@@ -137,7 +137,7 @@ void Twibd::Process() {
 		}
 	} else if(v.index() == 1) {
 		Response rs = std::get<Response>(v);
-		LogMessage(Info, "dispatching response");
+		LogMessage(Debug, "dispatching response");
 		LogMessage(Debug, "  client id: %08x", rs.client_id);
 		LogMessage(Debug, "  object id: %08x", rs.object_id);
 		LogMessage(Debug, "  result code: %08x", rs.result_code);
@@ -270,6 +270,9 @@ int main(int argc, char *argv[]) {
 
 	CLI::App app {"Twili debug monitor daemon"};
 
+	int verbosity = false;
+	app.add_flag("-v,--verbose", verbosity, "Enable verbose messages. Use twice to enable debug messages");
+	
 	bool systemd_mode = false;
 #if WITH_SYSTEMD == 1
 	app.add_flag("--systemd", systemd_mode, "Log in systemd format and obtain sockets from systemd (disables unix and tcp frontends)");
@@ -318,14 +321,21 @@ int main(int argc, char *argv[]) {
 	} catch(const CLI::ParseError &e) {
 		return app.exit(e);
 	}
-	
+
+	twili::log::Level min_log_level = twili::log::Level::Message;
+	if(verbosity >= 1) {
+		min_log_level = twili::log::Level::Info;
+	}
+	if(verbosity >= 2) {
+		min_log_level = twili::log::Level::Debug;
+	}
 #if WITH_SYSTEMD == 1
 	if(systemd_mode) {
-		add_log(std::make_shared<twili::log::SystemdLogger>(stderr, twili::log::Level::Debug));
+		add_log(std::make_shared<twili::log::SystemdLogger>(stderr, min_log_level));
 	}
 #endif
 	if(!systemd_mode) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
 		add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	}
 
