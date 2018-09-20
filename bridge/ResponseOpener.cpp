@@ -11,7 +11,7 @@ using trn::ResultError;
 ResponseOpener::ResponseOpener(std::shared_ptr<detail::ResponseState> state) : state(state) {
 }
 
-ResponseWriter ResponseOpener::BeginError(ResultCode code, size_t payload_size, uint32_t object_count) {
+ResponseWriter ResponseOpener::BeginError(ResultCode code, size_t payload_size, uint32_t object_count) const {
 	if(state->has_begun) {
 		throw ResultError(TWILI_ERR_FATAL_BRIDGE_STATE);
 	}
@@ -35,7 +35,7 @@ ResponseWriter ResponseOpener::BeginError(ResultCode code, size_t payload_size, 
 	return writer;
 }
 
-ResponseWriter ResponseOpener::BeginOk(size_t payload_size, uint32_t object_count) {
+ResponseWriter ResponseOpener::BeginOk(size_t payload_size, uint32_t object_count) const {
 	return BeginError(ResultCode(0), payload_size, object_count);
 }
 

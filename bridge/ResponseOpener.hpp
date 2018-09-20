@@ -68,11 +68,11 @@ class ResponseWriter {
 class ResponseOpener {
  public:
 	ResponseOpener(std::shared_ptr<detail::ResponseState> state);
-	ResponseWriter BeginOk(size_t payload_size=0, uint32_t object_count=0);
-	ResponseWriter BeginError(trn::ResultCode code, size_t payload_size=0, uint32_t object_count=0);
+	ResponseWriter BeginOk(size_t payload_size=0, uint32_t object_count=0) const;
+	ResponseWriter BeginError(trn::ResultCode code, size_t payload_size=0, uint32_t object_count=0) const;
 	
 	template<typename T, typename... Args>
-	std::shared_ptr<Object> MakeObject(Args &&... args) {
+	std::shared_ptr<Object> MakeObject(Args &&... args) const {
 		uint32_t object_id = state->ReserveObjectId();
 		std::shared_ptr<Object> obj = std::make_shared<T>(object_id, (std::forward<Args>(args))...);
 		state->InsertObject(std::pair<uint32_t, std::shared_ptr<Object>>(object_id, obj));
