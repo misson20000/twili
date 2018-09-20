@@ -72,10 +72,11 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 }
 
 void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> cb) {
+	TP_Debug("TwibPipe(%s): Write(%p, 0x%lx)\n", StateName(current_state_id), data, size);
 	if(size == 0) {
+		cb(true);
 		return;
 	}
-	TP_Debug("TwibPipe(%s): Write(%p, 0x%lx)\n", StateName(current_state_id), data, size);
 	
 	switch(current_state_id) {
 	case State::Idle:
