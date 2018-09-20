@@ -55,16 +55,15 @@ int main(int argc, char *argv[]) {
 			// set our filesystem permissions
 			static uint32_t fah[] = {0x1, 0xFFFFFFFF, 0xFFFFFFFF, 0x1C, 0, 0x1C, 0};
 			static uint32_t fac[] = {0x1, 0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF};
-			ResultCode::AssertOk(
-				fsppr.SendSyncRequest<0>( // RegisterProgram
-					ipc::InRaw<uint8_t>(3), // Storage ID
-					ipc::InRaw<uint64_t>( // Process ID
-						ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001))),
-					ipc::InRaw<uint64_t>(0x100000000006481), // Title ID
-					ipc::InRaw<uint64_t>(sizeof(fah)), // FAH Size
-					ipc::InRaw<uint64_t>(sizeof(fac)), // FAC Size
-					ipc::Buffer<uint32_t, 0x5>(fah, sizeof(fah)),
-					ipc::Buffer<uint32_t, 0x5>(fac, sizeof(fac))));
+			fsppr.SendSyncRequest<0>( // RegisterProgram
+				ipc::InRaw<uint8_t>(3), // Storage ID
+				ipc::InRaw<uint64_t>( // Process ID
+					ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001))),
+				ipc::InRaw<uint64_t>(0x100000000006481), // Title ID
+				ipc::InRaw<uint64_t>(sizeof(fah)), // FAH Size
+				ipc::InRaw<uint64_t>(sizeof(fac)), // FAC Size
+				ipc::Buffer<uint32_t, 0x5>(fah, sizeof(fah)),
+				ipc::Buffer<uint32_t, 0x5>(fac, sizeof(fac)));
 			
 		} // at this point we no longer need SM or ITwiliService
 		sm_force_finalize();
