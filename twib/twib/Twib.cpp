@@ -200,17 +200,18 @@ std::string ToHex(T num, bool prefix) {
 }
 
 void ListDevices(ITwibMetaInterface &iface) {
-	std::vector<std::array<std::string, 3>> rows;
-	rows.push_back({"Device ID", "Nickname", "Firmware Version"});
+	std::vector<std::array<std::string, 4>> rows;
+	rows.push_back({"Device ID", "Nickname", "Firmware Version", "Bridge Type"});
 	auto devices = iface.ListDevices();
 	for(msgpack11::MsgPack device : devices) {
 		uint32_t device_id = device["device_id"].uint32_value();
+		std::string bridge_type = device["bridge_type"].string_value();
 		msgpack11::MsgPack ident = device["identification"];
 		auto nickname = ident["device_nickname"].string_value();
 		auto version = ident["firmware_version"].binary_items();
 		std::string fw_version((char*) version.data() + 0x68);
 		
-		rows.push_back({ToHex(device_id, 8, false), nickname, fw_version});
+		rows.push_back({ToHex(device_id, 8, false), nickname, fw_version, bridge_type});
 	}
 	PrintTable(rows);
 }

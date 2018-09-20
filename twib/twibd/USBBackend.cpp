@@ -145,6 +145,14 @@ void USBBackend::Device::SendRequest(const Request &&request) {
 	}
 }
 
+int USBBackend::Device::GetPriority() {
+	return 2; // USB devices are a higher priority than TCP devices
+}
+
+std::string USBBackend::Device::GetBridgeType() {
+	return "usb";
+}
+
 std::shared_ptr<USBBackend::Device> *USBBackend::Device::SharedPtrForTransfer() {
 	return new std::shared_ptr<Device>(shared_from_this());
 }

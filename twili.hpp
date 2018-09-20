@@ -32,7 +32,7 @@ class Twili {
 	bool destroy_flag = false;
 	trn::Waiter event_waiter;
 	trn::ipc::server::IPCServer server;
-	//bridge::usb::USBBridge usb_bridge;
+	bridge::usb::USBBridge usb_bridge;
 	bridge::tcp::TCPBridge tcp_bridge;
 	
 	std::list<twili::MonitoredProcess> monitored_processes;

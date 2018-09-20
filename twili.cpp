@@ -76,7 +76,7 @@ namespace twili {
 Twili::Twili() :
 	event_waiter(),
 	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
-	//usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
+	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
 	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
 
 	server.CreateService("twili", [this](auto s) {

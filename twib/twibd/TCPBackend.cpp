@@ -187,6 +187,14 @@ void TCPBackend::Device::SendRequest(const Request &&r) {
 	connection.PumpOutput();
 }
 
+int TCPBackend::Device::GetPriority() {
+	return 1; // lower priority than USB devices
+}
+
+std::string TCPBackend::Device::GetBridgeType() {
+	return "tcp";
+}
+
 void TCPBackend::event_thread_func() {
 	fd_set readfds;
 	fd_set writefds;

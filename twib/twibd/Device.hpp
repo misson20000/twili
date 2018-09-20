@@ -12,7 +12,9 @@ namespace twibd {
 class Device {
  public:
 	virtual void SendRequest(const Request &&r) = 0;
-
+	virtual int GetPriority() = 0;
+	virtual std::string GetBridgeType() = 0;
+	
 	msgpack11::MsgPack identification;
 	std::string device_nickname;
 	std::string serial_number;

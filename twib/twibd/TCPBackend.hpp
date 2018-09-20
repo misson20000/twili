@@ -37,8 +37,10 @@ class TCPBackend {
 		void Begin();
 		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
 		void Identified(Response &r);
-		virtual void SendRequest(const Request &&r);
-
+		virtual void SendRequest(const Request &&r) override;
+		virtual int GetPriority() override;
+		virtual std::string GetBridgeType() override;
+		
 		TCPBackend *backend;
 		twibc::MessageConnection<Device> &connection;
 		std::list<WeakRequest> pending_requests;

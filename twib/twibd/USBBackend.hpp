@@ -41,6 +41,9 @@ class USBBackend {
 		// thread-agnostic
 		virtual void SendRequest(const Request &&r) override;
 
+		virtual int GetPriority() override;
+		virtual std::string GetBridgeType() override;
+		
 		bool ready_flag = false;
 		bool added_flag = false;
 	 private:

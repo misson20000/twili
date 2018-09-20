@@ -26,11 +26,12 @@
 namespace twili {
 namespace twibd {
 
-Twibd::Twibd() : local_client(std::make_shared<LocalClient>(this)),
-								 //usb(this),
-								 tcp(this) {
+Twibd::Twibd() :
+	local_client(std::make_shared<LocalClient>(this)),
+	usb(this),
+	tcp(this) {
 	AddClient(local_client);
-	//usb.Probe();
+	usb.Probe();
 }
 
 Twibd::~Twibd() {
@@ -40,7 +41,11 @@ Twibd::~Twibd() {
 void Twibd::AddDevice(std::shared_ptr<Device> device) {
 	std::lock_guard<std::mutex> lock(device_map_mutex);
 	LogMessage(Info, "adding device with id %08x", device->device_id);
-	devices[device->device_id] = device;
+	std::weak_ptr<Device> &entry = devices[device->device_id];
+	std::shared_ptr<Device> entry_lock = entry.lock();
+	if(!entry_lock || entry_lock->GetPriority() < device->GetPriority()) { // don't let tcp devices clobber usb devices
+		entry = device;
+	}
 	
 	LogMessage(Debug, "resetting objects on new device");
 	local_client->SendRequest(
@@ -177,6 +182,7 @@ Response Twibd::HandleRequest(Request &rq) {
 				device_packs.push_back(
 					msgpack11::MsgPack::object {
 						{"device_id", device->device_id},
+						{"bridge_type", device->GetBridgeType()},
 						{"identification", device->identification}
 					});
 			}
