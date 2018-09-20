@@ -220,6 +220,7 @@ void TCPBridge::ResetSockets() {
 	char message[] = "twili-announce";
 	ssize_t r = bsd_sendto(announce_socket.fd, message, strlen(message), 0, (sockaddr*) &addr, sizeof(addr));
 	printf("sendto result: %ld\n", r);
+	printf("  bsd_errno: %d\n", bsd_errno);
 }
 
 TCPBridge::~TCPBridge() {
