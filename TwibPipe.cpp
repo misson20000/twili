@@ -4,7 +4,8 @@
 
 using trn::ResultError;
 
-#define TP_Debug(...) printf(__VA_ARGS__)
+#define TP_Debug(...)
+//#define TP_Debug(...) printf(__VA_ARGS__)
 
 namespace twili {
 
