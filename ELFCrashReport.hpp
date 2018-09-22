@@ -9,7 +9,7 @@
 #include<map>
 
 #include "Elf.hpp"
-#include "USBBridge.hpp"
+#include "bridge/ResponseOpener.hpp"
 
 namespace twili {
 
@@ -55,8 +55,16 @@ class ELFCrashReport {
 		AddNote(name, type, bytes);
 	}
 	
-	trn::Result<std::nullopt_t> Generate(trn::KDebug &debug, usb::USBBridge::USBResponseWriter &writer);
+	void Generate(trn::KDebug &debug, bridge::ResponseOpener opener);
 	void AddNote(std::string name, uint32_t type, std::vector<uint8_t> desc);
+
+	template<typename T>
+	void AddNote(std::string name, uint32_t type, std::vector<T> desc) {
+		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
+		uint8_t *desc_bytes = (uint8_t*) desc.data();
+		std::vector<uint8_t> bytes(desc_bytes, desc_bytes + (desc.size() * sizeof(T)));
+		AddNote(name, type, bytes);
+	}
 	
  private:
 	std::vector<VMA> vmas;

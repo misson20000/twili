@@ -1,15 +1,21 @@
 RESOURCES := terminus-114n.psf
-OBJECTS := twili.o ITwiliService.o IPipe.o USBBridge.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o libtmt/tmt.o libpsf/libpsf.o terminal.o
+OBJECTS := twili.o ITwiliService.o IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o msgpack11/msgpack11.o Process.o ITwibDeviceInterface.o ITwibPipeReader.o TwibPipe.o ITwibPipeWriter.o ITwibDebugger.o service/pm/IShellService.o service/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o twib/Buffer.o service/nifm/IGeneralService.o service/nifm/IRequest.o Socket.o MutexShim.o libtmt/tmt.o libpsf/libpsf.o terminal.o
 LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o util.o
 HBABI_SHIM_OBJECTS := hbabi_shim.o
 
-TWILI_CXX_FLAGS := -Werror-return-type
+TWILI_CXX_FLAGS := -Werror-return-type -Og -I.
 
-all: build/twili_launcher.nsp build/twili.nro build/twili.nso
+BUILD_PFS0 := build_pfs0
+
+TITLE_ID := 0100000000006480
+ATMOSPHERE_TITLE_DIR := build/atmosphere/titles/$(TITLE_ID)
+ATMOSPHERE_TARGETS := $(addprefix $(ATMOSPHERE_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
+
+all: build/twili_launcher.nsp build/twili.nro build/twili.nso build/twili.kip build/twili_launcher.kip $(ATMOSPHERE_TARGETS)
 
 build/twili_launcher.nsp: build/twili_launcher_exefs/main build/twili_launcher_exefs/main.npdm
 	mkdir -p $(@D)
-	build_pfs0 build/twili_launcher_exefs/ $@
+	$(BUILD_PFS0) build/twili_launcher_exefs/ $@
 
 build/twili_launcher_exefs/main: build/twili_launcher.nso
 	mkdir -p $(@D)
@@ -18,6 +24,22 @@ build/twili_launcher_exefs/main: build/twili_launcher.nso
 build/twili_launcher_exefs/main.npdm: main.npdm
 	mkdir -p $(@D)
 	cp $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/main: build/twili.nso
+	mkdir -p $(@D)
+	cp $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/main.npdm: twili.json
+	mkdir -p $(@D)
+	npdmtool $< $@
+
+$(ATMOSPHERE_TITLE_DIR)/exefs/rtld.stub:
+	mkdir -p $(@D)
+	touch $@
+
+$(ATMOSPHERE_TITLE_DIR)/boot2.flag:
+	mkdir -p $(@D)
+	touch $@
 
 clean:
 	rm -rf build
@@ -47,6 +69,12 @@ build/twili.squashfs: build/hbabi_shim.nro $(RESOURCES)
 build/twili_launcher.squashfs: build/twili.nro
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
+
+build/twili.kip: build/twili.nso.so twili_kip.json
+	elf2kip build/twili.nso.so twili_kip.json build/twili.kip
+
+build/twili_launcher.kip: build/twili_launcher.nso.so twili_launcher_kip.json
+	elf2kip build/twili_launcher.nso.so twili_launcher_kip.json build/twili_launcher.kip
 
 build/twili.nro.so: $(addprefix build/,$(OBJECTS)) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)

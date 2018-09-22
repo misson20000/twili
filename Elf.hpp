@@ -54,6 +54,16 @@ enum {
 	NT_PRPSINFO = 3,
 	NT_TASKSTRUCT = 4,
 	NT_AUXV = 6,
+
+	NT_TWILI_PROCESS = 6480,
+	NT_TWILI_THREAD = 6481,
+	NT_TWILI_NSO = 6482,
+};
+
+enum {
+	AT_NULL = 0, // end of vector
+	AT_IGNORE = 1, // entry should be ignored
+	AT_ENTRY = 9, // entry point for program
 };
 
 struct Elf64_Phdr {
@@ -140,6 +150,33 @@ struct elf_prstatus {
 	uint32_t pr_sid;
 	uint64_t times[8];
 	uint64_t pr_reg[34]; // x0-x30, sp, pc, pstate
+	uint32_t pr_fpvalid;
+};
+	
+struct elf_auxv_t {
+	uint64_t a_type;
+	union {
+		uint64_t a_val;
+	} a_un;
+};
+
+struct twili_process {
+	uint64_t title_id;
+	uint64_t process_id;
+	char process_name[12];
+	uint32_t mmu_flags;
+};
+
+struct twili_thread {
+	uint64_t thread_id;
+	uint64_t tls_pointer;
+	uint64_t entrypoint;
+};
+
+struct twili_nso_info {
+	uint64_t addr;
+	uint64_t size;
+	uint8_t build_id[0x20];
 };
 
 }

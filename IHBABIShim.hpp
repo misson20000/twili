@@ -13,7 +13,7 @@ class IHBABIShim : public trn::ipc::server::Object {
 	IHBABIShim(trn::ipc::server::IPCServer *server, MonitoredProcess *process);
 	
 	virtual trn::ResultCode Dispatch(trn::ipc::Message msg, uint32_t request_id);
-	trn::ResultCode GetProcessHandle(trn::ipc::OutHandle<trn::KProcess, trn::ipc::copy> out);
+	trn::ResultCode GetProcessHandle(trn::ipc::OutHandle<handle_t, trn::ipc::copy> out);
 	trn::ResultCode GetLoaderConfigEntryCount(trn::ipc::OutRaw<uint32_t> out);
 	trn::ResultCode GetLoaderConfigEntries(trn::ipc::Buffer<loader_config_entry_t, 0x6, 0> buffer);
 	trn::ResultCode GetLoaderConfigHandle(trn::ipc::InRaw<uint32_t> placeholder, trn::ipc::OutHandle<handle_t, trn::ipc::copy> out);

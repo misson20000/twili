@@ -2,7 +2,6 @@
 #include<libtransistor/util.h>
 
 #include "ELFCrashReport.hpp"
-#include "USBBridge.hpp"
 
 #include<vector>
 #include<string>
@@ -39,7 +38,7 @@ ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
 	return &threads.find(thread_id)->second;
 }
 
-trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::usb::USBBridge::USBResponseWriter &r) {
+void ELFCrashReport::Generate(trn::KDebug &debug, twili::bridge::ResponseOpener ro) {
 	for(auto i = threads.begin(); i != threads.end(); i++) {
 		AddNote<ELF::Note::elf_prstatus>("CORE", ELF::NT_PRSTATUS, i->second.GeneratePRSTATUS(debug));
 	}
@@ -64,25 +63,25 @@ trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::
 	size_t ph_offset = total_size;
 	total_size+= sizeof(ELF::Elf64_Phdr) * (1 + vmas.size());
 
-	r.BeginOk(total_size);
+	bridge::ResponseWriter r = ro.BeginOk(total_size);
 	r.Write<ELF::Elf64_Ehdr>({
-		.e_ident = {
-			.ei_class = ELF::ELFCLASS64,
-			.ei_data = ELF::ELFDATALSB,
-			.ei_version = 1,
-			.ei_osabi = 3 // pretend to be a Linux core dump
-		},
-		.e_type = ELF::ET_CORE,
-		.e_machine = ELF::EM_AARCH64,
-		.e_version = 1,
-		.e_entry = 0,
-		.e_phoff = ph_offset,
-		.e_shoff = 0,
-		.e_flags = 0,
-		.e_phnum = static_cast<uint16_t>(1 + vmas.size()),
-		.e_shnum = 0,
-		.e_shstrndx = 0,
-	});
+			.e_ident = {
+				.ei_class = ELF::ELFCLASS64,
+				.ei_data = ELF::ELFDATALSB,
+				.ei_version = 1,
+				.ei_osabi = 3 // pretend to be a Linux core dump
+			},
+			.e_type = ELF::ET_CORE,
+			.e_machine = ELF::EM_AARCH64,
+			.e_version = 1,
+			.e_entry = 0,
+			.e_phoff = ph_offset,
+			.e_shoff = 0,
+			.e_flags = 0,
+			.e_phnum = static_cast<uint16_t>(1 + vmas.size()),
+			.e_shnum = 0,
+			.e_shstrndx = 0,
+		});
 
 	// write VMAs
 	std::vector<uint8_t> transfer_buffer(r.GetMaxTransferSize(), 0);
@@ -96,7 +95,7 @@ trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::
 			r.Write(transfer_buffer.data(), size);
 		}
 	}
-
+			
 	// write notes
 	std::vector<uint8_t> notes_bytes;
 	for(auto i = notes.begin(); i != notes.end(); i++) {
@@ -117,33 +116,33 @@ trn::Result<std::nullopt_t> ELFCrashReport::Generate(trn::KDebug &debug, twili::
 		notes_bytes.insert(notes_bytes.end(), note.begin(), note.end());
 	}
 	r.Write(notes_bytes);
-
+			
 	// write phdrs
 	std::vector<ELF::Elf64_Phdr> phdrs;
 	phdrs.push_back({
-		.p_type = ELF::PT_NOTE,
-		.p_flags = ELF::PF_R,
-		.p_offset = notes_offset,
-		.p_vaddr = 0,
-		.p_paddr = 0,
-		.p_filesz = notes_bytes.size(),
-		.p_memsz = 0,
-		.p_align = 4
-	});
+			.p_type = ELF::PT_NOTE,
+			.p_flags = ELF::PF_R,
+			.p_offset = notes_offset,
+			.p_vaddr = 0,
+			.p_paddr = 0,
+			.p_filesz = notes_bytes.size(),
+			.p_memsz = 0,
+			.p_align = 4
+		});
 	for(auto i = vmas.begin(); i != vmas.end(); i++) {
 		phdrs.push_back({
-			.p_type = ELF::PT_LOAD,
-			.p_flags = i->flags,
-			.p_offset = i->file_offset,
-			.p_vaddr = i->virtual_addr,
-			.p_paddr = 0,
-			.p_filesz = i->size,
-			.p_memsz = i->size,
-			.p_align = 0x1000
-		});
+				.p_type = ELF::PT_LOAD,
+				.p_flags = i->flags,
+				.p_offset = i->file_offset,
+				.p_vaddr = i->virtual_addr,
+				.p_paddr = 0,
+				.p_filesz = i->size,
+				.p_memsz = i->size,
+				.p_align = 0x1000
+			});
 	}
 	r.Write(phdrs);
-	return std::nullopt;
+	r.Finalize();
 }
 
 ELFCrashReport::Thread::Thread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint) :

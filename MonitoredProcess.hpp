@@ -5,24 +5,28 @@
 
 #include<memory>
 
-#include "USBBridge.hpp"
+#include "Process.hpp"
 #include "ELFCrashReport.hpp"
+#include "TwibPipe.hpp"
 
 namespace twili {
 
 class Twili;
 
-class MonitoredProcess {
+class MonitoredProcess : public Process {
  public:
 	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
 	
 	void Launch();
-	trn::Result<std::nullopt_t> CoreDump(usb::USBBridge::USBResponseWriter &r);
-   trn::Result<std::nullopt_t> Terminate();
-   
+	void GenerateCrashReport(ELFCrashReport &report, bridge::ResponseOpener r);
+	void Terminate();
+
+	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
+	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
+	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
+	
 	std::shared_ptr<trn::KProcess> proc;
 	const uint64_t target_entry;
-	const uint64_t pid;
 	bool destroy_flag = false;
 	bool crashed = false;
 	

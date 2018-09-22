@@ -2,10 +2,17 @@
 
 #include<libtransistor/cpp/waiter.hpp>
 #include<libtransistor/cpp/ipcserver.hpp>
-#include "USBBridge.hpp"
-#include "MonitoredProcess.hpp"
 
 #include<list>
+
+#include "MonitoredProcess.hpp"
+
+#include "bridge/usb/USBBridge.hpp"
+#include "bridge/tcp/TCPBridge.hpp"
+
+#include "service/pm/IShellService.hpp"
+#include "service/ldr/IDebugMonitorInterface.hpp"
+#include "service/nifm/IGeneralService.hpp"
 
 namespace twili {
 
@@ -13,20 +20,26 @@ class Twili {
  public:
 	Twili();
 
-	// bridge commands
-	trn::Result<std::nullopt_t> Reboot(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
-	trn::Result<std::nullopt_t> Run(std::vector<uint8_t> nro, usb::USBBridge::USBResponseWriter &writer);
-	trn::Result<std::nullopt_t> CoreDump(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
-   trn::Result<std::nullopt_t> Terminate(std::vector<uint8_t> payload, usb::USBBridge::USBResponseWriter &writer);
-   
-   std::optional<twili::MonitoredProcess*> FindMonitoredProcess(uint64_t pid);
-   
+	struct Services {
+	 public:
+		Services();
+		
+		service::pm::IShellService pm_shell;
+		service::ldr::IDebugMonitorInterface ldr_dmnt;
+		service::nifm::IGeneralService nifm;
+	} services;
+	
 	bool destroy_flag = false;
 	trn::Waiter event_waiter;
 	trn::ipc::server::IPCServer server;
-	twili::usb::USBBridge usb_bridge;
+	bridge::usb::USBBridge usb_bridge;
+	bridge::tcp::TCPBridge tcp_bridge;
+	
 	std::list<twili::MonitoredProcess> monitored_processes;
- private:
+	std::optional<twili::MonitoredProcess*> FindMonitoredProcess(uint64_t pid);
+
+	std::map<std::string, std::shared_ptr<TwibPipe>> named_pipes;
+	
 	std::vector<uint8_t> hbabi_shim_nro;
 };
 
