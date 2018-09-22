@@ -79,6 +79,9 @@ void MonitoredProcess::GenerateCrashReport(ELFCrashReport &report, bridge::Respo
 
 void MonitoredProcess::Terminate() {
 	ResultCode::AssertOk(trn::svc::TerminateProcess(*this->proc));
+	tp_stdin->Close();
+	tp_stdout->Close();
+	tp_stderr->Close();
 }
 
 MonitoredProcess::~MonitoredProcess() {
