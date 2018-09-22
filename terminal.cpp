@@ -1,3 +1,5 @@
+#include "terminal.hpp"
+
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/err.h>
 #include<libtransistor/util.h>
@@ -11,7 +13,7 @@
 #include "libtmt/tmt.h"
 #include "libpsf/psf.h"
 
-#include "terminal.hpp"
+#include "twili.hpp"
 
 using trn::ResultCode;
 
@@ -25,7 +27,7 @@ void callback_shim_tmt(tmt_msg_t m, TMT *vt, const void *a, void *p) {
 	((Terminal*) p)->CallbackTMT(m, vt, a);
 }
 
-Terminal::Terminal() {
+Terminal::Terminal(Twili &twili) : twili(twili) {
 	dbg_printf("loading font");
 	psf_font font;
 	psf_open_font(&font, "/squash/terminus-114n.psf");
@@ -51,7 +53,7 @@ Terminal::Terminal() {
 	}
 
 	dbg_printf("loaded font and vt");
-	
+
 	try {
 		ResultCode::AssertOk(gpu_initialize());
 		ResultCode::AssertOk(vi_init());
@@ -59,6 +61,18 @@ Terminal::Terminal() {
 		dbg_printf("initialized modules");
 		ResultCode::AssertOk(display_open_layer(&surface));
 		dbg_printf("opened layer");
+
+		revent_h buffer_event_raw;
+		ResultCode::AssertOk(surface_get_buffer_event(&surface, &buffer_event_raw));
+		buffer_event = buffer_event_raw;
+		
+		display_wait_handle = twili.event_waiter.Add(
+			buffer_event,
+			[this]() {
+				buffer_event.ResetSignal();
+				QueueImage();
+				return true;
+			});
 	} catch(trn::ResultError e) {
 		dbg_printf("caught 0x%x", e.code.code);
 		tmt_close(vt);

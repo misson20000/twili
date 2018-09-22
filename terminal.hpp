@@ -2,16 +2,20 @@
 
 #include<libtransistor/types.h>
 #include<libtransistor/display/display.h>
+#include<libtransistor/cpp/waiter.hpp>
 #include "libtmt/tmt.h"
 
 #include<vector>
 
 namespace twili {
+
+class Twili;
+
 namespace terminal {
 
 class Terminal {
  public:
-	Terminal();
+	Terminal(Twili &twili);
 	~Terminal();
 
 	/**
@@ -26,6 +30,10 @@ class Terminal {
 	
 	bool frame_update_signal = false;
  private:
+	Twili &twili;
+	trn::KEvent buffer_event;
+	std::shared_ptr<trn::WaitHandle> display_wait_handle;
+
 	int font_width;
 	int font_height;
 	std::vector<std::vector<uint32_t>> glyphs;
