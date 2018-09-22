@@ -50,7 +50,7 @@ int main() {
 		static twili::Twili twili;
 
 		printf("make terminal...\n");
-		twili::terminal::Terminal *t = new twili::terminal::Terminal();
+		std::unique_ptr<twili::terminal::Terminal> t = std::make_unique<twili::terminal::Terminal>(twili);
 		printf("stdout to terminal...\n");
 		dup2(t->MakeFD(), STDOUT_FILENO);
 		printf("terminal output\n");
