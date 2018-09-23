@@ -98,7 +98,7 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener 
 	uint64_t target_addr = ResultCode::AssertOk(builder.AppendNRO(nro_reader));
 	auto            proc = ResultCode::AssertOk(builder.Build());
 	
-	auto mon = twili.monitored_processes.emplace_back(&twili, proc, target_addr);
+	auto mon = twili.monitored_processes.emplace_back(&twili, proc, target_addr, nro);
 	mon.Launch();
 
 	struct {

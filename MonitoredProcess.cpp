@@ -11,11 +11,13 @@ namespace twili {
 
 using trn::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry) :
+MonitoredProcess::MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry, std::vector<uint8_t> nro_vec) :
 	twili(twili),
 	proc(proc),
 	target_entry(target_entry),
 	Process(*twili, ResultCode::AssertOk(trn::svc::GetProcessId(proc->handle))) {
+
+	nro = std::make_shared<std::vector<uint8_t>>(nro_vec),
 
 	printf("created monitored process: 0x%x, pid 0x%x\n", proc->handle, pid);
 	wait = twili->event_waiter.Add(*proc, [this]() {

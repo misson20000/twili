@@ -15,7 +15,7 @@ class Twili;
 
 class MonitoredProcess : public Process {
  public:
-	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
+	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry, std::vector<uint8_t> nro);
 	
 	void Launch();
 	void GenerateCrashReport(ELFCrashReport &report, bridge::ResponseOpener r);
@@ -26,6 +26,7 @@ class MonitoredProcess : public Process {
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
 	
 	std::shared_ptr<trn::KProcess> proc;
+	std::shared_ptr<std::vector<uint8_t>> nro;
 	const uint64_t target_entry;
 	bool destroy_flag = false;
 	bool crashed = false;

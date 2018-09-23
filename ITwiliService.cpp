@@ -20,6 +20,8 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
 	case 3:
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
+	case 4:
+		return trn::ipc::server::RequestHandler<&ITwiliService::GetNroFile>::Handle(this, msg);
 	case 10:
 		return trn::ipc::server::RequestHandler<&ITwiliService::CreateNamedOutputPipe>::Handle(this, msg);
 	case 999:
@@ -95,6 +97,21 @@ trn::ResultCode ITwiliService::CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0
 		return TWILI_ERR_PIPE_ALREADY_EXISTS;
 	}
 }
+
+trn::ResultCode ITwiliService::GetNroFile(trn::ipc::InPid pid, trn::ipc::OutObject<twili::IFile> &out) {
+	printf("Opening executable for 0x%lx\n", pid.value);
+	auto process = twili->FindMonitoredProcess(pid.value);
+	if (!process) {
+		printf("couldn't find process\n");
+		return TWILI_ERR_UNRECOGNIZED_PID;
+	}
+
+	printf("Creating IFile\n");
+	out.value = trn::ResultCode::AssertOk(server->CreateObject<twili::IFile>(this, (*process)->nro));
+	printf("Returning with grand success\n");
+	return RESULT_OK;
+}
+
 
 trn::ResultCode ITwiliService::Destroy() {
 	twili->destroy_flag = true;
