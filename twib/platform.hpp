@@ -36,6 +36,7 @@ static inline char *NetErrStr() {
 #include<arpa/inet.h>
 #include<unistd.h>
 #include<errno.h>
+#include<string.h>
 
 typedef int SOCKET;
 #define INVALID_SOCKET -1
