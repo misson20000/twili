@@ -2,6 +2,7 @@
 
 #include<libtransistor/types.h>
 #include<libtransistor/display/display.h>
+#include<libtransistor/mutex.h>
 #include<libtransistor/cpp/waiter.hpp>
 #include "libtmt/tmt.h"
 
@@ -34,6 +35,8 @@ class Terminal {
 	trn::KEvent buffer_event;
 	std::shared_ptr<trn::WaitHandle> display_wait_handle;
 
+	trn_mutex_t io_mutex = TRN_MUTEX_STATIC_INITIALIZER;
+	
 	int font_width;
 	int font_height;
 	std::vector<std::vector<uint32_t>> glyphs;

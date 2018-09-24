@@ -110,8 +110,10 @@ int Terminal::MakeFD() {
 }
 
 void Terminal::Write(const void *buf, size_t size) {
+	trn_mutex_lock(&io_mutex);
 	tmt_write(vt, (const char*) buf, size);
 	QueueImage();
+	trn_mutex_unlock(&io_mutex);
 }
 
 void Terminal::CallbackTMT(tmt_msg_t m, TMT *vt, const void *a) {
