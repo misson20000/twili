@@ -16,10 +16,12 @@ Version | Support
 2.0.0 | Expected working
 2.1.0 - 2.3.0 | Expected working
 3.0.0 | Tested working
-3.0.1 - 4.0.1 | Expected working
-4.1.0 | Tested working via Atmosphère-pm.boot2
-5.0.0 - 5.0.1 | Expected broken due to usb:ds changes
-5.0.2 | Expected broken due to usb:ds changes
+3.0.1 - 4.0.0 |
+4.0.1 | Tested working
+4.1.0 | Expected working
+5.0.0 | USBBridge is broken, but TCPBridge is tested working
+5.0.1 - 5.1.0 | TCPBridge expected working
+6.0.0 | Unknown
 
 # Installation
 
