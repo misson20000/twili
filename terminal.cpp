@@ -156,12 +156,9 @@ void Terminal::QueueImage() {
 	if(frame_update_signal) {
 		dbg_printf("frame update is signalled");
 		uint32_t *out_buffer;
-		trn::Result<std::nullopt_t> res = ResultCode::ExpectOk(surface_dequeue_buffer(&surface, &out_buffer));
-		dbg_printf("dequeue");
-		if(!res) {
-			dbg_printf("fail");
-			dbg_printf("failure to dequeue: 0x%x", res.error().code);
-			return;
+		trn::Result<std::nullopt_t> res = std::nullopt;
+		while(!(res = ResultCode::ExpectOk(surface_dequeue_buffer(&surface, &out_buffer)))) {
+			buffer_event.WaitSignal(1000000000);
 		}
 
 		memcpy(out_buffer, framebuffer, sizeof(framebuffer));
