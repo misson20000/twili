@@ -136,9 +136,15 @@ void TCPBridge::SocketThread() {
 				printf("failed to accept incoming connection\n");
 			} else {
 				printf("accepted %d\n", client.fd);
-				std::shared_ptr<Connection> connection = std::make_shared<Connection>(*this, std::move(client));
-				connections.push_back(connection);
-				printf("made connection\n");
+				try {
+					std::shared_ptr<Connection> connection = std::make_shared<Connection>(*this, std::move(client));
+					connections.push_back(connection);
+					printf("made connection\n");
+				} catch(std::bad_alloc &bad) {
+					printf("out of memory\n");
+				} catch(std::runtime_error &e) {
+					printf("caught %s\n", e.what());
+				}
 			}
 		}
 

@@ -43,7 +43,7 @@ void Twibd::AddDevice(std::shared_ptr<Device> device) {
 	LogMessage(Info, "adding device with id %08x", device->device_id);
 	std::weak_ptr<Device> &entry = devices[device->device_id];
 	std::shared_ptr<Device> entry_lock = entry.lock();
-	if(!entry_lock || entry_lock->GetPriority() < device->GetPriority()) { // don't let tcp devices clobber usb devices
+	if(!entry_lock || entry_lock->GetPriority() <= device->GetPriority()) { // don't let tcp devices clobber usb devices
 		entry = device;
 	}
 	
