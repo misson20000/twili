@@ -95,7 +95,6 @@ result_t terminal_file_write(void *data, const void *buf, size_t size, size_t *b
 }
 
 result_t terminal_file_release(trn_file_t *file) {
-	delete (Terminal*) (file->data);
 	return RESULT_OK;
 }
 
