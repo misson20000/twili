@@ -32,18 +32,20 @@ int main() {
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
 	
 	try {
-		ResultCode::AssertOk(usb_serial_init());
-
-		// set up serial console
-		int usb_fd = usb_serial_open_fd();
-		if(usb_fd < 0) {
-			throw trn::ResultError(-usb_fd);
+		if(usb_serial_init() == RESULT_OK) {
+			// set up serial console
+			int usb_fd = usb_serial_open_fd();
+			if(usb_fd < 0) {
+				throw trn::ResultError(-usb_fd);
+			}
+			dup2(usb_fd, STDOUT_FILENO);
+			dup2(usb_fd, STDERR_FILENO);
+			dup2(usb_fd, STDIN_FILENO);
+			dbg_set_file(fd_file_get(usb_fd));
+			printf("brought up USB serial\n");
+		} else {
+			// ignore
 		}
-		dup2(usb_fd, STDOUT_FILENO);
-		dup2(usb_fd, STDERR_FILENO);
-		dup2(usb_fd, STDIN_FILENO);
-		dbg_set_file(fd_file_get(usb_fd));
-		printf("brought up USB serial\n");
 		
 		// initialize twili
 		static twili::Twili twili;
