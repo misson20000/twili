@@ -16,7 +16,7 @@ Version | Support
 2.0.0 | Expected working
 2.1.0 - 2.3.0 | Expected working
 3.0.0 | Tested working
-3.0.1 - 4.0.0 |
+3.0.1 - 4.0.0 | Expected working
 4.0.1 | Tested working
 4.1.0 | Expected working
 5.0.0 | USBBridge is broken, but TCPBridge is tested working
