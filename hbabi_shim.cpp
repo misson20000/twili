@@ -3,7 +3,7 @@
 #include<stdio.h>
 #include<unistd.h>
 
-static uint8_t _heap[6 * 1024 * 1024];
+static uint8_t _heap[8 * 1024 * 1024];
 extern "C" {
 runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
 void *_trn_runconf_heap_base = _heap;
@@ -167,7 +167,8 @@ int main(int argc, char *argv[]) {
 				ipc::InRaw<uint32_t>(ret)));
 	} catch(trn::ResultError &e) {
 		// crash and generate core dump
-		svcBreak(0, 0, 0);
+		printf("caught %s\n", e.what());
+		svcBreak(e.code.code, 0, 0);
 	}
 
 	return 0;
