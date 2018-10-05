@@ -37,6 +37,8 @@ class IAppletShim::ControlImpl : public IAppletShim {
  public:
 	ControlImpl(trn::ipc::server::IPCServer *server, AppletTracker &tracker);
 	virtual ~ControlImpl();
+
+	virtual trn::ResultCode GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode);
 	
 	virtual trn::ResultCode GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event);
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
@@ -47,6 +49,8 @@ class IAppletShim::ControlImpl : public IAppletShim {
 class IAppletShim::HostImpl : public IAppletShim {
  public:
 	HostImpl(trn::ipc::server::IPCServer *server, std::shared_ptr<process::AppletProcess> process);
+
+	virtual trn::ResultCode GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode);
 	
 	virtual trn::ResultCode GetTargetSize(trn::ipc::OutRaw<size_t> size);
 	virtual trn::ResultCode SetupTarget(trn::ipc::InRaw<uint64_t> buffer_address, trn::ipc::InRaw<uint64_t> map_address);

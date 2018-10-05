@@ -8,6 +8,11 @@ namespace service {
 IAppletShim::HostImpl::HostImpl(trn::ipc::server::IPCServer *server, std::shared_ptr<process::AppletProcess> process) : IAppletShim(server), process(process) {
 }
 
+trn::ResultCode IAppletShim::HostImpl::GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode) {
+	mode = applet_shim::Mode::Host;
+	return RESULT_OK;
+}
+
 trn::ResultCode IAppletShim::HostImpl::GetTargetSize(trn::ipc::OutRaw<size_t> size) {
 	size = process->GetTargetSize();
 	return RESULT_OK;

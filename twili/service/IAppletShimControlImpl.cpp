@@ -13,6 +13,11 @@ IAppletShim::ControlImpl::~ControlImpl() {
 	tracker.ReleaseControlProcess();
 }
 
+trn::ResultCode IAppletShim::ControlImpl::GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode) {
+	mode = applet_shim::Mode::Control;
+	return RESULT_OK;
+}
+
 trn::ResultCode IAppletShim::ControlImpl::GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event) {
 	event = tracker.GetProcessQueuedEvent().handle;
 	return RESULT_OK;

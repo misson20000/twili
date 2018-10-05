@@ -22,7 +22,7 @@ namespace twili {
 namespace applet_shim {
 
 void ControlMode(ipc::client::Object &iappletshim) {
-	printf("IAppletShim entering control mode\n");
+	printf("AppletShim entering control mode\n");
 	
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 
@@ -55,21 +55,30 @@ void ControlMode(ipc::client::Object &iappletshim) {
 		event,
 		[&iappletshim, &ilac, &event]() -> bool {
 			printf("iappletshim controller spawning host\n");
-			event.ResetSignal();
+			try {
+				event.ResetSignal();
+				
+				uint32_t command;
+				while(iappletshim.SendSyncRequest<101>(trn::ipc::OutRaw(command))) {
+					printf("  command %d\n", command);
+					
+					ipc::client::Object ilaa;
+					ResultCode::AssertOk(
+						ilac.SendSyncRequest<0>( // CreateLibraryApplet
+							ipc::InRaw<uint32_t>(0x15),
+							ipc::InRaw<uint32_t>(0),
+							ipc::OutObject(ilaa)));
 
-			uint32_t command;
-			while(iappletshim.SendSyncRequest<101>(trn::ipc::OutRaw(command))) {
-				printf("  command %d\n", command);
-
-				ipc::client::Object ilaa;
-				ResultCode::AssertOk(
-					ilac.SendSyncRequest<0>( // CreateLibraryApplet
-						ipc::InRaw<uint32_t>(0x15),
-						ipc::InRaw<uint32_t>(0),
-						ipc::OutObject(ilaa)));
-
-				ResultCode::AssertOk(
-					ilaa.SendSyncRequest<10>()); // Start
+					printf("created\n");
+					
+					ResultCode::AssertOk(
+						ilaa.SendSyncRequest<10>()); // Start
+					
+					printf("started\n");
+				}
+			} catch(trn::ResultError &e) {
+				printf("caught 0x%x\n", e.code.code);
+				// TODO: report error back to Twili
 			}
 			
 			return true;
@@ -89,7 +98,7 @@ static void substitute_handle(ipc::client::Object &shimservice, handle_t *handle
 }
 
 void HostMode(ipc::client::Object &iappletshim) {
-	printf("IAppletShim entering host mode\n");
+	printf("AppletShim entering host mode\n");
 	
 	size_t target_size;
 	ResultCode::AssertOk(
@@ -261,6 +270,8 @@ int main(int argc, char *argv[]) {
 					ipc::OutObject(iappletshim)));
 		}
 
+		printf("got IAppletShim\n");
+		
 		twili::applet_shim::Mode mode;
 		ResultCode::AssertOk(
 			iappletshim.SendSyncRequest<0>( // GetMode
@@ -280,8 +291,8 @@ int main(int argc, char *argv[]) {
 		
 		return 0;
 	} catch(trn::ResultError &e) {
-		// crash and generate core dump
-		svcBreak(0, 0, 0);
+		printf("caught 0x%x\n", e.code.code);
+		return e.code.code;
 	}
 
 	return 0;

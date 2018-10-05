@@ -1,20 +1,22 @@
 {
 	"name": "TwiliApplet",
-	"title_id": "0x0100000000006482",
+	"title_id": "0x010000000000100D",
 	"title_id_range_min": "0x0100000000000000",
 	"title_id_range_max": "0x0100000000006482",
 	"main_thread_stack_size": "0x00010000",
 	"main_thread_priority": 44,
 	"default_cpu_id": 0,
+	"system_resource_size": 0,
 	"process_category": 0,
 	"is_retail": true,
-	"pool_partition": 2,
+	"pool_partition": 1,
 	"is_64_bit": true,
 	"address_space_type": 3,
 	"filesystem_access": {
 		"permissions": "0xFFFFFFFFFFFFFFFF"
 	},
 	"service_access": {
+		"*": false,
 		"twili": false,
 		"appletAE": false,
 		"appletOE": false
@@ -23,7 +25,7 @@
 		"kernel_flags": {
 			"highest_thread_priority": 63,
 			"lowest_thread_priority": 24,
-			"lowest_cpu_id": 3,
+			"lowest_cpu_id": 0,
 			"highest_cpu_id": 3
 		},
 		"syscalls": {
@@ -84,9 +86,11 @@
 			"svcReadDebugProcessMemory": "0x6a",
 			"svcGetDebugThreadParam": "0x6d"
 		},
-		"min_kernel_version": "0x0060",
+		"application_type": 2,
+		"handle_table_size": 512,
+		"min_kernel_version": "0x30",
 		"debug_flags": {
-			"allow_debug": false,
+			"allow_debug": true,
 			"force_debug": true
 		}
 	}

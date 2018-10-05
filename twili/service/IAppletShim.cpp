@@ -11,7 +11,7 @@ namespace twili {
 namespace service {
 
 IAppletShim::IAppletShim(trn::ipc::server::IPCServer *server) : trn::ipc::server::Object(server) {
-	printf("opening applet shim");
+	printf("opening applet shim\n");
 }
 
 trn::ResultCode IAppletShim::Dispatch(trn::ipc::Message msg, uint32_t request_id) {
