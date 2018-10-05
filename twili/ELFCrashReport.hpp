@@ -12,6 +12,9 @@
 #include "bridge/ResponseOpener.hpp"
 
 namespace twili {
+namespace process {
+class Process;
+}
 
 class ELFCrashReport {
 	struct VMA {
@@ -43,9 +46,6 @@ class ELFCrashReport {
 	
  public:
 	ELFCrashReport();
-	void AddVMA(uint64_t virtual_addr, uint64_t size, uint32_t flags);
-	void AddThread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint);
-	Thread *GetThread(uint64_t thread_id);
 
 	template<typename T>
 	void AddNote(std::string name, uint32_t type, T t) {
@@ -55,7 +55,7 @@ class ELFCrashReport {
 		AddNote(name, type, bytes);
 	}
 	
-	void Generate(trn::KDebug &debug, bridge::ResponseOpener opener);
+	void Generate(process::Process &process, bridge::ResponseOpener opener);
 	void AddNote(std::string name, uint32_t type, std::vector<uint8_t> desc);
 
 	template<typename T>
@@ -70,6 +70,10 @@ class ELFCrashReport {
 	std::vector<VMA> vmas;
 	std::vector<Note> notes;
 	std::map<uint64_t, Thread> threads;
+
+	void AddVMA(uint64_t virtual_addr, uint64_t size, uint32_t flags);
+	void AddThread(uint64_t thread_id, uint64_t tls_pointer, uint64_t entrypoint);
+	Thread *GetThread(uint64_t thread_id);
 };
 
 }

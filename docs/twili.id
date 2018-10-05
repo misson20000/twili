@@ -3,7 +3,8 @@ interface twili::ITwiliService is twili {
 	[1] OpenStdout(pid) -> object<twili::IPipe>;
 	[2] OpenStderr(pid) -> object<twili::IPipe>;
 	[3] OpenHBABIShim(pid) -> object<twili::IHBABIShim>;
-
+	[4] OpenAppletShim(pid) -> object<twili::IAppletShim>;
+	
 	[10] CreateNamedOutputPipe(array<uint8_t, 0x6> name) -> object<twili::IPipe>;
 	
 	[999] Destroy();
@@ -28,4 +29,18 @@ interface twili::IHBABIShim {
 	[4] SetNextLoadPath(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
 	[5] GetTargetEntryPoint() -> u64;
 	[6] SetExitCode(u32);
+}
+
+interface twili::IAppletShim {
+	[0] GetMode() -> u32 mode;
+
+	# Control mode
+	[100] GetEvent() -> handle<event, copy> event;
+	[101] GetCommand() -> u32 command;
+	
+	# Host mode
+	[200] GetTargetSize() -> u64 target_size;
+	[201] SetupTarget(u64 backing_memory, u64 map_target);
+	[202] OpenHBABIShim() -> object<twili::HBABIShim>;
+	[203] FinalizeTarget();
 }

@@ -6,34 +6,35 @@
 #include<memory>
 
 #include "Process.hpp"
-#include "ELFCrashReport.hpp"
-#include "TwibPipe.hpp"
+#include "../TwibPipe.hpp"
 
 namespace twili {
 
 class Twili;
 
+namespace process {
+
 class MonitoredProcess : public Process {
  public:
-	MonitoredProcess(Twili *twili, std::shared_ptr<trn::KProcess> proc, uint64_t target_entry);
+	MonitoredProcess(Twili &twili);
+	virtual ~MonitoredProcess();
 	
-	void Launch();
-	void GenerateCrashReport(ELFCrashReport &report, bridge::ResponseOpener r);
-	void Terminate();
+	virtual void Launch() = 0;
+	
+	virtual uint64_t GetPid() override;
+	virtual void AddNotes(ELFCrashReport &report) override;
+	virtual void Terminate() override;
 
 	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
 	
 	std::shared_ptr<trn::KProcess> proc;
-	const uint64_t target_entry;
+	uint64_t target_entry;
+
 	bool destroy_flag = false;
 	bool crashed = false;
-	
-	~MonitoredProcess();
- private:
-	Twili *twili;
-	std::shared_ptr<trn::WaitHandle> wait;
 };
 
-}
+} // namespace process
+} // namespace twili

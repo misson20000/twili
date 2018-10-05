@@ -1,14 +1,14 @@
 #include "IHBABIShim.hpp"
 
 #include "../twili.hpp"
-#include "../MonitoredProcess.hpp"
+#include "../process/MonitoredProcess.hpp"
 
 #include "err.hpp"
 
 namespace twili {
 namespace service {
 
-IHBABIShim::IHBABIShim(trn::ipc::server::IPCServer *server, MonitoredProcess *process) : trn::ipc::server::Object(server), process(process) {
+IHBABIShim::IHBABIShim(trn::ipc::server::IPCServer *server, std::shared_ptr<process::MonitoredProcess> process) : trn::ipc::server::Object(server), process(process) {
 	printf("opened HBABI shim for 0x%x\n", process->proc->handle);
 	entries.push_back({
 		.key = LCONFIG_KEY_TWILI_PRESENT,

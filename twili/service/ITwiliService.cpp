@@ -4,6 +4,11 @@
 #include<string.h>
 
 #include "../twili.hpp"
+
+#include "IPipe.hpp"
+#include "IHBABIShim.hpp"
+#include "IAppletShim.hpp"
+
 #include "err.hpp"
 
 namespace twili {
@@ -22,6 +27,8 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenStderr>::Handle(this, msg);
 	case 3:
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
+	case 4:
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenAppletShim>::Handle(this, msg);
 	case 10:
 		return trn::ipc::server::RequestHandler<&ITwiliService::CreateNamedOutputPipe>::Handle(this, msg);
 	case 999:
@@ -32,7 +39,7 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 
 trn::ResultCode ITwiliService::OpenPipe(trn::ipc::InPid pid, trn::ipc::OutObject<IPipe> &val, int fd) {
 	IPipe *object;
-	auto proc = twili->FindMonitoredProcess(pid.value);
+	std::shared_ptr<process::MonitoredProcess> proc = twili->FindMonitoredProcess(pid.value);
 	if(!proc) {
 		printf("opening pipe %d for non-monitored process: %ld\n", fd, pid.value);
 		object = trn::ResultCode::AssertOk(server->CreateObject<IPipeStandard>(this, fd));
@@ -41,13 +48,13 @@ trn::ResultCode ITwiliService::OpenPipe(trn::ipc::InPid pid, trn::ipc::OutObject
 		std::shared_ptr<TwibPipe> pipe;
 		switch(fd) {
 		case 0:
-			pipe = (*proc)->tp_stdin;
+			pipe = proc->tp_stdin;
 			break;
 		case 1:
-			pipe = (*proc)->tp_stdout;
+			pipe = proc->tp_stdout;
 			break;
 		case 2:
-			pipe = (*proc)->tp_stderr;
+			pipe = proc->tp_stderr;
 			break;
 		default:
 			return TWILI_ERR_INVALID_PIPE;
@@ -72,17 +79,41 @@ trn::ResultCode ITwiliService::OpenStderr(trn::ipc::InPid pid, trn::ipc::OutObje
 
 trn::ResultCode ITwiliService::OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<IHBABIShim> &out) {
 	printf("opening HBABI shim for pid 0x%lx\n", pid.value);
-   auto i = twili->FindMonitoredProcess(pid.value);
+	std::shared_ptr<process::MonitoredProcess> i = twili->FindMonitoredProcess(pid.value);
 	if(!i) {
 		printf("couldn't find process\n");
 		return TWILI_ERR_UNRECOGNIZED_PID;
 	}
-	auto r = server->CreateObject<IHBABIShim>(this, *i);
+	auto r = server->CreateObject<IHBABIShim>(this, i);
 	if(r) {
 		out.value = r.value();
 		return RESULT_OK;
 	} else {
 		return r.error().code;
+	}
+}
+
+trn::ResultCode ITwiliService::OpenAppletShim(trn::ipc::InPid pid, trn::ipc::InHandle<trn::KProcess, trn::ipc::copy> process, trn::ipc::OutObject<IAppletShim> &out) {
+	printf("opening applet shim for pid 0x%lx\n", pid.value);
+
+	if(!twili->applet_tracker.HasControlProcess()) {
+		printf("creating control shim\n");
+		auto r = server->CreateObject<IAppletShim::ControlImpl>(this, twili->applet_tracker);
+		if(r) {
+			out.value = r.value();
+			return RESULT_OK;
+		} else {
+			return r.error().code;
+		}
+	} else {
+		printf("attaching host shim\n");
+		auto r = server->CreateObject<IAppletShim::HostImpl>(this, twili->applet_tracker.AttachHostProcess(std::move(process.object)));
+		if(r) {
+			out.value = r.value();
+			return RESULT_OK;
+		} else {
+			return r.error().code;
+		}
 	}
 }
 

@@ -20,7 +20,8 @@ typedef bool _Bool;
 #include "util.hpp"
 #include "twili.hpp"
 #include "process_creation.hpp"
-#include "Process.hpp"
+#include "process/Process.hpp"
+#include "process/UnmonitoredProcess.hpp"
 #include "service/ITwiliService.hpp"
 #include "bridge/interfaces/ITwibDeviceInterface.hpp"
 #include "err.hpp"
@@ -54,14 +55,14 @@ int main() {
 			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
 			twili.monitored_processes.remove_if(
 				[](const auto &proc) {
-					return proc.destroy_flag;
+					return proc->destroy_flag;
 				});
 		}
 		
 		printf("twili terminating...\n");
 		printf("terminating monitored processes...\n");
-		for(twili::MonitoredProcess &proc : twili.monitored_processes) {
-			proc.Terminate();
+		for(std::shared_ptr<twili::process::MonitoredProcess> proc : twili.monitored_processes) {
+			proc->Terminate();
 		}
 		printf("done\n");
 	} catch(trn::ResultError &e) {
@@ -84,7 +85,8 @@ Twili::Twili() :
 			return new twili::service::ITwiliService(this);
 		}),
 	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
-	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
+	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
+	applet_tracker(*this) {
 
 	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
 	if(!hbabi_shim_nro) {
@@ -95,17 +97,26 @@ Twili::Twili() :
 	printf("initialized Twili\n");
 }
 
-std::optional<twili::MonitoredProcess*> Twili::FindMonitoredProcess(uint64_t pid) {
-   auto i = std::find_if(monitored_processes.begin(),
-                         monitored_processes.end(),
-                         [pid](auto const &proc) {
-                            return proc.pid == pid;
-                         });
-   if(i == monitored_processes.end()) {
-      return {};
-   } else {
-      return &(*i);
-   }
+std::shared_ptr<process::MonitoredProcess> Twili::FindMonitoredProcess(uint64_t pid) {
+	auto i = std::find_if(
+		monitored_processes.begin(),
+		monitored_processes.end(),
+		[pid](auto const &proc) {
+			return proc->GetPid() == pid;
+		});
+	if(i == monitored_processes.end()) {
+		return {};
+	} else {
+		return *i;
+	}
+}
+
+std::shared_ptr<process::Process> Twili::FindProcess(uint64_t pid) {
+	std::shared_ptr<process::Process> proc = FindMonitoredProcess(pid);
+	if(!proc) {
+		proc = std::make_shared<process::UnmonitoredProcess>(*this, pid);
+	}
+	return proc;
 }
 
 Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory) {

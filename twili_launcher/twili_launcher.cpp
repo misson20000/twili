@@ -45,11 +45,11 @@ int main(int argc, char *argv[]) {
 				0b00000000000001001111111111111111, // DebugFlags (can debug others)
 			};
 
-			twili::process_creation::ProcessBuilder builder("twili", caps);
+			twili::process_creation::ProcessBuilder builder;
 			FILE *twili = fopen("/squash/twili.nro", "rb");
 			twili::process_creation::ProcessBuilder::FileDataReader data_reader(twili);
 			trn::ResultCode::AssertOk(builder.AppendNRO(data_reader));
-			auto proc = trn::ResultCode::AssertOk(builder.Build());
+			auto proc = trn::ResultCode::AssertOk(builder.Build("twili", caps));
 			fclose(twili);
 			
 			// launch Twili

@@ -49,19 +49,22 @@ class ProcessBuilder {
 		uint64_t load_addr;
 	};
 	
-	ProcessBuilder(const char *name, std::vector<uint32_t> caps);
+	ProcessBuilder();
 
 	// returns load address
 	trn::Result<uint64_t> AppendSegment(Segment &&seg);
 	// returns load address
 	trn::Result<uint64_t> AppendNRO(DataReader &nro_reader);
-	
-	trn::Result<std::shared_ptr<trn::KProcess>> Build();
+
+	trn::Result<std::nullopt_t> Load(std::shared_ptr<trn::KProcess> process, uint64_t base, uint64_t map);
+	trn::Result<std::nullopt_t> Unload(std::shared_ptr<trn::KProcess> process);
+	trn::Result<std::shared_ptr<trn::KProcess>> Build(const char *name, std::vector<uint32_t> caps);
+
+	size_t GetTotalSize();
  private:
-	const char *name;
-	std::vector<uint32_t> caps;
 	std::vector<Segment> segments;
 	uint64_t load_base;
+	uint64_t target;
 	size_t total_size = 0;
 };
 

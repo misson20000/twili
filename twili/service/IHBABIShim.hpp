@@ -6,13 +6,15 @@
 
 namespace twili {
 
+namespace process {
 class MonitoredProcess;
+}
 
 namespace service {
 
 class IHBABIShim : public trn::ipc::server::Object {
  public:
-	IHBABIShim(trn::ipc::server::IPCServer *server, MonitoredProcess *process);
+	IHBABIShim(trn::ipc::server::IPCServer *server, std::shared_ptr<process::MonitoredProcess> process);
 	
 	virtual trn::ResultCode Dispatch(trn::ipc::Message msg, uint32_t request_id);
 	trn::ResultCode GetProcessHandle(trn::ipc::OutHandle<handle_t, trn::ipc::copy> out);
@@ -23,7 +25,7 @@ class IHBABIShim : public trn::ipc::server::Object {
 	trn::ResultCode GetTargetEntryPoint(trn::ipc::OutRaw<uint64_t> out);
 	trn::ResultCode SetExitCode(trn::ipc::InRaw<uint32_t> code);
  private:
-	MonitoredProcess *process;
+	std::shared_ptr<process::MonitoredProcess> process;
 	std::vector<loader_config_entry_t> entries;
 	std::vector<trn::KObject*> handles;
 };

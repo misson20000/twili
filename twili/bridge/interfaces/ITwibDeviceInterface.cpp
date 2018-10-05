@@ -15,7 +15,10 @@
 #include "../../msgpack11/msgpack11.hpp"
 
 #include "../../twili.hpp"
-#include "process_creation.hpp"
+#include "../../process/ManagedProcess.hpp"
+#include "../../process/UnmonitoredProcess.hpp"
+#include "../../ELFCrashReport.hpp"
+
 #include "ITwibPipeReader.hpp"
 #include "ITwibPipeWriter.hpp"
 #include "ITwibDebugger.hpp"
@@ -77,29 +80,11 @@ void ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, bridge::Response
 }
 
 void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener opener) {
-	std::vector<uint32_t> caps = {
-		0b00011111111111111111111111101111, // SVC grants
-		0b00111111111111111111111111101111,
-		0b01011111111111111111111111101111,
-		0b01100000000000001111111111101111,
-		0b10011111111111111111111111101111,
-		0b10100000000000000000111111101111,
-		0b00000010000000000111001110110111, // KernelFlags
-		0b00000000000000000101111111111111, // ApplicationType
-		0b00000000000110000011111111111111, // KernelReleaseVersion
-		0b00000010000000000111111111111111, // HandleTableSize
-		0b00000000000001101111111111111111, // DebugFlags (can be debugged)
-	};
+	//auto mon = twili.monitored_processes.emplace_back(
+	//	std::make_shared<process::ManagedProcess>(twili, nro));
 
-	twili::process_creation::ProcessBuilder builder("twili_child", caps);
-	process_creation::ProcessBuilder::VectorDataReader hbabi_shim_reader(twili.hbabi_shim_nro);
-	process_creation::ProcessBuilder::VectorDataReader nro_reader(nro);
-	uint64_t   shim_addr = ResultCode::AssertOk(builder.AppendNRO(hbabi_shim_reader));
-	uint64_t target_addr = ResultCode::AssertOk(builder.AppendNRO(nro_reader));
-	auto            proc = ResultCode::AssertOk(builder.Build());
-	
-	auto mon = twili.monitored_processes.emplace_back(&twili, proc, target_addr);
-	mon.Launch();
+	auto mon = std::make_shared<process::AppletProcess>(twili, nro);
+	mon->Launch();
 
 	struct {
 		uint64_t pid;
@@ -110,10 +95,10 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener 
 
 	auto w = opener.BeginOk(sizeof(response), 3);
 	
-	response.pid = mon.pid;
-	response.tp_stdin  = w.Object(opener.MakeObject<ITwibPipeWriter>(mon.tp_stdin ));
-	response.tp_stdout = w.Object(opener.MakeObject<ITwibPipeReader>(mon.tp_stdout));
-	response.tp_stderr = w.Object(opener.MakeObject<ITwibPipeReader>(mon.tp_stderr));
+	response.pid = mon->GetPid();
+	response.tp_stdin  = w.Object(opener.MakeObject<ITwibPipeWriter>(mon->tp_stdin ));
+	response.tp_stdout = w.Object(opener.MakeObject<ITwibPipeReader>(mon->tp_stdout));
+	response.tp_stderr = w.Object(opener.MakeObject<ITwibPipeReader>(mon->tp_stderr));
 	
 	w.Write<decltype(response)>(response);
 	
@@ -125,15 +110,9 @@ void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, bridge::Respon
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
 	uint64_t pid = *((uint64_t*) payload.data());
-	auto proc = twili.FindMonitoredProcess(pid);
+	std::shared_ptr<process::Process> proc = twili.FindProcess(pid);
 	ELFCrashReport report;
-	if (!proc) {
-		printf("generating crash report for non-monitored process 0x%lx...\n", pid);
-		Process(twili, pid).GenerateCrashReport(report, opener);
-	} else {
-		printf("generating crash report for monitored process 0x%lx...\n", pid);
-		(*proc)->GenerateCrashReport(report, opener);
-	}
+	report.Generate(*proc, opener);
 }
 
 void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
@@ -142,24 +121,10 @@ void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, bridge::Respo
 	}
 	uint64_t pid = *((uint64_t*) payload.data());
 
-	// try to kill a monitored process
-	auto proc = twili.FindMonitoredProcess(pid);
-	if(proc) {
-		(*proc)->Terminate();
-		opener.BeginOk().Finalize();
-		return;
-	}
-	
-	// try to terminate a process via pm:shell
-	if(twili.services.pm_shell.TerminateProcessByPid(pid)) {
-		opener.BeginOk().Finalize();
-		return;
-	}
+	twili.FindProcess(pid)->Terminate();
 
-	// try to terminate a process via svcTerminateDebugProcess as a last resort
-	trn::KDebug debug = ResultCode::AssertOk(trn::svc::DebugActiveProcess(pid));
-	ResultCode::AssertOk(svcTerminateDebugProcess(debug.handle));
 	opener.BeginOk().Finalize();
+	return;
 }
 
 void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {

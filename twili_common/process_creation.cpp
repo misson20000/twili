@@ -94,8 +94,7 @@ size_t ProcessBuilder::VectorDataReader::TotalSize() {
 	return vec.size();
 }
 
-ProcessBuilder::ProcessBuilder(const char *name, std::vector<uint32_t> caps) :
-	name(name), caps(caps) {
+ProcessBuilder::ProcessBuilder() {
 	if(env_get_kernel_version() >= KERNEL_VERSION_200) {
 		load_base = 0x7100000000;
 	} else {
@@ -141,7 +140,44 @@ trn::Result<uint64_t> ProcessBuilder::AppendNRO(DataReader &nro) {
 	return base;
 }
 
-trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
+trn::Result<std::nullopt_t> ProcessBuilder::Load(std::shared_ptr<trn::KProcess> proc, uint64_t load_base, uint64_t target) {
+	this->load_base = load_base;
+	this->target = target;
+	
+	// load segments
+	{
+		std::shared_ptr<trn::svc::MemoryMapping> map =
+			trn::ResultCode::AssertOk(
+				trn::svc::MapProcessMemory(proc, load_base, total_size));
+		printf("Mapped at %p\n", map->Base());
+		for(auto i = segments.begin(); i != segments.end(); i++) {
+			uint8_t *target = map->Base() + (i->load_addr - load_base);
+			i->data.Seek(i->data_offset);
+			i->data.Read(target, i->data_length);
+		}
+		printf("Copied segments\n");
+	} // let map go out of scope
+
+	if(load_base != target) {
+		printf("Mapping code memory...\n");
+		trn::ResultCode::AssertOk(
+			svcMapProcessCodeMemory(proc->handle, (void*) target, (void*) load_base, total_size));
+	}
+	
+	printf("Reprotecting...\n");
+	for(auto i = segments.begin(); i != segments.end(); i++) {
+		trn::ResultCode::AssertOk(
+			trn::svc::SetProcessMemoryPermission(*proc, target + (i->load_addr - load_base), i->virt_length, i->permissions));
+	}
+
+	return std::nullopt;
+}
+
+trn::Result<std::nullopt_t> ProcessBuilder::Unload(std::shared_ptr<trn::KProcess> process) {
+	return trn::ResultCode::ExpectOk(svcUnmapProcessCodeMemory(process->handle, (void*) target, (void*) load_base, total_size));
+}
+
+trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *name, std::vector<uint32_t> caps) {
 	try {
 		trn::KResourceLimit resource_limit =
 			trn::ResultCode::AssertOk(
@@ -218,32 +254,16 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build() {
 			std::move(trn::ResultCode::AssertOk(
 									trn::svc::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
 		printf("Made process 0x%x\n", proc->handle);
-		
-		// load segments
-		{
-			std::shared_ptr<trn::svc::MemoryMapping> map =
-				trn::ResultCode::AssertOk(
-					trn::svc::MapProcessMemory(proc, load_base, total_size));
-			printf("Mapped at %p\n", map->Base());
-			for(auto i = segments.begin(); i != segments.end(); i++) {
-				uint8_t *target = map->Base() + (i->load_addr - load_base);
-				i->data.Seek(i->data_offset);
-				i->data.Read(target, i->data_length);
-			}
-			printf("Copied segments\n");
-		} // let map go out of scope
-		
-		printf("Reprotecting...\n");
-		for(auto i = segments.begin(); i != segments.end(); i++) {
-			trn::ResultCode::AssertOk(
-				trn::svc::SetProcessMemoryPermission(*proc, i->load_addr, i->virt_length, i->permissions));
-		}
 
-		return proc;
+		return Load(proc, load_base, load_base).map([proc](auto _) { return proc; });
 	} catch(trn::ResultError e) {
 		return tl::make_unexpected(e.code);
 	}
 }
 
+size_t ProcessBuilder::GetTotalSize() {
+	return total_size;
 }
-}
+
+} // namespace process_creation
+} // namespace twili

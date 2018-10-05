@@ -5,7 +5,8 @@
 
 #include<list>
 
-#include "MonitoredProcess.hpp"
+#include "AppletTracker.hpp"
+#include "process/MonitoredProcess.hpp"
 
 #include "bridge/usb/USBBridge.hpp"
 #include "bridge/tcp/TCPBridge.hpp"
@@ -42,9 +43,12 @@ class Twili {
 	bridge::usb::USBBridge usb_bridge;
 	bridge::tcp::TCPBridge tcp_bridge;
 	
-	std::list<twili::MonitoredProcess> monitored_processes;
-	std::optional<twili::MonitoredProcess*> FindMonitoredProcess(uint64_t pid);
+	std::list<std::shared_ptr<process::MonitoredProcess>> monitored_processes;
+	std::shared_ptr<process::MonitoredProcess> FindMonitoredProcess(uint64_t pid);
+	std::shared_ptr<process::Process> FindProcess(uint64_t pid);
 
+	AppletTracker applet_tracker;
+	
 	std::map<std::string, std::shared_ptr<TwibPipe>> named_pipes;
 	
 	std::vector<uint8_t> hbabi_shim_nro;
