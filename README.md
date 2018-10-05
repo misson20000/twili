@@ -90,7 +90,7 @@ Twili Launcher is a small application designed to spawn the process that Twili r
 
 Twib is the workstation-side tool, consisting of two parts: `twibd`, and `twib`. `twibd` is the server side, which communicates with Twili over USB or sockets, and multiplexes access between multiple instances of the `twib` client-side. The `twibd` server-side has a number of backends, which handle talking to Twili. It also has a number of frontends, which accept connections from the `twib` client. On UNIX systems, this is a UNIX socket. On Windows systems, this is a named pipe.
 
-![Twib block diagram](doc/twib_diagram.svg)
+![Twib block diagram](docs/twib_diagram.svg)
 
 The frontend and backend each run in their own threads to simplify synchronization.
 

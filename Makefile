@@ -1,8 +1,9 @@
-OBJECTS := twili.o ITwiliService.o IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process_creation.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o IHBABIShim.o util.o msgpack11/msgpack11.o Process.o ITwibDeviceInterface.o ITwibPipeReader.o TwibPipe.o ITwibPipeWriter.o ITwibDebugger.o service/pm/IShellService.o service/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o twib/Buffer.o service/nifm/IGeneralService.o service/nifm/IRequest.o Socket.o MutexShim.o
-LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o process_creation.o util.o
-HBABI_SHIM_OBJECTS := hbabi_shim.o
+TWILI_OBJECTS := twili.o service/ITwiliService.o service/IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o MonitoredProcess.o ELFCrashReport.o twili.squashfs.o service/IHBABIShim.o msgpack11/msgpack11.o Process.o bridge/interfaces/ITwibDeviceInterface.o bridge/interfaces/ITwibPipeReader.o TwibPipe.o bridge/interfaces/ITwibPipeWriter.o bridge/interfaces/ITwibDebugger.o ipcbind/pm/IShellService.o ipcbind/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o ipcbind/nifm/IGeneralService.o ipcbind/nifm/IRequest.o Socket.o MutexShim.o
+TWILI_COMMON_OBJECTS := process_creation.o util.o
+COMMON_OBJECTS := Buffer.o
 
-TWILI_CXX_FLAGS := -Werror-return-type -Og -I.
+LAUNCHER_OBJECTS := twili_launcher.o twili_launcher.squashfs.o
+HBABI_SHIM_OBJECTS := hbabi_shim.o
 
 BUILD_PFS0 := build_pfs0
 
@@ -20,15 +21,15 @@ build/twili_launcher_exefs/main: build/twili_launcher.nso
 	mkdir -p $(@D)
 	cp $< $@
 
-build/twili_launcher_exefs/main.npdm: main.npdm
+build/twili_launcher_exefs/main.npdm: twili_launcher/twili_launcher.json
 	mkdir -p $(@D)
-	cp $< $@
+	npdmtool $< $@
 
 $(ATMOSPHERE_TITLE_DIR)/exefs/main: build/twili.nso
 	mkdir -p $(@D)
 	cp $< $@
 
-$(ATMOSPHERE_TITLE_DIR)/exefs/main.npdm: twili.json
+$(ATMOSPHERE_TITLE_DIR)/exefs/main.npdm: twili/twili.json
 	mkdir -p $(@D)
 	npdmtool $< $@
 
@@ -49,6 +50,8 @@ ifndef LIBTRANSISTOR_HOME
 endif
 include $(LIBTRANSISTOR_HOME)/libtransistor.mk
 
+CXX_FLAGS += -Werror-return-type -Og -I$(realpath twili_common)
+
 build/%.o: %.c
 	mkdir -p $(@D)
 	$(CC) $(CC_FLAGS) -c -o $@ $<
@@ -61,32 +64,38 @@ build/%.squashfs.o: build/%.squashfs
 	mkdir -p $(@D)
 	$(LD) -s -r -b binary -m aarch64elf -T $(LIBTRANSISTOR_HOME)/fs.T -o $@ $<
 
-build/twili.squashfs: build/hbabi_shim.nro
+build/twili/twili.squashfs: build/hbabi_shim.nro
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
 
-build/twili_launcher.squashfs: build/twili.nro
+build/twili_launcher/twili_launcher.squashfs: build/twili.nro
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
 
-build/twili.kip: build/twili.nso.so twili_kip.json
-	elf2kip build/twili.nso.so twili_kip.json build/twili.kip
+build/twili.kip: build/twili.nso.so twili/twili_kip.json
+	elf2kip build/twili.nso.so twili/twili_kip.json build/twili.kip
 
-build/twili_launcher.kip: build/twili_launcher.nso.so twili_launcher_kip.json
-	elf2kip build/twili_launcher.nso.so twili_launcher_kip.json build/twili_launcher.kip
+build/twili_launcher.kip: build/twili_launcher.nso.so twili_launcher/twili_launcher_kip.json
+	elf2kip build/twili_launcher.nso.so twili_launcher/twili_launcher_kip.json build/twili_launcher.kip
 
-build/twili.nro.so: $(addprefix build/,$(OBJECTS)) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
+# main twili service
+TWILI_DEPS = $(addprefix build/twili/,$(TWILI_OBJECTS)) $(addprefix build/twili_common/,$(TWILI_COMMON_OBJECTS)) $(addprefix build/common/,$(COMMON_OBJECTS))
+build/twili.nro.so: $(TWILI_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
-	$(LD) $(LD_FLAGS) -o $@ $(addprefix build/,$(OBJECTS)) $(LIBTRANSISTOR_NRO_LDFLAGS)
+	$(LD) $(LD_FLAGS) -o $@ $(TWILI_DEPS) $(LIBTRANSISTOR_NRO_LDFLAGS)
 
-build/twili.nso.so: $(addprefix build/,$(OBJECTS)) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
+build/twili.nso.so: $(TWILI_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
-	$(LD) $(LD_FLAGS) -o $@ $(addprefix build/,$(OBJECTS)) $(LIBTRANSISTOR_NSO_LDFLAGS)
+	$(LD) $(LD_FLAGS) -o $@ $(TWILI_DEPS) $(LIBTRANSISTOR_NSO_LDFLAGS)
 
-build/twili_launcher.nso.so: $(addprefix build/,$(LAUNCHER_OBJECTS)) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
+# twili launcher
+TWILI_LAUNCHER_DEPS = $(addprefix build/twili_launcher/,$(LAUNCHER_OBJECTS)) $(addprefix build/twili_common/,$(TWILI_COMMON_OBJECTS))
+build/twili_launcher.nso.so: $(TWILI_LAUNCHER_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
-	$(LD) $(LD_FLAGS) -o $@ $(addprefix build/,$(LAUNCHER_OBJECTS)) $(LIBTRANSISTOR_NSO_LDFLAGS)
+	$(LD) $(LD_FLAGS) -o $@ $(TWILI_LAUNCHER_DEPS) $(LIBTRANSISTOR_NSO_LDFLAGS)
 
-build/hbabi_shim.nro.so: $(addprefix build/,$(HBABI_SHIM_OBJECTS)) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
+# HBABI shim
+HBABI_SHIM_DEPS = $(addprefix build/hbabi_shim/,$(HBABI_SHIM_OBJECTS))
+build/hbabi_shim.nro.so: $(HBABI_SHIM_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
-	$(LD) $(LD_FLAGS) -o $@ $(addprefix build/,$(HBABI_SHIM_OBJECTS)) $(LIBTRANSISTOR_NRO_LDFLAGS)
+	$(LD) $(LD_FLAGS) -o $@ $(HBABI_SHIM_DEPS) $(LIBTRANSISTOR_NRO_LDFLAGS)

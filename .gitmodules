@@ -1,5 +1,5 @@
 [submodule "msgpack11"]
-	path = msgpack11
+	path = twili/msgpack11
 	url = https://github.com/ar90n/msgpack11.git
 [submodule "twib2/externals/CLI11"]
 	path = twib/externals/CLI11
