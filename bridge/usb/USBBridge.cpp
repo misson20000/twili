@@ -41,7 +41,7 @@ static usb_interface_descriptor_t interface_descriptor = {
 	.bDescriptorType = TRN_USB_DT_INTERFACE,
 	.bInterfaceNumber = USB_DS_INTERFACE_NUMBER_AUTO,
 	.bAlternateSetting = 0x00,
-	.bNumEndpoints = 0x00,
+	.bNumEndpoints = 0x04,
 	.bInterfaceClass = 0xFF,
 	.bInterfaceSubClass = 0x01,
 	.bInterfaceProtocol = 0x00,
@@ -55,7 +55,7 @@ static const size_t TRANSFER_BUFFER_SIZE = 0x8000;
 
 USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
-	ds(ResultCode::AssertOk(trn::service::usb::ds::DS::Initialize(2))),
+	ds(ResultCode::AssertOk(trn::service::usb::ds::DS::Initialize(2, nullptr))),
 	usb_state_change_event(ResultCode::AssertOk(ds.GetStateChangeEvent())),
 	request_reader(this),
 	request_meta_buffer(0x1000),
@@ -65,14 +65,14 @@ USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) 
 	
 	interface = ResultCode::AssertOk(
 		ds.GetInterface(interface_descriptor, "twili_bridge"));
-	endpoint_response_meta = ResultCode::AssertOk(
-		interface->GetEndpoint(endpoint_in_descriptor)); // into host
 	endpoint_request_meta = ResultCode::AssertOk(
 		interface->GetEndpoint(endpoint_out_descriptor)); // out from host
-	endpoint_response_data = ResultCode::AssertOk(
-		interface->GetEndpoint(endpoint_in_descriptor)); // into host
 	endpoint_request_data = ResultCode::AssertOk(
 		interface->GetEndpoint(endpoint_out_descriptor)); // out from host
+	endpoint_response_meta = ResultCode::AssertOk(
+		interface->GetEndpoint(endpoint_in_descriptor)); // into host
+	endpoint_response_data = ResultCode::AssertOk(
+		interface->GetEndpoint(endpoint_in_descriptor)); // into host
 	ResultCode::AssertOk(interface->Enable());
 
 	objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(0, object_zero));
