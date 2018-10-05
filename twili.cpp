@@ -78,12 +78,13 @@ namespace twili {
 Twili::Twili() :
 	event_waiter(),
 	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
+	twili_registration(
+		server, "twili",
+		[this](auto s) {
+			return new twili::ITwiliService(this);
+		}),
 	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
 	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)) {
-
-	server.CreateService("twili", [this](auto s) {
-			return new twili::ITwiliService(this);
-		});
 
 	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
 	if(!hbabi_shim_nro) {
@@ -105,6 +106,10 @@ std::optional<twili::MonitoredProcess*> Twili::FindMonitoredProcess(uint64_t pid
    } else {
       return &(*i);
    }
+}
+
+Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory) {
+	ResultCode::AssertOk(server.CreateService(name.c_str(), factory));
 }
 
 Twili::Services::Services() {
