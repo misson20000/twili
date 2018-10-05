@@ -80,5 +80,11 @@ ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 	return rs.objects[*(uint32_t*) rs.payload.data()];
 }
 
+msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
+	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO);
+	std::string err;
+	return msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
+}
+
 } // namespace twib
-} // namespace twil
+} // namespace twili

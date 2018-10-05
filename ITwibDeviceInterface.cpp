@@ -21,11 +21,7 @@
 #include "ITwibPipeWriter.hpp"
 #include "ITwibDebugger.hpp"
 
-using trn::ResultCode;
-using trn::ResultError;
-
-template<typename T>
-using Result = trn::Result<T>;
+using namespace trn;
 
 namespace twili {
 namespace bridge {
@@ -64,6 +60,9 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 		break;
 	case protocol::ITwibDeviceInterface::Command::OPEN_ACTIVE_DEBUGGER:
 		OpenActiveDebugger(payload, opener);
+		break;
+	case protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO:
+		GetMemoryInfo(payload, opener);
 		break;
 	default:
 		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
@@ -322,6 +321,41 @@ void ITwibDeviceInterface::OpenActiveDebugger(std::vector<uint8_t> payload, brid
 	auto debugger = opener.MakeObject<ITwibDebugger>(twili, std::move(debug));
 	auto w = opener.BeginOk(sizeof(uint32_t), 1);
 	w.Write(w.Object(debugger));
+	w.Finalize();
+}
+
+void ITwibDeviceInterface::GetMemoryInfo(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+	if(payload.size() > 0) {
+		throw ResultError(TWILI_ERR_BAD_REQUEST);
+	}
+
+	size_t total_mem_available, total_mem_usage;
+
+	ResultCode::AssertOk(svcGetInfo(&total_mem_available, 6, 0xffff8001, 0));
+	ResultCode::AssertOk(svcGetInfo(&total_mem_usage,     7, 0xffff8001, 0));
+	
+	std::vector<msgpack11::MsgPack::object> resource_limit_infos;
+	for(size_t i = 0; i < 3; i++) {
+		size_t current_value, limit_value;
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<65001>( // AtmosphereGetCurrentLimitInfo
+				ipc::InRaw<uint32_t>((uint32_t) i),
+				ipc::InRaw<uint32_t>(0), // LimitableResource_Memory
+				ipc::OutRaw<uint64_t>(current_value),
+				ipc::OutRaw<uint64_t>(limit_value)));
+		resource_limit_infos.push_back({{"category", i}, {"current_value", current_value}, {"limit_value", limit_value}});
+	}
+	
+	msgpack11::MsgPack meminfo = msgpack11::MsgPack::object {
+		{"total_memory_available", total_mem_available},
+		{"total_memory_usage", total_mem_usage},
+		{"limits", resource_limit_infos},
+	};
+
+	std::string ser = meminfo.dump();
+	
+	auto w = opener.BeginOk(ser.size());
+	w.Write(ser);
 	w.Finalize();
 }
 

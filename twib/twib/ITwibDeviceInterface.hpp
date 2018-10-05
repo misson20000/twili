@@ -38,6 +38,7 @@ class ITwibDeviceInterface {
 	msgpack11::MsgPack Identify();
 	std::vector<std::string> ListNamedPipes();
 	ITwibPipeReader OpenNamedPipe(std::string name);
+	msgpack11::MsgPack GetMemoryInfo();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

@@ -26,6 +26,7 @@ class ITwibDeviceInterface : public bridge::Object {
 	void ListNamedPipes(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 	void OpenNamedPipe(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 	void OpenActiveDebugger(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+	void GetMemoryInfo(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 };
 
 } // namespace bridge

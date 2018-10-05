@@ -326,6 +326,8 @@ int main(int argc, char *argv[]) {
 	CLI::App *open_named_pipe = app.add_subcommand("open-named-pipe", "Open a named pipe on the device");
 	std::string open_named_pipe_name;
 	open_named_pipe->add_option("name", open_named_pipe_name, "Name of pipe to open")->required();
+
+	CLI::App *get_memory_info = app.add_subcommand("get-memory-info", "Gets memory usage information from the device");
 	
 	app.require_subcommand(1);
 	
@@ -513,6 +515,29 @@ int main(int argc, char *argv[]) {
 			} else {
 				throw e;
 			}
+		}
+		return 0;
+	}
+
+	if(get_memory_info->parsed()) {
+		msgpack11::MsgPack meminfo = itdi.GetMemoryInfo();
+		uint64_t total_memory_available = meminfo["total_memory_available"].uint64_value();
+		uint64_t total_memory_usage     = meminfo["total_memory_usage"    ].uint64_value();
+		const size_t one_mib = 1024 * 1024;
+		printf(
+			"Twili Memory: %ld MiB / %ld MiB (%ld%%)\n",
+			total_memory_usage / one_mib,
+			total_memory_available / one_mib,
+			total_memory_usage * 100 / total_memory_available);
+
+		std::vector<const char*> category_labels = {"System", "Application", "Applet"};
+		for(auto &cat_info : meminfo["limits"].array_items()) {
+			printf(
+				"%s Category Limit: %ld MiB / %ld MiB (%ld%%)\n",
+				category_labels[cat_info["category"].int_value()],
+				cat_info["current_value"].uint64_value() / one_mib,
+				cat_info["limit_value"].uint64_value() / one_mib,
+				cat_info["current_value"].uint64_value() * 100 / cat_info["limit_value"].uint64_value());
 		}
 		return 0;
 	}

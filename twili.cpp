@@ -114,6 +114,8 @@ Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &ser
 
 Twili::Services::Services() {
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+
+	pm_dmnt = ResultCode::AssertOk(sm.GetService("pm:dmnt"));
 	
 	pm_shell = twili::service::pm::IShellService(
 		ResultCode::AssertOk(

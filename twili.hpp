@@ -32,7 +32,8 @@ class Twili {
 	struct Services {
 	 public:
 		Services();
-		
+
+		trn::ipc::client::Object pm_dmnt;
 		service::pm::IShellService pm_shell;
 		service::ldr::IDebugMonitorInterface ldr_dmnt;
 		service::nifm::IGeneralService nifm;
