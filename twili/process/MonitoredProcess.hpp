@@ -23,10 +23,11 @@ class MonitoredProcess : public Process {
 	virtual void Launch() = 0;
 	
 	virtual uint64_t GetPid() override;
-	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
 	virtual void AddNotes(ELFCrashReport &report) override;
 	virtual void Terminate() override;
 
+	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
+	
 	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
