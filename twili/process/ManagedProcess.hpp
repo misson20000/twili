@@ -7,7 +7,7 @@ namespace process {
 
 class ManagedProcess : public MonitoredProcess {
  public:
-	ManagedProcess(Twili &twili, std::vector<uint8_t> nro);
+	ManagedProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro);
 	virtual void Launch() override;
  private:
 	std::shared_ptr<trn::WaitHandle> wait;

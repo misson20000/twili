@@ -9,14 +9,15 @@ using namespace trn;
 namespace twili {
 namespace process {
 
-AppletProcess::AppletProcess(Twili &twili, std::vector<uint8_t> nro) :
-	MonitoredProcess(twili),
+AppletProcess::AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro) :
+	MonitoredProcess(twili, attachment_opener),
 	reader(nro) {
 	builder.AppendNRO(reader);
 }
 
 void AppletProcess::Launch() {
-	twili.applet_tracker.QueueLaunch(shared_from_this());
+	// this is not cool.
+	twili.applet_tracker.QueueLaunch(std::dynamic_pointer_cast<AppletProcess>(shared_from_this()));
 }
 
 void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries) {
@@ -28,10 +29,6 @@ void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries)
 				.applet_type = LCONFIG_APPLET_TYPE_LIBRARY_APPLET,
 			}
 		});
-}
-
-void AppletProcess::Attach(trn::KProcess &&process) {
-	proc = std::make_shared<trn::KProcess>(std::move(process));
 }
 
 size_t AppletProcess::GetTargetSize() {

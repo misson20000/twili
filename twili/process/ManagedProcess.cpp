@@ -9,7 +9,7 @@ using namespace trn;
 namespace twili {
 namespace process {
 
-ManagedProcess::ManagedProcess(Twili &twili, std::vector<uint8_t> nro) : MonitoredProcess(twili) {
+ManagedProcess::ManagedProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro) : MonitoredProcess(twili, attachment_opener) {
 	std::vector<uint32_t> caps = {
 		0b00011111111111111111111111101111, // SVC grants
 		0b00111111111111111111111111101111,
@@ -30,8 +30,10 @@ ManagedProcess::ManagedProcess(Twili &twili, std::vector<uint8_t> nro) : Monitor
 	uint64_t   shim_addr = ResultCode::AssertOk(builder.AppendNRO(hbabi_shim_reader));
 	
 	target_entry = ResultCode::AssertOk(builder.AppendNRO(nro_reader));
-	proc = ResultCode::AssertOk(builder.Build("twili_child", caps));
+	std::shared_ptr<trn::KProcess> process = ResultCode::AssertOk(builder.Build("twili_child", caps));
 
+	Attach(process);
+	
 	printf("created managed process: 0x%x, pid 0x%x\n", proc->handle, GetPid());
 	wait = twili.event_waiter.Add(*proc, [this]() {
 			printf("managed process (0x%x) signalled\n", this->proc->handle);

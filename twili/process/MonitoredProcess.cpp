@@ -6,6 +6,8 @@
 #include "Process.hpp"
 #include "../twili.hpp"
 #include "../ELFCrashReport.hpp"
+#include "../bridge/interfaces/ITwibPipeReader.hpp"
+#include "../bridge/interfaces/ITwibPipeWriter.hpp"
 
 #include "err.hpp"
 
@@ -14,7 +16,7 @@ namespace process {
 
 using trn::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili &twili) : Process(twili) {
+MonitoredProcess::MonitoredProcess(Twili &twili, bridge::ResponseOpener attachment_opener) : Process(twili), attachment_opener(attachment_opener) {
 
 }
 
@@ -55,6 +57,35 @@ void MonitoredProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entri
 	});
 }
 
+void MonitoredProcess::Attach(std::shared_ptr<trn::KProcess> process) {
+	if(proc) {
+		throw trn::ResultError(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
+	}
+	proc = process;
+
+	struct {
+		uint64_t pid;
+		uint32_t tp_stdin;
+		uint32_t tp_stdout;
+		uint32_t tp_stderr;
+	} response;
+
+	auto w = attachment_opener->BeginOk(sizeof(response), 3);
+	
+	response.pid = GetPid();
+	response.tp_stdin  = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeWriter>(tp_stdin ));
+	response.tp_stdout = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeReader>(tp_stdout));
+	response.tp_stderr = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeReader>(tp_stderr));
+	
+	w.Write<decltype(response)>(response);
+	
+	w.Finalize();
+
+	attachment_opener.reset();
+	
+	twili.monitored_processes.push_back(shared_from_this());
+	printf("  began monitoring 0x%x\n", GetPid());
+}
 
 MonitoredProcess::~MonitoredProcess() {
 	tp_stdin->Close();

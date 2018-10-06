@@ -83,26 +83,8 @@ void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener 
 	//auto mon = twili.monitored_processes.emplace_back(
 	//	std::make_shared<process::ManagedProcess>(twili, nro));
 
-	auto mon = std::make_shared<process::AppletProcess>(twili, nro);
+	auto mon = std::make_shared<process::AppletProcess>(twili, opener, nro);
 	mon->Launch();
-
-	struct {
-		uint64_t pid;
-		uint32_t tp_stdin;
-		uint32_t tp_stdout;
-		uint32_t tp_stderr;
-	} response;
-
-	auto w = opener.BeginOk(sizeof(response), 3);
-	
-	response.pid = mon->GetPid();
-	response.tp_stdin  = w.Object(opener.MakeObject<ITwibPipeWriter>(mon->tp_stdin ));
-	response.tp_stdout = w.Object(opener.MakeObject<ITwibPipeReader>(mon->tp_stdout));
-	response.tp_stderr = w.Object(opener.MakeObject<ITwibPipeReader>(mon->tp_stderr));
-	
-	w.Write<decltype(response)>(response);
-	
-	w.Finalize();
 }
 
 void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {

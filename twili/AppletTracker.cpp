@@ -55,10 +55,8 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
 	}
 	std::shared_ptr<process::AppletProcess> proc = created.front();
-	proc->Attach(std::move(process));
+	proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
 	printf("  attached\n");
-	twili.monitored_processes.push_back(proc);
-	printf("  began monitoring 0x%x\n", proc->GetPid());
 	created.pop_front();
 	return proc;
 }

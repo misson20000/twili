@@ -14,14 +14,13 @@ class AppletTracker;
 
 namespace process {
 
-class AppletProcess : public MonitoredProcess, public std::enable_shared_from_this<AppletProcess> {
+class AppletProcess : public MonitoredProcess {
  public:
-	AppletProcess(Twili &twili, std::vector<uint8_t> nro);
+	AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro);
 	
 	virtual void Launch() override;
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
 	
-	void Attach(trn::KProcess &&process);
 	size_t GetTargetSize();
 	void SetupTarget();
 	
