@@ -1,9 +1,9 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_executable(twib Twib.cpp Messages.cpp RemoteObject.cpp ITwibMetaInterface.cpp ITwibDeviceInterface.cpp ../../util.cpp msgpack_show.cpp ITwibPipeReader.cpp ITwibPipeWriter.cpp)
+add_executable(twib Twib.cpp Messages.cpp RemoteObject.cpp ITwibMetaInterface.cpp ITwibDeviceInterface.cpp msgpack_show.cpp ITwibPipeReader.cpp ITwibPipeWriter.cpp)
 
-target_link_libraries(twib twib-log twib-buffer twib-error)
+target_link_libraries(twib twib-common)
 
 include_directories(msgpack11 INTERFACE)
 target_link_libraries(twib msgpack11)

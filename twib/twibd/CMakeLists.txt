@@ -5,7 +5,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(SOURCE Twibd.cpp USBBackend.cpp Messages.cpp LocalClient.cpp SocketFrontend.cpp BridgeObject.cpp TCPBackend.cpp)
 add_executable(twibd ${SOURCE})
 
-target_link_libraries(twibd twib-log twib-buffer)
+target_link_libraries(twibd twib-common)
 
 include_directories(msgpack11 INTERFACE)
 target_link_libraries(twibd msgpack11)

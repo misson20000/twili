@@ -62,11 +62,9 @@ add_definitions("-DPROJECT_ROOT=\"${PROJECT_SOURCE_DIR}\"") # for logging
 
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
-include_directories("${PROJECT_SOURCE_DIR}/../")
+include_directories("${PROJECT_SOURCE_DIR}/../common/")
 
-add_library(twib-log Logger.cpp)
-add_library(twib-buffer Buffer.cpp)
-add_library(twib-error ResultError.cpp)
+add_library(twib-common Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp)
 add_subdirectory(externals EXCLUDE_FROM_ALL)
 add_subdirectory(twibd)
 add_subdirectory(twib)
