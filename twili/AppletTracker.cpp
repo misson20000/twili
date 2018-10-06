@@ -34,14 +34,18 @@ const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
 	return process_queued_event;
 }
 
-bool AppletTracker::PopQueuedProcess() {
+bool AppletTracker::HasQueuedProcess() {
+	return queued.size() > 0;
+}
+
+std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
+	std::shared_ptr<process::AppletProcess> proc;
 	if(queued.size() > 0) {
-		created.push_back(queued.front());
+		proc = queued.front();
+		created.push_back(proc);
 		queued.pop_front();
-		return true;
-	} else {
-		return false;
 	}
+	return proc;
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KProcess &&process) {

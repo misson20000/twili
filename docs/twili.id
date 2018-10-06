@@ -37,10 +37,10 @@ interface twili::IAppletShim {
 	# Control mode
 	[100] GetEvent() -> handle<event, copy> event;
 	[101] GetCommand() -> u32 command;
-	
+	[102] PopApplet() -> u64 target_size;
+
 	# Host mode
-	[200] GetTargetSize() -> u64 target_size;
-	[201] SetupTarget(u64 backing_memory, u64 map_target);
+	# 200: REMOVED
+	[201] SetupTarget();
 	[202] OpenHBABIShim() -> object<twili::HBABIShim>;
-	[203] FinalizeTarget();
 }

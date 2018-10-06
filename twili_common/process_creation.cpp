@@ -36,7 +36,6 @@ struct ProcessInfo {
 	uint32_t process_flags;
 	handle_t reslimit_h;
 	uint32_t system_resource_num_pages;
-	uint32_t personal_mm_heap_num_pages;
 };
 
 ProcessBuilder::Segment::Segment(DataReader &data, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
@@ -140,10 +139,7 @@ trn::Result<uint64_t> ProcessBuilder::AppendNRO(DataReader &nro) {
 	return base;
 }
 
-trn::Result<std::nullopt_t> ProcessBuilder::Load(std::shared_ptr<trn::KProcess> proc, uint64_t load_base, uint64_t target) {
-	this->load_base = load_base;
-	this->target = target;
-	
+trn::Result<std::nullopt_t> ProcessBuilder::Load(std::shared_ptr<trn::KProcess> proc, uint64_t load_base) {
 	// load segments
 	{
 		std::shared_ptr<trn::svc::MemoryMapping> map =
@@ -151,30 +147,20 @@ trn::Result<std::nullopt_t> ProcessBuilder::Load(std::shared_ptr<trn::KProcess> 
 				trn::svc::MapProcessMemory(proc, load_base, total_size));
 		printf("Mapped at %p\n", map->Base());
 		for(auto i = segments.begin(); i != segments.end(); i++) {
-			uint8_t *target = map->Base() + (i->load_addr - load_base);
+			uint8_t *target = map->Base() + (i->load_addr - this->load_base);
 			i->data.Seek(i->data_offset);
 			i->data.Read(target, i->data_length);
 		}
 		printf("Copied segments\n");
 	} // let map go out of scope
 
-	if(load_base != target) {
-		printf("Mapping code memory...\n");
-		trn::ResultCode::AssertOk(
-			svcMapProcessCodeMemory(proc->handle, (void*) target, (void*) load_base, total_size));
-	}
-	
 	printf("Reprotecting...\n");
 	for(auto i = segments.begin(); i != segments.end(); i++) {
 		trn::ResultCode::AssertOk(
-			trn::svc::SetProcessMemoryPermission(*proc, target + (i->load_addr - load_base), i->virt_length, i->permissions));
+			trn::svc::SetProcessMemoryPermission(*proc, load_base + (i->load_addr - this->load_base), i->virt_length, i->permissions));
 	}
 
 	return std::nullopt;
-}
-
-trn::Result<std::nullopt_t> ProcessBuilder::Unload(std::shared_ptr<trn::KProcess> process) {
-	return trn::ResultCode::ExpectOk(svcUnmapProcessCodeMemory(process->handle, (void*) target, (void*) load_base, total_size));
 }
 
 trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *name, std::vector<uint32_t> caps) {
@@ -243,7 +229,6 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *na
 			.process_flags = process_flags,
 			.reslimit_h = resource_limit.handle,
 			.system_resource_num_pages = 0,
-			.personal_mm_heap_num_pages = 0,
 		};
 		strncpy((char*) process_info.name, name, sizeof(process_info).name-1);
 		process_info.name[sizeof(process_info).name-1] = 0;
@@ -255,7 +240,7 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *na
 									trn::svc::CreateProcess(&process_info, (void*) caps.data(), caps.size()))));
 		printf("Made process 0x%x\n", proc->handle);
 
-		return Load(proc, load_base, load_base).map([proc](auto _) { return proc; });
+		return Load(proc, load_base).map([proc](auto _) { return proc; });
 	} catch(trn::ResultError e) {
 		return tl::make_unexpected(e.code);
 	}

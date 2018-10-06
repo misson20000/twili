@@ -23,11 +23,10 @@ class IAppletShim : public trn::ipc::server::Object {
 	
 	virtual trn::ResultCode GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event);
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
+	virtual trn::ResultCode PopApplet(trn::ipc::OutRaw<uint64_t> target_size);
 
-	virtual trn::ResultCode GetTargetSize(trn::ipc::OutRaw<size_t> size);
-	virtual trn::ResultCode SetupTarget(trn::ipc::InRaw<uint64_t> buffer_address, trn::ipc::InRaw<uint64_t> map_address);
+	virtual trn::ResultCode SetupTarget();
 	virtual trn::ResultCode OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim);
-	virtual trn::ResultCode FinalizeTarget();
 
 	class ControlImpl;
 	class HostImpl;
@@ -42,6 +41,7 @@ class IAppletShim::ControlImpl : public IAppletShim {
 	
 	virtual trn::ResultCode GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event);
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
+	virtual trn::ResultCode PopApplet(trn::ipc::OutRaw<uint64_t> target_size);
  private:
 	AppletTracker &tracker;
 };
@@ -52,10 +52,8 @@ class IAppletShim::HostImpl : public IAppletShim {
 
 	virtual trn::ResultCode GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode);
 	
-	virtual trn::ResultCode GetTargetSize(trn::ipc::OutRaw<size_t> size);
-	virtual trn::ResultCode SetupTarget(trn::ipc::InRaw<uint64_t> buffer_address, trn::ipc::InRaw<uint64_t> map_address);
+	virtual trn::ResultCode SetupTarget();
 	virtual trn::ResultCode OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim);
-	virtual trn::ResultCode FinalizeTarget();
  private:
 	std::shared_ptr<process::AppletProcess> process;
 };

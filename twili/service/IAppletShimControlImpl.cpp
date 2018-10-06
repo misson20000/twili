@@ -24,12 +24,17 @@ trn::ResultCode IAppletShim::ControlImpl::GetEvent(trn::ipc::OutHandle<handle_t,
 }
 
 trn::ResultCode IAppletShim::ControlImpl::GetCommand(trn::ipc::OutRaw<uint32_t> cmd) {
-	if(tracker.PopQueuedProcess()) {
+	if(tracker.HasQueuedProcess()) {
 		cmd = 0;
 		return RESULT_OK;
 	} else {
 		return TWILI_ERR_APPLET_SHIM_NO_COMMANDS_LEFT;
 	}
+}
+
+trn::ResultCode IAppletShim::ControlImpl::PopApplet(trn::ipc::OutRaw<uint64_t> process_image_size) {
+	process_image_size = tracker.PopQueuedProcess()->GetTargetSize();
+	return RESULT_OK;
 }
 
 } // namespace service

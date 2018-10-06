@@ -13,13 +13,8 @@ trn::ResultCode IAppletShim::HostImpl::GetMode(trn::ipc::OutRaw<applet_shim::Mod
 	return RESULT_OK;
 }
 
-trn::ResultCode IAppletShim::HostImpl::GetTargetSize(trn::ipc::OutRaw<size_t> size) {
-	size = process->GetTargetSize();
-	return RESULT_OK;
-}
-
-trn::ResultCode IAppletShim::HostImpl::SetupTarget(trn::ipc::InRaw<uint64_t> buffer_address, trn::ipc::InRaw<uint64_t> map_address) {
-	process->SetupTarget(buffer_address.value, map_address.value);
+trn::ResultCode IAppletShim::HostImpl::SetupTarget() {
+	process->SetupTarget();
 	return RESULT_OK;
 }
 
@@ -31,11 +26,6 @@ trn::ResultCode IAppletShim::HostImpl::OpenHBABIShim(trn::ipc::OutObject<IHBABIS
 	} else {
 		return r.error().code;
 	}
-}
-
-trn::ResultCode IAppletShim::HostImpl::FinalizeTarget() {
-	process->FinalizeTarget();
-	return RESULT_OK;
 }
 
 } // namespace service

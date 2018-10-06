@@ -2,6 +2,7 @@
 
 #include<libtransistor/cpp/types.hpp>
 #include<libtransistor/cpp/waiter.hpp>
+#include<libtransistor/loader_config.h>
 
 #include<memory>
 
@@ -22,6 +23,7 @@ class MonitoredProcess : public Process {
 	virtual void Launch() = 0;
 	
 	virtual uint64_t GetPid() override;
+	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
 	virtual void AddNotes(ELFCrashReport &report) override;
 	virtual void Terminate() override;
 

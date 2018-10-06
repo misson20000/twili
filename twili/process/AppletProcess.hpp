@@ -19,11 +19,11 @@ class AppletProcess : public MonitoredProcess, public std::enable_shared_from_th
 	AppletProcess(Twili &twili, std::vector<uint8_t> nro);
 	
 	virtual void Launch() override;
+	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
 	
 	void Attach(trn::KProcess &&process);
 	size_t GetTargetSize();
-	void SetupTarget(uint64_t buffer_address, uint64_t map_address);
-	void FinalizeTarget();
+	void SetupTarget();
 	
  private:
 	process_creation::ProcessBuilder::VectorDataReader reader;

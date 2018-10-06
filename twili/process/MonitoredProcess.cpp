@@ -48,6 +48,21 @@ class CrashReportThread {
 	uint64_t entrypoint;
 };
 
+void MonitoredProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries) {
+	entries.push_back({
+		.key = LCONFIG_KEY_TWILI_PRESENT,
+		.flags = 0,
+	});
+	entries.push_back({
+		.key = LCONFIG_KEY_SYSCALL_AVAILABLE_HINT,
+		.flags = 0,
+		.syscall_available_hint = {
+			0xffffffffffffffff,
+			0xffffffffffffffff
+		}
+	});
+}
+
 void MonitoredProcess::AddNotes(ELFCrashReport &report) {
 	Process::AddNotes(report);
 	std::vector<ELF::Note::elf_auxv_t> auxv;

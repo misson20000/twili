@@ -19,7 +19,8 @@ class AppletTracker {
 	void AttachControlProcess();
 	void ReleaseControlProcess();
 	const trn::KEvent &GetProcessQueuedEvent();
-	bool PopQueuedProcess(); // returns true if there was a process to pop
+	bool HasQueuedProcess();
+	std::shared_ptr<process::AppletProcess> PopQueuedProcess();
 
 	// for host process
 	std::shared_ptr<process::AppletProcess> AttachHostProcess(trn::KProcess &&process);

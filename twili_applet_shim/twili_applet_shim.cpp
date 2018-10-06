@@ -1,5 +1,7 @@
 #include<libtransistor/cpp/nx.hpp>
 
+#include<list>
+
 #include<stdio.h>
 #include<unistd.h>
 
@@ -21,11 +23,52 @@ using namespace trn;
 namespace twili {
 namespace applet_shim {
 
+class ControlledApplet {
+ public:
+	ControlledApplet(trn::Waiter &waiter, ipc::client::Object &&ilaa_in) : ilaa(std::move(ilaa_in)) {
+		ResultCode::AssertOk(
+			ilaa.SendSyncRequest<0>( // GetAppletStateChangedEvent
+				ipc::OutHandle<trn::KEvent, ipc::copy>(event)));
+		
+		wh = waiter.Add(
+			event,
+			[&]() -> bool {
+				printf("controlled applet state change event signalled\n");
+				event.ResetSignal();
+				Result<std::nullopt_t> r = ilaa.SendSyncRequest<30>();
+				if(r) {
+					printf("  result: OK\n");
+				} else {
+					printf("  result: 0x%x\n", r.error().code);
+				}
+				return true;
+			});
+	}
+	
+	bool IsCompleted() {
+		bool is;
+		ResultCode::AssertOk(ilaa.SendSyncRequest<1>(ipc::OutRaw(is)));
+		return is;
+	}
+	
+	void Start() {
+		ResultCode::AssertOk(ilaa.SendSyncRequest<10>()); // Start
+		ResultCode::AssertOk(ilaa.SendSyncRequest<150>()); // RequestForAppletToGetForeground
+	}
+
+	std::shared_ptr<trn::WaitHandle> wh;
+	ipc::client::Object ilaa;
+	trn::KEvent event;
+};
+
 void ControlMode(ipc::client::Object &iappletshim) {
 	printf("AppletShim entering control mode\n");
 	
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 
+	ipc::client::Object ldr_shell = ResultCode::AssertOk(
+		sm.GetService("ldr:shel")); // IShellInterface
+	
 	ipc::client::Object iasaps = ResultCode::AssertOk(
 		sm.GetService("appletAE")); // IAllSystemAppletProxiesService
 
@@ -50,17 +93,30 @@ void ControlMode(ipc::client::Object &iappletshim) {
 	ResultCode::AssertOk(
 		iappletshim.SendSyncRequest<100>( // GetEvent
 			ipc::OutHandle<KEvent, ipc::copy>(event)));
+
+	std::list<ControlledApplet> applets;
 	
 	auto wh = waiter.Add(
 		event,
-		[&iappletshim, &ilac, &event]() -> bool {
+		[&]() -> bool {
 			printf("iappletshim controller spawning host\n");
 			try {
 				event.ResetSignal();
 				
 				uint32_t command;
-				while(iappletshim.SendSyncRequest<101>(trn::ipc::OutRaw(command))) {
+				while(iappletshim.SendSyncRequest<101>(trn::ipc::OutRaw(command))) { // GetCommand
 					printf("  command %d\n", command);
+
+					size_t applet_size;
+					ResultCode::AssertOk(
+						iappletshim.SendSyncRequest<102>(
+							ipc::OutRaw(applet_size))); // PopApplet
+
+					// let loader know how much extra memory we'll be needing to load the final process
+					ResultCode::AssertOk(
+						ldr_shell.SendSyncRequest<65000>( // AtmosphereSetExtraMemory
+							ipc::InRaw<uint64_t>(TitleId),
+							ipc::InRaw<uint64_t>(applet_size)));
 					
 					ipc::client::Object ilaa;
 					ResultCode::AssertOk(
@@ -70,9 +126,9 @@ void ControlMode(ipc::client::Object &iappletshim) {
 							ipc::OutObject(ilaa)));
 
 					printf("created\n");
-					
-					ResultCode::AssertOk(
-						ilaa.SendSyncRequest<10>()); // Start
+
+					auto i = applets.emplace(applets.end(), waiter, std::move(ilaa));
+					i->Start();
 					
 					printf("started\n");
 				}
@@ -87,6 +143,15 @@ void ControlMode(ipc::client::Object &iappletshim) {
 	printf("entering wait loop...\n");
 	while(true) {
 		ResultCode::AssertOk(waiter.Wait(3000000000));
+
+		for(auto i = applets.begin(); i != applets.end(); ) {
+			if(i->IsCompleted()) {
+				printf("controlled applet completed\n");
+				i = applets.erase(i);
+			} else {
+				i++;
+			}
+		}
 	}
 }
 
@@ -99,26 +164,8 @@ static void substitute_handle(ipc::client::Object &shimservice, handle_t *handle
 
 void HostMode(ipc::client::Object &iappletshim) {
 	printf("AppletShim entering host mode\n");
-	
-	size_t target_size;
-	ResultCode::AssertOk(
-		iappletshim.SendSyncRequest<200>( // GetTargetSize
-			ipc::OutRaw(target_size)));
 
-	printf("target is 0x%lx bytes long\n", target_size);
-	
-	as::Reservation target_source_res(target_size);
-	as::Reservation target_dest_res(target_size);
-	ResultCode::AssertOk(
-		svcMapPhysicalMemory(target_source_res.base, target_size));
-
-	printf("allocated memory at %p\n", target_source_res.base);
-	printf("map region at %p\n", target_dest_res.base);
-	
-	ResultCode::AssertOk(
-		iappletshim.SendSyncRequest<201>( // SetupTarget
-			ipc::InRaw<uint64_t>((uint64_t) target_source_res.base),
-			ipc::InRaw<uint64_t>((uint64_t) target_dest_res.base)));
+	ResultCode::AssertOk(iappletshim.SendSyncRequest<201>()); // SetupTarget
 
 	printf("twili has set up our target\n");
 	
@@ -209,7 +256,7 @@ void HostMode(ipc::client::Object &iappletshim) {
 		shimservice.SendSyncRequest<5>(
 			ipc::OutRaw<uint64_t>(target_entry_addr)));
 	
-	result_t (*target_entry)(loader_config_entry_t*, thread_h) = (result_t (*)(loader_config_entry_t*, thread_h)) target_dest_res.base;
+	result_t (*target_entry)(loader_config_entry_t*, thread_h) = (result_t (*)(loader_config_entry_t*, thread_h)) target_entry_addr;
 
 	printf("ready to jump to application\n");
 	
@@ -232,12 +279,6 @@ void HostMode(ipc::client::Object &iappletshim) {
 	ResultCode::AssertOk(
 		shimservice.SendSyncRequest<6>( // SetExitCode
 			ipc::InRaw<uint32_t>(ret)));
-
-	ResultCode::AssertOk(
-		iappletshim.SendSyncRequest<203>()); // FinalizeTarget
-	
-	ResultCode::AssertOk(
-		svcUnmapPhysicalMemory(target_source_res.base, target_size));
 }
 
 } // namespace applet_shim
