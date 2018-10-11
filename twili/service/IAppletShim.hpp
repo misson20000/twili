@@ -12,6 +12,8 @@ namespace twili {
 namespace service {
 
 class IHBABIShim;
+class IAppletController;
+
 class IAppletShim : public trn::ipc::server::Object {
  public:
 	IAppletShim(trn::ipc::server::IPCServer *server);
@@ -23,7 +25,7 @@ class IAppletShim : public trn::ipc::server::Object {
 	
 	virtual trn::ResultCode GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event);
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
-	virtual trn::ResultCode PopApplet(trn::ipc::OutRaw<uint64_t> target_size);
+	virtual trn::ResultCode PopApplet(trn::ipc::OutObject<IAppletController> &controller);
 
 	virtual trn::ResultCode SetupTarget();
 	virtual trn::ResultCode OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim);
@@ -41,7 +43,7 @@ class IAppletShim::ControlImpl : public IAppletShim {
 	
 	virtual trn::ResultCode GetEvent(trn::ipc::OutHandle<handle_t, trn::ipc::copy> event);
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
-	virtual trn::ResultCode PopApplet(trn::ipc::OutRaw<uint64_t> target_size);
+	virtual trn::ResultCode PopApplet(trn::ipc::OutObject<IAppletController> &controller);
  private:
 	AppletTracker &tracker;
 };

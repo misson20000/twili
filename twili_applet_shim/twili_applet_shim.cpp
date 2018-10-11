@@ -25,7 +25,9 @@ namespace applet_shim {
 
 class ControlledApplet {
  public:
-	ControlledApplet(trn::Waiter &waiter, ipc::client::Object &&ilaa_in) : ilaa(std::move(ilaa_in)) {
+	ControlledApplet(trn::Waiter &waiter, ipc::client::Object &&ilaa_in, ipc::client::Object &&controller_in) :
+		ilaa(std::move(ilaa_in)), controller(std::move(controller_in)) {
+		
 		ResultCode::AssertOk(
 			ilaa.SendSyncRequest<0>( // GetAppletStateChangedEvent
 				ipc::OutHandle<trn::KEvent, ipc::copy>(event)));
@@ -40,6 +42,7 @@ class ControlledApplet {
 					printf("  result: OK\n");
 				} else {
 					printf("  result: 0x%x\n", r.error().code);
+					ResultCode::AssertOk(controller.SendSyncRequest<1>(ipc::InRaw<uint32_t>(r.error().code))); // SetResult
 				}
 				return true;
 			});
@@ -58,6 +61,7 @@ class ControlledApplet {
 
 	std::shared_ptr<trn::WaitHandle> wh;
 	ipc::client::Object ilaa;
+	ipc::client::Object controller; // twili::IAppletController
 	trn::KEvent event;
 };
 
@@ -107,11 +111,17 @@ void ControlMode(ipc::client::Object &iappletshim) {
 				while(iappletshim.SendSyncRequest<101>(trn::ipc::OutRaw(command))) { // GetCommand
 					printf("  command %d\n", command);
 
-					size_t applet_size;
+					trn::ipc::client::Object controller; // twili::IAppletController
+					
 					ResultCode::AssertOk(
 						iappletshim.SendSyncRequest<102>(
-							ipc::OutRaw(applet_size))); // PopApplet
+							ipc::OutObject(controller))); // PopApplet
 
+					size_t applet_size;
+					ResultCode::AssertOk(
+						controller.SendSyncRequest<0>( // GetTargetSize
+							ipc::OutRaw(applet_size)));
+					
 					// let loader know how much extra memory we'll be needing to load the final process
 					ResultCode::AssertOk(
 						ldr_shell.SendSyncRequest<65000>( // AtmosphereSetExtraMemory
@@ -127,7 +137,7 @@ void ControlMode(ipc::client::Object &iappletshim) {
 
 					printf("created\n");
 
-					auto i = applets.emplace(applets.end(), waiter, std::move(ilaa));
+					auto i = applets.emplace(applets.end(), waiter, std::move(ilaa), std::move(controller));
 					i->Start();
 					
 					printf("started\n");

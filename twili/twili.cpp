@@ -55,7 +55,7 @@ int main() {
 			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
 			twili.monitored_processes.remove_if(
 				[](const auto &proc) {
-					return proc->destroy_flag;
+					return proc->GetState() == twili::process::MonitoredProcess::State::Exited;
 				});
 		}
 		

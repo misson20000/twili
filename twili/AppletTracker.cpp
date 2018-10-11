@@ -34,8 +34,8 @@ const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
 	return process_queued_event;
 }
 
-bool AppletTracker::HasQueuedProcess() {
-	return queued.size() > 0;
+bool AppletTracker::ReadyToLaunch() {
+	return queued.size() > 0 && created.size() == 0;
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
@@ -44,8 +44,10 @@ std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
 		proc = queued.front();
 		created.push_back(proc);
 		queued.pop_front();
+		return proc;
+	} else {
+		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
 	}
-	return proc;
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KProcess &&process) {
@@ -58,12 +60,17 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 	proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
 	printf("  attached\n");
 	created.pop_front();
+	if(ReadyToLaunch()) {
+		process_queued_wevent.Signal();
+	}
 	return proc;
 }
 
 void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process) {
 	queued.push_back(process);
-	process_queued_wevent.Signal();
+	if(ReadyToLaunch()) {
+		process_queued_wevent.Signal();
+	}
 }
 
 } // namespace twili

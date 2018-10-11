@@ -6,6 +6,7 @@ namespace twili {
 namespace service {
 
 IAppletShim::HostImpl::HostImpl(trn::ipc::server::IPCServer *server, std::shared_ptr<process::AppletProcess> process) : IAppletShim(server), process(process) {
+	process->ChangeState(process::MonitoredProcess::State::Running);
 }
 
 trn::ResultCode IAppletShim::HostImpl::GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode) {

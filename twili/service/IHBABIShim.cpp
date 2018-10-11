@@ -9,7 +9,6 @@ namespace twili {
 namespace service {
 
 IHBABIShim::IHBABIShim(trn::ipc::server::IPCServer *server, std::shared_ptr<process::MonitoredProcess> process) : trn::ipc::server::Object(server), process(process) {
-	printf("opened HBABI shim for 0x%x\n", process->proc->handle);
 	process->AddHBABIEntries(entries);
 }
 
@@ -34,7 +33,7 @@ trn::ResultCode IHBABIShim::Dispatch(trn::ipc::Message msg, uint32_t request_id)
 }
 
 trn::ResultCode IHBABIShim::GetProcessHandle(trn::ipc::OutHandle<handle_t, trn::ipc::copy> out) {
-	out = process->proc->handle;
+	out = process->GetProcess()->handle;
 	return RESULT_OK;
 }
 
@@ -61,17 +60,18 @@ trn::ResultCode IHBABIShim::GetLoaderConfigHandle(trn::ipc::InRaw<uint32_t> plac
 }
 
 trn::ResultCode IHBABIShim::SetNextLoadPath(trn::ipc::Buffer<uint8_t, 0x5, 0> path, trn::ipc::Buffer<uint8_t, 0x5, 0> argv) {
-	printf("[HBABIShim(0x%x)] next load path: %s[%s]\n", process->proc->handle, path.data, argv.data);
+	printf("[HBABIShim(0x%lx)] next load path: %s[%s]\n", process->GetPid(), path.data, argv.data);
 	return RESULT_OK;
 }
 
 trn::ResultCode IHBABIShim::GetTargetEntryPoint(trn::ipc::OutRaw<uint64_t> out) {
-	out = process->target_entry;
+	out = process->GetTargetEntry();
 	return RESULT_OK;
 }
 
 trn::ResultCode IHBABIShim::SetExitCode(trn::ipc::InRaw<uint32_t> code) {
-	printf("[HBABIShim(0x%x)] exit code 0x%x\n", process->proc->handle, code.value);
+	process->SetResult(code.value);
+	printf("[HBABIShim(0x%lx)] exit code 0x%x\n", process->GetPid(), code.value);
 	return RESULT_OK;
 }
 

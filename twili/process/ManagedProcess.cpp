@@ -43,11 +43,11 @@ ManagedProcess::ManagedProcess(Twili &twili, bridge::ResponseOpener attachment_o
 			if(state == trn::svc::ProcessState::CRASHED) {
 				printf("managed process (0x%x) crashed\n", this->proc->handle);
 				printf("ready to generate crash report\n");
-				crashed = true;
+				ChangeState(State::Crashed);
 			}
 			if(state == trn::svc::ProcessState::EXITED) {
 				printf("managed process (0x%x) exited\n", this->proc->handle);
-				destroy_flag = true;
+				ChangeState(State::Exited);
 			}
 			return true;
 		});
@@ -55,8 +55,13 @@ ManagedProcess::ManagedProcess(Twili &twili, bridge::ResponseOpener attachment_o
 
 void ManagedProcess::Launch() {
 	printf("launching managed process: 0x%x\n", proc->handle);
-	trn::ResultCode::AssertOk(
-		trn::svc::StartProcess(*proc, 58, 0, 0x100000));
+	auto r = trn::svc::StartProcess(*proc, 58, 0, 0x100000);
+	if(!r) {
+		SetResult(r.error());
+		ChangeState(State::Exited);
+	} else {
+		ChangeState(State::Running);
+	}
 }
 
 } // namespace process
