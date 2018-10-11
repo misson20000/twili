@@ -66,7 +66,7 @@ Subcommands:
 
 ## Twili
 
-First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. In order to build KIP1 binaries, you will need to use elf2kip form the `elf2kip-segments` branch of [my switch-tools fork](https://github.com/misson20000/switch-tools/tree/elf2kip-segments). After that, building Twili should be as simple as running `make`. If you want to use twili_launcher, `twili_launcher.kip` will be available in `build/`. Otherwise, if you're using Atmosphère-boot2, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card.
+First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. In order to build the (nonfunctional) KIP1 binary, you will need to use elf2kip form the `elf2kip-segments` branch of [my switch-tools fork](https://github.com/misson20000/switch-tools/tree/elf2kip-segments). After that, building Twili should be as simple as running `make`. To use Atmosphère-boot2 to launch Twili, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card.
 
 ## Twib
 
@@ -81,10 +81,6 @@ $ make -j4
 ```
 
 # Details
-
-## Twili Launcher
-
-Twili Launcher is a small application designed to spawn the process that Twili runs in. Its original purpose was to be launched through nspwn, and allow the Twili process to escape getting killed when the applet closes. It now finds a purpose in helping Twili escape the memory limitations of a builtin process.
 
 ## Twib
 
