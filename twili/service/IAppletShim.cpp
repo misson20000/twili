@@ -4,6 +4,7 @@
 #include "../process/MonitoredProcess.hpp"
 
 #include "IHBABIShim.hpp"
+#include "IAppletController.hpp"
 
 #include "err.hpp"
 
@@ -44,7 +45,7 @@ trn::ResultCode IAppletShim::GetCommand(trn::ipc::OutRaw<uint32_t> cmd) {
 	return TWILI_ERR_APPLET_SHIM_WRONG_MODE;
 }
 
-trn::ResultCode IAppletShim::PopApplet(trn::ipc::OutRaw<uint64_t> target_size) {
+trn::ResultCode IAppletShim::PopApplet(trn::ipc::OutObject<IAppletController> &controller) {
 	return TWILI_ERR_APPLET_SHIM_WRONG_MODE;
 }
 

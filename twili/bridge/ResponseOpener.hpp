@@ -78,7 +78,7 @@ class ResponseOpener {
 		state->InsertObject(std::pair<uint32_t, std::shared_ptr<Object>>(object_id, obj));
 		return obj;
 	}
-	
+
  private:
 	std::shared_ptr<detail::ResponseState> state;
 };

@@ -1,5 +1,7 @@
 #include "IAppletShim.hpp"
 
+#include "IAppletController.hpp"
+
 #include "err.hpp"
 
 namespace twili {
@@ -24,7 +26,7 @@ trn::ResultCode IAppletShim::ControlImpl::GetEvent(trn::ipc::OutHandle<handle_t,
 }
 
 trn::ResultCode IAppletShim::ControlImpl::GetCommand(trn::ipc::OutRaw<uint32_t> cmd) {
-	if(tracker.HasQueuedProcess()) {
+	if(tracker.ReadyToLaunch()) {
 		cmd = 0;
 		return RESULT_OK;
 	} else {
@@ -32,8 +34,14 @@ trn::ResultCode IAppletShim::ControlImpl::GetCommand(trn::ipc::OutRaw<uint32_t> 
 	}
 }
 
-trn::ResultCode IAppletShim::ControlImpl::PopApplet(trn::ipc::OutRaw<uint64_t> process_image_size) {
-	process_image_size = tracker.PopQueuedProcess()->GetTargetSize();
+trn::ResultCode IAppletShim::ControlImpl::PopApplet(trn::ipc::OutObject<IAppletController> &controller) {
+	auto r = server->CreateObject<IAppletController>(this, std::move(tracker.PopQueuedProcess()));
+	if(r) {
+		controller.value = r.value();
+		return RESULT_OK;
+	} else {
+		return r.error().code;
+	}
 	return RESULT_OK;
 }
 
