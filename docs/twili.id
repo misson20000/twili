@@ -41,11 +41,10 @@ interface twili::IAppletShim {
 
 	# Host mode
 	# 200: REMOVED
-	[201] SetupTarget();
+	# 201: REMOVED
 	[202] OpenHBABIShim() -> object<twili::IHBABIShim>;
 }
 
 interface twili::IAppletController {
-	[0] GetTargetSize() -> u64;
-	[1] SetResult(u32 result);
+	[0] SetResult(u32 result);
 }

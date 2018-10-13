@@ -19,16 +19,9 @@ IAppletController::~IAppletController() {
 trn::ResultCode IAppletController::Dispatch(trn::ipc::Message msg, uint32_t request_id) {
 	switch(request_id) {
 	case 0:
-		return trn::ipc::server::RequestHandler<&IAppletController::GetTargetSize>::Handle(this, msg);
-	case 1:
 		return trn::ipc::server::RequestHandler<&IAppletController::SetResult>::Handle(this, msg);
 	}
 	return 1;
-}
-
-trn::ResultCode IAppletController::GetTargetSize(trn::ipc::OutRaw<uint64_t> target_size) {
-	target_size = process->GetTargetSize();
-	return RESULT_OK;
 }
 
 trn::ResultCode IAppletController::SetResult(trn::ipc::InRaw<uint32_t> result) {

@@ -25,7 +25,7 @@ ManagedProcess::ManagedProcess(Twili &twili, bridge::ResponseOpener attachment_o
 	};
 
 	twili::process_creation::ProcessBuilder builder;
-	process_creation::ProcessBuilder::VectorDataReader hbabi_shim_reader(twili.hbabi_shim_nro);
+	process_creation::ProcessBuilder::VectorDataReader hbabi_shim_reader(twili.resources.hbabi_shim_nro);
 	process_creation::ProcessBuilder::VectorDataReader nro_reader(nro);
 	uint64_t   shim_addr = ResultCode::AssertOk(builder.AppendNRO(hbabi_shim_reader));
 	

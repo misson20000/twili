@@ -27,7 +27,6 @@ class IAppletShim : public trn::ipc::server::Object {
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
 	virtual trn::ResultCode PopApplet(trn::ipc::OutObject<IAppletController> &controller);
 
-	virtual trn::ResultCode SetupTarget();
 	virtual trn::ResultCode OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim);
 
 	class ControlImpl;
@@ -54,7 +53,6 @@ class IAppletShim::HostImpl : public IAppletShim {
 
 	virtual trn::ResultCode GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode);
 	
-	virtual trn::ResultCode SetupTarget();
 	virtual trn::ResultCode OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim);
  private:
 	std::shared_ptr<process::AppletProcess> process;

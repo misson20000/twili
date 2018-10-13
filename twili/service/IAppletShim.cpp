@@ -25,8 +25,6 @@ trn::ResultCode IAppletShim::Dispatch(trn::ipc::Message msg, uint32_t request_id
 		return trn::ipc::server::RequestHandler<&IAppletShim::GetCommand>::Handle(this, msg);
 	case 102:
 		return trn::ipc::server::RequestHandler<&IAppletShim::PopApplet>::Handle(this, msg);
-	case 201:
-		return trn::ipc::server::RequestHandler<&IAppletShim::SetupTarget>::Handle(this, msg);
 	case 202:
 		return trn::ipc::server::RequestHandler<&IAppletShim::OpenHBABIShim>::Handle(this, msg);
 	}
@@ -46,10 +44,6 @@ trn::ResultCode IAppletShim::GetCommand(trn::ipc::OutRaw<uint32_t> cmd) {
 }
 
 trn::ResultCode IAppletShim::PopApplet(trn::ipc::OutObject<IAppletController> &controller) {
-	return TWILI_ERR_APPLET_SHIM_WRONG_MODE;
-}
-
-trn::ResultCode IAppletShim::SetupTarget() {
 	return TWILI_ERR_APPLET_SHIM_WRONG_MODE;
 }
 

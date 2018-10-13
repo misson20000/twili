@@ -15,9 +15,7 @@ class IAppletController : public trn::ipc::server::Object {
 	
 	virtual trn::ResultCode Dispatch(trn::ipc::Message msg, uint32_t request_id) override;
 
-	trn::ResultCode GetTargetSize(trn::ipc::OutRaw<uint64_t> target_size);
 	trn::ResultCode SetResult(trn::ipc::InRaw<uint32_t> result);
-
  private:
 	std::shared_ptr<process::AppletProcess> process;
 };

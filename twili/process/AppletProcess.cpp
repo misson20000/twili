@@ -1,22 +1,28 @@
 #include "AppletProcess.hpp"
 
 #include "../twili.hpp"
+#include "fs/ActualFile.hpp"
+#include "fs/VectorFile.hpp"
 
 #include "err.hpp"
+#include "applet_shim.hpp"
 
 using namespace trn;
 
 namespace twili {
 namespace process {
 
-AppletProcess::AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro) :
-	MonitoredProcess(twili, attachment_opener),
-	reader(nro) {
-	builder.AppendNRO(reader);
+AppletProcess::AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nso) :
+	MonitoredProcess(twili, attachment_opener) {
+
+	// build virtual exefs
+	virtual_exefs.SetRtld(std::make_shared<fs::ActualFile>(fopen("/squash/twili_applet_shim.nso", "rb")));
+	virtual_exefs.SetNpdm(std::make_shared<fs::ActualFile>(fopen("/squash/default.npdm", "rb")));
+	virtual_exefs.SetMain(std::make_shared<fs::VectorFile>(nso));
 }
 
 void AppletProcess::Launch() {
-	// this is not cool.
+	// this pointer cast is not cool.
 	twili.applet_tracker.QueueLaunch(std::dynamic_pointer_cast<AppletProcess>(shared_from_this()));
 }
 
@@ -31,47 +37,16 @@ void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries)
 		});
 }
 
-size_t AppletProcess::GetTargetSize() {
-	return builder.GetTotalSize();
-}
-
-void AppletProcess::SetupTarget() {
-	// find the extra memory the loader gave us
-
-	uint64_t load_addr = 0;
-	uint64_t extramem_size = 0;
-	
-	uint64_t addr = 0;
-	memory_info_t meminfo;
-	printf("setting up target...\n");
-	do {
-		meminfo = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, addr)));
-		if(meminfo.memory_type == 3) {
-			printf("  found CodeStatic at 0x%lx, perm %d\n", (uint64_t) meminfo.base_addr, meminfo.permission);
-			if(meminfo.permission == 0) {
-				printf("    this is likely our extra memory\n");
-				load_addr = (uint64_t) meminfo.base_addr;
-				extramem_size = meminfo.size;
-			}
-		}
-		
-		addr = (uint64_t) meminfo.base_addr + meminfo.size;
-	} while(addr > 0);
-
-	if(load_addr == 0) {
-		printf("couldn't find extra memory\n");
-		throw ResultError(TWILI_ERR_EXTRA_MEMORY_NOT_FOUND);
-	}
-
-	if(extramem_size < GetTargetSize()) {
-		printf("not enough extra memory. expected 0x%lx bytes, got 0x%lx bytes\n",
-					 GetTargetSize(), extramem_size);
-		throw ResultError(TWILI_ERR_EXTRA_MEMORY_NOT_FOUND);
-	}
-
-	target_entry = load_addr;
-	
-	ResultCode::AssertOk(builder.Load(proc, load_addr));
+void AppletProcess::PrepareForLaunch() {
+	printf("installing ExternalContentSource\n");
+	KObject session;
+	ResultCode::AssertOk(
+		twili.services.ldr_shel.SendSyncRequest<65000>( // SetExternalContentSource
+			trn::ipc::InRaw<uint64_t>(applet_shim::TitleId),
+			trn::ipc::OutHandle<KObject, trn::ipc::move>(session)));
+	printf("installed ExternalContentSource\n");
+	ResultCode::AssertOk(
+		twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
 }
 
 } // namespace process

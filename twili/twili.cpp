@@ -87,13 +87,6 @@ Twili::Twili() :
 	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
 	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
 	applet_tracker(*this) {
-
-	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
-	if(!hbabi_shim_nro) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
-	}
-	this->hbabi_shim_nro = *hbabi_shim_nro;
-	
 	printf("initialized Twili\n");
 }
 
@@ -135,6 +128,9 @@ Twili::Services::Services() {
 	ldr_dmnt = twili::service::ldr::IDebugMonitorInterface(
 		ResultCode::AssertOk(
 			sm.GetService("ldr:dmnt")));
+
+	printf("acquiring ldr:shel\n");
+	ldr_shel = ResultCode::AssertOk(sm.GetService("ldr:shel"));
 	
 	ipc::client::Object nifm_static = ResultCode::AssertOk(
 		sm.GetService("nifm:s"));
@@ -146,4 +142,13 @@ Twili::Services::Services() {
 	printf("acquired services\n");
 }
 
+Twili::Resources::Resources() {
+	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
+	if(!hbabi_shim_nro) {
+		throw trn::ResultError(TWILI_ERR_IO_ERROR);
+	}
+	this->hbabi_shim_nro = *hbabi_shim_nro;
+	printf("prepared resources\n");
 }
+
+} // namespace twili

@@ -37,10 +37,14 @@ class AppletTracker {
 	//  - attached
 	std::deque<std::shared_ptr<process::AppletProcess>> queued;
 	std::deque<std::shared_ptr<process::AppletProcess>> created;
-
+	
 	bool has_control_process = false;
 	trn::KEvent process_queued_event;
 	trn::KWEvent process_queued_wevent;
+
+	// control applet launch
+	void PrepareForControlAppletLaunch();
+	process::fs::ProcessFileSystem control_exevfs;
 };
 
 } // namespace twili

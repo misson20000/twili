@@ -42,7 +42,7 @@ class ControlledApplet {
 					printf("  result: OK\n");
 				} else {
 					printf("  result: 0x%x\n", r.error().code);
-					ResultCode::AssertOk(controller.SendSyncRequest<1>(ipc::InRaw<uint32_t>(r.error().code))); // SetResult
+					ResultCode::AssertOk(controller.SendSyncRequest<0>(ipc::InRaw<uint32_t>(r.error().code))); // SetResult
 				}
 				return true;
 			});
@@ -116,17 +116,6 @@ void ControlMode(ipc::client::Object &iappletshim) {
 					ResultCode::AssertOk(
 						iappletshim.SendSyncRequest<102>(
 							ipc::OutObject(controller))); // PopApplet
-
-					size_t applet_size;
-					ResultCode::AssertOk(
-						controller.SendSyncRequest<0>( // GetTargetSize
-							ipc::OutRaw(applet_size)));
-					
-					// let loader know how much extra memory we'll be needing to load the final process
-					ResultCode::AssertOk(
-						ldr_shell.SendSyncRequest<65000>( // AtmosphereSetExtraMemory
-							ipc::InRaw<uint64_t>(TitleId),
-							ipc::InRaw<uint64_t>(applet_size)));
 					
 					ipc::client::Object ilaa;
 					ResultCode::AssertOk(

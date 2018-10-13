@@ -5,8 +5,8 @@
 #include<memory>
 
 #include "MonitoredProcess.hpp"
-
-#include "../process_creation.hpp"
+#include "fs/ProcessFile.hpp"
+#include "fs/ProcessFileSystem.hpp"
 
 namespace twili {
 
@@ -16,17 +16,16 @@ namespace process {
 
 class AppletProcess : public MonitoredProcess {
  public:
-	AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nro);
+	AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nso);
 	
 	virtual void Launch() override;
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
-	
-	size_t GetTargetSize();
-	void SetupTarget();
+
+	// sets up ExternalContentSource for loader
+	void PrepareForLaunch();
 	
  private:
-	process_creation::ProcessBuilder::VectorDataReader reader;
-	process_creation::ProcessBuilder builder;
+	fs::ProcessFileSystem virtual_exefs;
 };
 
 } // namespace process

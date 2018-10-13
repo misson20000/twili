@@ -2,14 +2,21 @@
 
 #include "twili.hpp"
 #include "process/AppletProcess.hpp"
+#include "process/fs/ActualFile.hpp"
 
 #include "err.hpp"
+#include "applet_shim.hpp"
 
 namespace twili {
 
 AppletTracker::AppletTracker(Twili &twili) :
 	twili(twili),
 	process_queued_wevent(process_queued_event) {
+	printf("building AppletTracker\n");
+	control_exevfs.SetMain(std::make_shared<process::fs::ActualFile>(fopen("/squash/twili_applet_shim.nso", "rb")));
+	control_exevfs.SetNpdm(std::make_shared<process::fs::ActualFile>(fopen("/squash/default.npdm", "rb")));
+	printf("prepared control_exevfs\n");
+	PrepareForControlAppletLaunch();
 }
 
 bool AppletTracker::HasControlProcess() {
@@ -28,6 +35,7 @@ void AppletTracker::ReleaseControlProcess() {
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
 	has_control_process = false;
+	PrepareForControlAppletLaunch();
 }
 
 const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
@@ -44,6 +52,8 @@ std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
 		proc = queued.front();
 		created.push_back(proc);
 		queued.pop_front();
+
+		proc->PrepareForLaunch();
 		return proc;
 	} else {
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
@@ -71,6 +81,21 @@ void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process)
 	if(ReadyToLaunch()) {
 		process_queued_wevent.Signal();
 	}
+}
+
+void AppletTracker::PrepareForControlAppletLaunch() {
+	printf("installing ExternalContentSource for control applet\n");
+	trn::KObject session;
+	trn::ResultCode::AssertOk(
+		twili.services.ldr_shel.SendSyncRequest<65000>( // SetExternalContentSource
+			trn::ipc::InRaw<uint64_t>(applet_shim::TitleId),
+			trn::ipc::OutHandle<trn::KObject, trn::ipc::move>(session)));
+	printf("installed ExternalContentSource for control applet\n");
+	printf("  VFS server session: 0x%x\n", session.handle);
+	trn::ResultCode::AssertOk(
+		twili.server.AttachSession<process::fs::ProcessFileSystem::IFileSystem>(std::move(session), control_exevfs));
+	printf("  session mutated: 0x%x\n", session.handle);
+	printf("attached VFS server\n");
 }
 
 } // namespace twili

@@ -14,11 +14,6 @@ trn::ResultCode IAppletShim::HostImpl::GetMode(trn::ipc::OutRaw<applet_shim::Mod
 	return RESULT_OK;
 }
 
-trn::ResultCode IAppletShim::HostImpl::SetupTarget() {
-	process->SetupTarget();
-	return RESULT_OK;
-}
-
 trn::ResultCode IAppletShim::HostImpl::OpenHBABIShim(trn::ipc::OutObject<IHBABIShim> &hbabishim) {
 	auto r = server->CreateObject<IHBABIShim>(this, process);
 	if(r) {

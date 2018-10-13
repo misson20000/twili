@@ -1,4 +1,4 @@
-TWILI_OBJECTS := twili.o service/ITwiliService.o service/IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process/MonitoredProcess.o ELFCrashReport.o twili.squashfs.o service/IHBABIShim.o msgpack11/msgpack11.o process/Process.o bridge/interfaces/ITwibDeviceInterface.o bridge/interfaces/ITwibPipeReader.o TwibPipe.o bridge/interfaces/ITwibPipeWriter.o bridge/interfaces/ITwibDebugger.o ipcbind/pm/IShellService.o ipcbind/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o ipcbind/nifm/IGeneralService.o ipcbind/nifm/IRequest.o Socket.o MutexShim.o service/IAppletShim.o service/IAppletShimControlImpl.o service/IAppletShimHostImpl.o AppletTracker.o process/AppletProcess.o process/ManagedProcess.o process/UnmonitoredProcess.o process_creation.o service/IAppletController.o
+TWILI_OBJECTS := twili.o service/ITwiliService.o service/IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process/MonitoredProcess.o ELFCrashReport.o twili.squashfs.o service/IHBABIShim.o msgpack11/msgpack11.o process/Process.o bridge/interfaces/ITwibDeviceInterface.o bridge/interfaces/ITwibPipeReader.o TwibPipe.o bridge/interfaces/ITwibPipeWriter.o bridge/interfaces/ITwibDebugger.o ipcbind/pm/IShellService.o ipcbind/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o ipcbind/nifm/IGeneralService.o ipcbind/nifm/IRequest.o Socket.o MutexShim.o service/IAppletShim.o service/IAppletShimControlImpl.o service/IAppletShimHostImpl.o AppletTracker.o process/AppletProcess.o process/ManagedProcess.o process/UnmonitoredProcess.o process_creation.o service/IAppletController.o service/fs/IFileSystem.o service/fs/IFile.o process/fs/ProcessFileSystem.o process/fs/VectorFile.o process/fs/ActualFile.o
 COMMON_OBJECTS := Buffer.o util.o
 
 TWILI_APPLET_SHIM_OBJECTS := twili_applet_shim.o
@@ -10,11 +10,7 @@ ATMOSPHERE_TWILI_TITLE_ID := 0100000000006480
 ATMOSPHERE_TWILI_TITLE_DIR := build/atmosphere/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
 ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
 
-ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_ID := 010000000000100d
-ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_DIR := build/atmosphere/titles/$(ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_ID)
-ATMOSPHERE_TWILI_APPLET_SHIM_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub)
-
-all: build/twili.nro build/twili.nso build/twili.kip $(ATMOSPHERE_TWILI_TARGETS) $(ATMOSPHERE_TWILI_APPLET_SHIM_TARGETS)
+all: build/twili.nro build/twili.nso build/twili.kip $(ATMOSPHERE_TWILI_TARGETS)
 
 $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main: build/twili.nso
 	mkdir -p $(@D)
@@ -24,11 +20,7 @@ $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main.npdm: twili/twili.json
 	mkdir -p $(@D)
 	npdmtool $< $@
 
-$(ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_DIR)/exefs/main: build/twili_applet_shim.nso
-	mkdir -p $(@D)
-	cp $< $@
-
-$(ATMOSPHERE_TWILI_APPLET_SHIM_TITLE_DIR)/exefs/main.npdm: twili_applet_shim/twili_applet_shim.json
+build/%.npdm: %.json
 	mkdir -p $(@D)
 	npdmtool $< $@
 
@@ -63,7 +55,7 @@ build/%.squashfs.o: build/%.squashfs
 	mkdir -p $(@D)
 	$(LD) -s -r -b binary -m aarch64elf -T $(LIBTRANSISTOR_HOME)/fs.T -o $@ $<
 
-build/twili/twili.squashfs: build/hbabi_shim.nro
+build/twili/twili.squashfs: build/hbabi_shim.nro build/twili_applet_shim.nso build/twili_applet_shim/default.npdm
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
 
