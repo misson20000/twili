@@ -4,8 +4,6 @@
 
 #include "Twibd.hpp"
 
-#include<netdb.h>
-
 namespace twili {
 namespace twibd {
 namespace backend {
@@ -31,7 +29,7 @@ TCPBackend::TCPBackend(Twibd &twibd) :
 	ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("224.0.53.55");
 	mreq.imr_interface.s_addr = INADDR_ANY;
-	if(setsockopt(listen_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0) {
+	if(setsockopt(listen_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*) &mreq, sizeof(mreq)) != 0) {
 		LogMessage(Error, "Failed to join multicast group");
 		exit(1);
 	}
@@ -204,6 +202,7 @@ void TCPBackend::event_thread_func() {
 		
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
+		FD_ZERO(&errorfds);
 
 		// add listen socket
 		max_fd = std::max(max_fd, listen_fd);

@@ -34,6 +34,7 @@ static inline char *NetErrStr() {
 #include<netinet/in.h>
 #include<netinet/ip.h>
 #include<arpa/inet.h>
+#include<netdb.h>
 #include<unistd.h>
 #include<errno.h>
 #include<string.h>

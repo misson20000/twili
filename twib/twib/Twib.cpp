@@ -89,8 +89,8 @@ void ListProcesses(ITwibDeviceInterface &iface) {
 } // namespace twib
 } // namespace twili
 
-int connect_tcp(uint16_t port);
-int connect_unix(std::string path);
+SOCKET connect_tcp(uint16_t port);
+SOCKET connect_unix(std::string path);
 
 void show(msgpack11::MsgPack const& blob);
 
@@ -196,10 +196,11 @@ int main(int argc, char *argv[]) {
 		return app.exit(e);
 	}
 
+	twili::log::init_color();
 	if(is_verbose) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
 	}
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
+	twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	
 	LogMessage(Message, "starting twib");
 
@@ -227,7 +228,7 @@ int main(int argc, char *argv[]) {
 
 	uint32_t device_id;
 	if(device_id_str.size() > 0) {
-		device_id = std::stoull(device_id_str, NULL, 16);
+		device_id = std::stoul(device_id_str, NULL, 16);
 	} else {
 		std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
 		if(devices.size() == 0) {
@@ -253,7 +254,7 @@ int main(int argc, char *argv[]) {
 		mon.AppendCode(*code_opt);
 		uint64_t pid = mon.Launch();
 		if(!run_quiet) {
-			printf("PID: 0x%x\n", pid);
+			printf("PID: 0x%lx\n", pid);
 		}
 		volatile bool running = true;
 		auto pump_output =
@@ -415,7 +416,7 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-int connect_tcp(uint16_t port) {
+SOCKET connect_tcp(uint16_t port) {
 #if TWIB_TCP_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "TCP socket not supported");
 	exit(1);
@@ -423,7 +424,7 @@ int connect_tcp(uint16_t port) {
 #else
 	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
-		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create TCP socket: %s", NetErrStr());
 		exit(1);
 	}
 
@@ -434,7 +435,7 @@ int connect_tcp(uint16_t port) {
 	addr.sin6_port = htons(port);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		closesocket(fd);
 		exit(1);
 	}
@@ -443,7 +444,7 @@ int connect_tcp(uint16_t port) {
 #endif
 }
 
-int connect_unix(std::string path) {
+SOCKET connect_unix(std::string path) {
 #if TWIB_UNIX_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "UNIX domain socket not supported");
 	exit(1);
@@ -451,7 +452,7 @@ int connect_unix(std::string path) {
 #else
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(fd < 0) {
-		LogMessage(Fatal, "failed to create UNIX domain socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create UNIX domain socket: %s", NetErrStr());
 		exit(1);
 	}
 
@@ -461,7 +462,7 @@ int connect_unix(std::string path) {
 	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path)-1);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		close(fd);
 		exit(1);
 	}

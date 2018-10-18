@@ -341,8 +341,9 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 	if(!systemd_mode) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
+		twili::log::init_color();
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	}
 
 	LogMessage(Message, "starting twibd");

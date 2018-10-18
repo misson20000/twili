@@ -8,7 +8,7 @@ SocketClient::SocketClient(SOCKET fd) : notifier(*this), connection(fd, notifier
 	// TODO: Figure out how to fix this.
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
-		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", NetErrStr());
 		exit(1);
 	}
 #endif
@@ -62,7 +62,7 @@ void SocketClient::event_thread_func() {
 		}
 
 		if(select(maxfd + 1, &recvset, &sendset, NULL, NULL) < 0) {
-			LogMessage(Fatal, "failed to select file descriptors: %s", strerror(errno));
+			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
 			exit(1);
 		}
 
@@ -72,7 +72,7 @@ void SocketClient::event_thread_func() {
 			char buf[64];
 			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
 			if(r < 0) {
-				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", strerror(errno));
+				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", NetErrStr());
 				exit(1);
 			}
 			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
@@ -100,9 +100,10 @@ void SocketClient::event_thread_func() {
 }
 
 void SocketClient::NotifyEventThread() {
+	// TODO: fixme for windows
 	char buf[] = ".";
 	if(write(event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
-		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", strerror(errno));
+		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", NetErrStr());
 		exit(1);
 	}
 }

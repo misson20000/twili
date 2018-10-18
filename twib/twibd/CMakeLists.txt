@@ -14,7 +14,7 @@ include_directories(CLI11 INTERFACE)
 target_link_libraries(twibd CLI11)
 
 find_package(libusb-1.0 REQUIRED)
-include_directories(${LIBUSB_1_INCLUDE_DIRS})
+include_directories(${LIBUSB_1_INCLUDE_DIRS} INTERFACE)
 target_link_libraries(twibd ${LIBUSB_1_LIBRARIES})
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)

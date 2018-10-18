@@ -105,6 +105,7 @@ class SystemdLogger : public FileLogger {
 
 void _log(Level lvl, const char *fname, int line, const char *format, ...);
 void add_log(std::shared_ptr<Logger> l);
+void init_color();
 
 } // namespace log
 } // namespace twili
