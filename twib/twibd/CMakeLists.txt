@@ -3,6 +3,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(SOURCE Twibd.cpp USBBackend.cpp Messages.cpp LocalClient.cpp SocketFrontend.cpp BridgeObject.cpp TCPBackend.cpp)
+if(WIN32)
+	set(SOURCE ${SOURCE} NamedPipeFrontend.cpp)
+endif()
 add_executable(twibd ${SOURCE})
 
 target_link_libraries(twibd twib-common)
