@@ -21,7 +21,8 @@ Version | Support
 4.1.0 | Expected working
 5.0.0 | Tested working
 5.0.1 - 5.1.0 | Expected working
-6.0.0 | Unknown
+6.0.0 | Expected working
+6.0.1 | Tested working
 
 # Installation
 
