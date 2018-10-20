@@ -18,14 +18,20 @@ namespace process {
 
 class MonitoredProcess : public Process, public std::enable_shared_from_this<MonitoredProcess> {
  public:
-	MonitoredProcess(Twili &twili, bridge::ResponseOpener attachment_opener);
+	MonitoredProcess(Twili &twili);
 	virtual ~MonitoredProcess();
 
 	enum class State {
-		Starting, Running, Crashed, Exited
+		Created,
+		Started,
+		Attached,
+		Running,
+		Crashed,
+		Exited
 	};
 	
-	virtual void Launch() = 0;
+	virtual void Launch(bridge::ResponseOpener response) = 0;
+	virtual void AppendCode(std::vector<uint8_t> code) = 0;
 	
 	virtual uint64_t GetPid() override;
 	virtual void AddNotes(ELFCrashReport &report) override;
@@ -37,7 +43,7 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	// these shouldn't really be public
 	void Attach(std::shared_ptr<trn::KProcess> process);
 	void SetResult(trn::ResultCode r);
-	void ChangeState(State state);
+	virtual void ChangeState(State state);
 	std::shared_ptr<trn::KProcess> GetProcess(); // needed by HBABIShim
 	uint64_t GetTargetEntry(); // needed by HBABIShim
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
@@ -48,13 +54,11 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	
  protected:
 	std::shared_ptr<trn::KProcess> proc;
-	uint64_t target_entry;
+	uint64_t target_entry = 0;
 	
  private:
-	State state = State::Starting;
+	State state = State::Created;
 	trn::ResultCode result = RESULT_OK;
-	
-	std::optional<bridge::ResponseOpener> attachment_opener;
 };
 
 } // namespace process

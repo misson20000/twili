@@ -150,6 +150,9 @@ int main(int argc, char *argv[]) {
 				ipc::OutRaw<uint64_t>(target_entry_addr)));
 
 		result_t (*target_entry)(loader_config_entry_t*, thread_h) = (result_t (*)(loader_config_entry_t*, thread_h)) target_entry_addr;
+
+		ResultCode::AssertOk( // WaitToStart()
+			shimservice.SendSyncRequest<7>());
 		
 		// Run the application
 		uint8_t tls_backup[0x200];

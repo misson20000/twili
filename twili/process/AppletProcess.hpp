@@ -3,6 +3,7 @@
 #include<libtransistor/cpp/nx.hpp>
 
 #include<memory>
+#include<optional>
 
 #include "MonitoredProcess.hpp"
 #include "fs/ProcessFile.hpp"
@@ -16,15 +17,19 @@ namespace process {
 
 class AppletProcess : public MonitoredProcess {
  public:
-	AppletProcess(Twili &twili, bridge::ResponseOpener attachment_opener, std::vector<uint8_t> nso);
+	AppletProcess(Twili &twili);
 	
-	virtual void Launch() override;
+	virtual void Launch(bridge::ResponseOpener) override;
+	virtual void AppendCode(std::vector<uint8_t>) override;
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
-
+	virtual void ChangeState(State state) override;
+	
 	// sets up ExternalContentSource for loader
 	void PrepareForLaunch();
 	
  private:
+	bool has_code = false;
+	std::optional<bridge::ResponseOpener> run_opener;
 	fs::ProcessFileSystem virtual_exefs;
 };
 

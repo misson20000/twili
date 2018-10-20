@@ -16,7 +16,7 @@ class ITwibDeviceInterface : public bridge::Object {
  private:
 	Twili &twili;
 	
-	void Run(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+	void CreateMonitoredProcess(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 	void Reboot(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 	void CoreDump(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
 	void Terminate(std::vector<uint8_t> payload, bridge::ResponseOpener opener);

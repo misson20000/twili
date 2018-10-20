@@ -303,6 +303,8 @@ int main(int argc, char *argv[]) {
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
 	std::string run_file;
+	bool run_applet;
+	run->add_flag("-a,--applet", run_applet, "Run as an applet");
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
 	
 	CLI::App *reboot = app.add_subcommand("reboot", "Reboot the device");
@@ -384,13 +386,15 @@ int main(int argc, char *argv[]) {
 	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(twib.mc.obj, device_id, 0));
 	
 	if(run->parsed()) {
-		auto v_opt = twili::util::ReadFile(run_file.c_str());
-		if(!v_opt) {
+		auto code_opt = twili::util::ReadFile(run_file.c_str());
+		if(!code_opt) {
 			LogMessage(Fatal, "could not read file");
 			return 1;
 		}
-		twili::twib::RunResult rs = itdi.Run(*v_opt);
-		printf("PID: 0x%x\n", rs.pid);
+		
+		twili::twib::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_applet ? "applet" : "managed");
+		mon.AppendCode(*code_opt);
+		printf("PID: 0x%x\n", mon.Launch());
 		volatile bool running = true;
 		auto pump_output =
 			[&running](twili::twib::ITwibPipeReader reader, FILE *stream) {
@@ -416,8 +420,8 @@ int main(int argc, char *argv[]) {
 					throw;
 				}
 			};
-		std::thread stdout_pump(pump_output, rs.tp_stdout, stdout);
-		std::thread stderr_pump(pump_output, rs.tp_stderr, stderr);
+		std::thread stdout_pump(pump_output, mon.OpenStdout(), stdout);
+		std::thread stderr_pump(pump_output, mon.OpenStderr(), stderr);
 		std::thread stdin_pump(
 			[&running](twili::twib::ITwibPipeWriter writer) {
 				try {
@@ -450,7 +454,7 @@ int main(int argc, char *argv[]) {
 					running = false;
 					throw;
 				}
-			}, rs.tp_stdin);
+			}, mon.OpenStdin());
 		stdout_pump.join();
 		stderr_pump.join();
 		exit(0); // skip calling stdin_pump thread destructor, since it will std::terminate

@@ -20,8 +20,8 @@
 #include "../../ELFCrashReport.hpp"
 
 #include "ITwibPipeReader.hpp"
-#include "ITwibPipeWriter.hpp"
 #include "ITwibDebugger.hpp"
+#include "ITwibProcessMonitor.hpp"
 
 #include "err.hpp"
 
@@ -35,8 +35,8 @@ ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : O
 
 void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibDeviceInterface::Command) command_id) {
-	case protocol::ITwibDeviceInterface::Command::RUN:
-		Run(payload, opener);
+	case protocol::ITwibDeviceInterface::Command::CREATE_MONITORED_PROCESS:
+		CreateMonitoredProcess(payload, opener);
 		break;
 	case protocol::ITwibDeviceInterface::Command::REBOOT:
 		Reboot(payload, opener);
@@ -79,12 +79,23 @@ void ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, bridge::Response
 	ResultCode::AssertOk(bpc_reboot_system());
 }
 
-void ITwibDeviceInterface::Run(std::vector<uint8_t> nro, bridge::ResponseOpener opener) {
-	//auto mon = twili.monitored_processes.emplace_back(
-	//	std::make_shared<process::ManagedProcess>(twili, nro));
+void ITwibDeviceInterface::CreateMonitoredProcess(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+	std::string type(payload.begin(), payload.end());
+	
+	std::shared_ptr<process::MonitoredProcess> proc;
+	if(type == "managed") {
+		proc = std::make_shared<process::ManagedProcess>(twili);
+	} else if(type == "applet") {
+		proc = std::make_shared<process::AppletProcess>(twili);
+	} else {
+		opener.BeginError(ResultCode(TWILI_ERR_UNRECOGNIZED_MONITORED_PROCESS_TYPE)).Finalize();
+		return;
+	}
 
-	auto mon = std::make_shared<process::AppletProcess>(twili, opener, nro);
-	mon->Launch();
+	auto monitor = opener.MakeObject<ITwibProcessMonitor>(proc);
+	auto w = opener.BeginOk(sizeof(uint32_t), 1);
+	w.Write(w.Object(monitor));
+	w.Finalize();
 }
 
 void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {

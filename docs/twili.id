@@ -29,6 +29,7 @@ interface twili::IHBABIShim {
 	[4] SetNextLoadPath(array<uint8_t, 0x5> path, array<uint8_t, 0x5> argv);
 	[5] GetTargetEntryPoint() -> u64;
 	[6] SetExitCode(u32);
+	[7] WaitToStart();
 }
 
 interface twili::IAppletShim {

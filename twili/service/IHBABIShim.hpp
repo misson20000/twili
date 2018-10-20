@@ -24,6 +24,7 @@ class IHBABIShim : public trn::ipc::server::Object {
 	trn::ResultCode SetNextLoadPath(trn::ipc::Buffer<uint8_t, 0x5, 0> path, trn::ipc::Buffer<uint8_t, 0x5, 0> argv);
 	trn::ResultCode GetTargetEntryPoint(trn::ipc::OutRaw<uint64_t> out);
 	trn::ResultCode SetExitCode(trn::ipc::InRaw<uint32_t> code);
+	trn::ResultCode WaitToStart(std::function<void(trn::ResultCode)> cb);
  private:
 	std::shared_ptr<process::MonitoredProcess> process;
 	std::vector<loader_config_entry_t> entries;

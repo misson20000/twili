@@ -9,24 +9,9 @@ namespace twib {
 ITwibDeviceInterface::ITwibDeviceInterface(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 }
 
-RunResult ITwibDeviceInterface::Run(std::vector<uint8_t> executable) {
-	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::RUN, executable);
-	if(rs.payload.size() < sizeof(uint64_t)) {
-		LogMessage(Fatal, "response size invalid");
-		exit(1);
-	}
-	struct {
-		uint64_t pid;
-		uint32_t tp_stdin;
-		uint32_t tp_stdout;
-		uint32_t tp_stderr;
-	} rss = *(decltype(rss)*) rs.payload.data();
-	return {
-		rss.pid,
-		rs.objects[rss.tp_stdin],
-		rs.objects[rss.tp_stdout],
-		rs.objects[rss.tp_stderr]
-	};
+ITwibProcessMonitor ITwibDeviceInterface::CreateMonitoredProcess(std::string type) {
+	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::CREATE_MONITORED_PROCESS, std::vector<uint8_t>(type.begin(), type.end()));
+	return ITwibProcessMonitor(rs.objects[0]);
 }
 
 void ITwibDeviceInterface::Reboot() {

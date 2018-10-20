@@ -16,7 +16,7 @@ namespace process {
 
 using trn::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili &twili, bridge::ResponseOpener attachment_opener) : Process(twili), attachment_opener(attachment_opener) {
+MonitoredProcess::MonitoredProcess(Twili &twili) : Process(twili) {
 
 }
 
@@ -55,6 +55,7 @@ void MonitoredProcess::Attach(std::shared_ptr<trn::KProcess> process) {
 		throw trn::ResultError(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
 	}
 	proc = process;
+	ChangeState(State::Attached);
 }
 
 void MonitoredProcess::SetResult(trn::ResultCode r) {
@@ -62,39 +63,11 @@ void MonitoredProcess::SetResult(trn::ResultCode r) {
 }
 
 void MonitoredProcess::ChangeState(State new_state) {
-	if(new_state == State::Exited) {
-		if(state == State::Starting) {
-			if(attachment_opener) {
-				attachment_opener->BeginError(result).Finalize();
-				attachment_opener.reset();
-			}
-		}
-	}
+	printf("process [0x%lx] changing to state %d\n", GetPid(), (int) new_state);
 	if(new_state == State::Running) {
-		struct {
-			uint64_t pid;
-			uint32_t tp_stdin;
-			uint32_t tp_stdout;
-			uint32_t tp_stderr;
-		} response;
-
-		auto w = attachment_opener->BeginOk(sizeof(response), 3);
-	
-		response.pid = GetPid();
-		response.tp_stdin  = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeWriter>(tp_stdin ));
-		response.tp_stdout = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeReader>(tp_stdout));
-		response.tp_stderr = w.Object(attachment_opener->MakeObject<bridge::ITwibPipeReader>(tp_stderr));
-	
-		w.Write<decltype(response)>(response);
-	
-		w.Finalize();
-
-		attachment_opener.reset();
-	
 		twili.monitored_processes.push_back(shared_from_this());
 		printf("  began monitoring 0x%x\n", GetPid());
 	}
-	
 	state = new_state;
 }
 

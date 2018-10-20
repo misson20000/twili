@@ -261,6 +261,9 @@ void HostMode(ipc::client::Object &iappletshim) {
 	
 	// make sure this is available for the application
 	sm_force_finalize();
+
+	ResultCode::AssertOk( // WaitToStart()
+		shimservice.SendSyncRequest<7>());
 	
 	// Run the application
 	uint8_t tls_backup[0x200];

@@ -28,6 +28,8 @@ trn::ResultCode IHBABIShim::Dispatch(trn::ipc::Message msg, uint32_t request_id)
 		return trn::ipc::server::RequestHandler<&IHBABIShim::GetTargetEntryPoint>::Handle(this, msg);
 	case 6:
 		return trn::ipc::server::RequestHandler<&IHBABIShim::SetExitCode>::Handle(this, msg);
+	case 7:
+		return trn::ipc::server::RequestHandler<&IHBABIShim::WaitToStart>::Handle(this, msg);
 	}
 	return 1;
 }
@@ -72,6 +74,12 @@ trn::ResultCode IHBABIShim::GetTargetEntryPoint(trn::ipc::OutRaw<uint64_t> out) 
 trn::ResultCode IHBABIShim::SetExitCode(trn::ipc::InRaw<uint32_t> code) {
 	process->SetResult(code.value);
 	printf("[HBABIShim(0x%lx)] exit code 0x%x\n", process->GetPid(), code.value);
+	return RESULT_OK;
+}
+
+trn::ResultCode IHBABIShim::WaitToStart(std::function<void(trn::ResultCode)> cb) {
+	process->ChangeState(process::MonitoredProcess::State::Running);
+	cb(RESULT_OK);
 	return RESULT_OK;
 }
 

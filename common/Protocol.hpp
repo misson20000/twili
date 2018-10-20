@@ -33,7 +33,7 @@ class ITwibMetaInterface {
 class ITwibDeviceInterface {
  public:
 	enum class Command : uint32_t {
-		RUN = 10,
+		CREATE_MONITORED_PROCESS = 10,
 		REBOOT = 11,
 		COREDUMP = 12,
 		TERMINATE = 13,
@@ -76,6 +76,19 @@ class ITwibDebugger {
 		SET_THREAD_CONTEXT = 18,
 		GET_NSO_INFOS = 19,
 		WAIT_EVENT = 20,
+	};
+};
+
+class ITwibProcessMonitor {
+ public:
+	enum class Command : uint32_t {
+		LAUNCH = 10,
+		//RUN = 11, reserved
+		TERMINATE = 12,
+		APPEND_CODE = 13,
+		OPEN_STDIN = 14,
+		OPEN_STDOUT = 15,
+		OPEN_STDERR = 16,
 	};
 };
 
