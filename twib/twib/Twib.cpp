@@ -15,8 +15,8 @@
 #include "ResultError.hpp"
 #include "config.hpp"
 #include "Protocol.hpp"
-#include "ITwibMetaInterface.hpp"
-#include "ITwibDeviceInterface.hpp"
+#include "interfaces/ITwibMetaInterface.hpp"
+#include "interfaces/ITwibDeviceInterface.hpp"
 #include "util.hpp"
 #include "err.hpp"
 

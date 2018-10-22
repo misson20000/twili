@@ -2,17 +2,16 @@
 
 #include<vector>
 
-#include "RemoteObject.hpp"
+#include "../RemoteObject.hpp"
 
 namespace twili {
 namespace twib {
 
-class ITwibPipeWriter {
+class ITwibPipeReader {
  public:
-	ITwibPipeWriter(std::shared_ptr<RemoteObject> obj);
+	ITwibPipeReader(std::shared_ptr<RemoteObject> obj);
 
-	void WriteSync(std::vector<uint8_t> data);
-	void Close();
+	std::vector<uint8_t> ReadSync();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

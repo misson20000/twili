@@ -2,7 +2,7 @@
 
 #include<vector>
 
-#include "RemoteObject.hpp"
+#include "../RemoteObject.hpp"
 #include "ITwibPipeWriter.hpp"
 #include "ITwibPipeReader.hpp"
 

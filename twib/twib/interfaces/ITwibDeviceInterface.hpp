@@ -4,7 +4,7 @@
 
 #include<msgpack11.hpp>
 
-#include "RemoteObject.hpp"
+#include "../RemoteObject.hpp"
 #include "ITwibPipeWriter.hpp"
 #include "ITwibPipeReader.hpp"
 #include "ITwibProcessMonitor.hpp"
