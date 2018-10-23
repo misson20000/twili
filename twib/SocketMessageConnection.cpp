@@ -3,49 +3,59 @@
 namespace twili {
 namespace twibc {
 
-SocketMessageConnection::SocketMessageConnection(SOCKET fd, EventThreadNotifier &notifier) : fd(fd), notifier(notifier) {
+SocketMessageConnection::SocketMessageConnection(SOCKET fd, const EventThreadNotifier &notifier) : socket(*this, fd), notifier(notifier) {
 }
 
 SocketMessageConnection::~SocketMessageConnection() {
-	closesocket(fd);
 }
 
-bool SocketMessageConnection::HasOutData() {
-	std::lock_guard<std::mutex> lock(out_buffer_mutex); // ReadAvailable() might not be atomic
-	return out_buffer.ReadAvailable() > 0;
+SocketMessageConnection::MessageSocket::MessageSocket(SocketMessageConnection &conn, SOCKET fd) : Socket(fd), connection(conn) {
 }
 
-bool SocketMessageConnection::PumpOutput() {
-	LogMessage(Debug, "pumping out 0x%lx bytes", out_buffer.ReadAvailable());
-	std::lock_guard<std::mutex> lock(out_buffer_mutex);
-	if(out_buffer.ReadAvailable() > 0) {
-		ssize_t r = send(fd, (char*) out_buffer.Read(), out_buffer.ReadAvailable(), 0);
-		if(r < 0) {
-			return false;
-		}
-		if(r > 0) {
-			out_buffer.MarkRead(r);
-		}
-	}
+bool SocketMessageConnection::MessageSocket::WantsRead() {
 	return true;
 }
 
-bool SocketMessageConnection::PumpInput() {
-	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
+bool SocketMessageConnection::MessageSocket::WantsWrite() {
+	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex); // ReadAvailable() might not be atomic
+	return connection.out_buffer.ReadAvailable() > 0;
+}
+
+void SocketMessageConnection::MessageSocket::SignalRead() {
+	std::tuple<uint8_t*, size_t> target = connection.in_buffer.Reserve(8192);
 	ssize_t r = recv(fd, (char*) std::get<0>(target), std::get<1>(target), 0);
 	if(r <= 0) {
-		return false;
+		connection.error_flag = true;
 	} else {
-		in_buffer.MarkWritten(r);
+		connection.in_buffer.MarkWritten(r);
 	}
-	return true;
 }
 
-void SocketMessageConnection::SignalInput() {
+void SocketMessageConnection::MessageSocket::SignalWrite() {
+	LogMessage(Debug, "pumping out 0x%lx bytes", connection.out_buffer.ReadAvailable());
+	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex);
+	if(connection.out_buffer.ReadAvailable() > 0) {
+		ssize_t r = send(fd, (char*) connection.out_buffer.Read(), connection.out_buffer.ReadAvailable(), 0);
+		if(r < 0) {
+			connection.error_flag = true;
+			return;
+		}
+		if(r > 0) {
+			connection.out_buffer.MarkRead(r);
+		}
+	}
+}
+
+void SocketMessageConnection::MessageSocket::SignalError() {
+	LogMessage(Debug, "error signalled on socket");
+	connection.error_flag = true;
+}
+
+void SocketMessageConnection::RequestInput() {
 	// unnecessary
 }
 
-void SocketMessageConnection::SignalOutput() {
+void SocketMessageConnection::RequestOutput() {
 	notifier.Notify();
 }
 

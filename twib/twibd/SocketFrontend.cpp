@@ -17,10 +17,12 @@ namespace frontend {
 
 SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
 	twibd(twibd),
+	server_socket(*this),
 	address_family(address_family),
 	socktype(socktype),
 	bind_addrlen(bind_addrlen),
-	notifier(*this) {
+	server_logic(*this),
+	socket_server(server_logic) {
 
 	if(bind_addr == NULL) {
 		LogMessage(Fatal, "failed to allocate bind_addr");
@@ -28,80 +30,51 @@ SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, s
 	}
 	memcpy((char*) &this->bind_addr, bind_addr, bind_addrlen);
 	
-	fd = socket(address_family, socktype, 0);
-	if(fd == INVALID_SOCKET) {
+	server_socket = socket(address_family, socktype, 0);
+	if(!server_socket.IsValid()) {
 		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
 		exit(1);
 	}
 	
-	LogMessage(Debug, "created socket: %d", fd);
-
 	if(address_family == AF_INET6) {
 		int ipv6only = 0;
-		if(setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*) &ipv6only, sizeof(ipv6only)) == -1) {
+		if(setsockopt(server_socket.fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*) &ipv6only, sizeof(ipv6only)) == -1) {
 			LogMessage(Fatal, "failed to make ipv6 server dual stack: %s", NetErrStr());
 		}
 	}
 
 	UnlinkIfUnix();
 	
-	if(bind(fd, bind_addr, bind_addrlen) < 0) {
+	if(bind(server_socket.fd, bind_addr, bind_addrlen) < 0) {
 		LogMessage(Fatal, "failed to bind socket: %s", NetErrStr());
-		closesocket(fd);
+		server_socket.Close();
 		exit(1);
 	}
 
-	if(listen(fd, 20) < 0) {
+	if(listen(server_socket.fd, 20) < 0) {
 		LogMessage(Fatal, "failed to listen on socket: %s", NetErrStr());
-		closesocket(fd);
+		server_socket.Close();
 		UnlinkIfUnix();
 		exit(1);
 	}
 
-#ifndef _WIN32
-	if(pipe(event_thread_notification_pipe) < 0) {
-		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", NetErrStr());
-		closesocket(fd);
-		UnlinkIfUnix();
-		exit(1);
-	}
-#endif // _WIN32
-
-	std::thread event_thread(&SocketFrontend::event_thread_func, this);
-	this->event_thread = std::move(event_thread);
+	socket_server.Begin();
 }
 
 SocketFrontend::SocketFrontend(Twibd &twibd, int fd) :
 	twibd(twibd),
-	fd(fd),
+	server_socket(*this, fd),
 	address_family(0),
 	socktype(SOCK_STREAM),
-	notifier(*this) {
-
-#ifndef _WIN32
-	if(pipe(event_thread_notification_pipe) < 0) {
-		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", NetErrStr());
-		closesocket(fd);
-		UnlinkIfUnix();
-		exit(1);
-	}
-#endif // _WIN32
-
-	std::thread event_thread(&SocketFrontend::event_thread_func, this);
-	this->event_thread = std::move(event_thread);
+	server_logic(*this),
+	socket_server(server_logic) {
+	socket_server.Begin();
 }
 
 SocketFrontend::~SocketFrontend() {
-	event_thread_destroy = true;
-	NotifyEventThread();
-	event_thread.join();
-	
-	closesocket(fd);
+	socket_server.Destroy();
+	server_socket.Close();
 	UnlinkIfUnix();
-#ifndef _WIN32
-	close(event_thread_notification_pipe[0]);
-	close(event_thread_notification_pipe[1]);
-#endif
 }
 
 void SocketFrontend::UnlinkIfUnix() {
@@ -112,142 +85,77 @@ void SocketFrontend::UnlinkIfUnix() {
 #endif
 }
 
-void SocketFrontend::event_thread_func() {
-	fd_set readfds;
-	fd_set writefds;
-	SOCKET max_fd = 0;
-	while(!event_thread_destroy) {
-		LogMessage(Debug, "socket event thread loop");
-		
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
-
-		// add server socket
-		max_fd = std::max(max_fd, fd);
-		FD_SET(fd, &readfds);
-
-#ifndef _WIN32
-		// add event thread notification pipe
-		max_fd = std::max(max_fd, event_thread_notification_pipe[0]);
-		FD_SET(event_thread_notification_pipe[0], &readfds);
-#endif
-		
-		// add client sockets
-		for(auto &c : clients) {
-			max_fd = std::max(max_fd, c->connection.fd);
-			FD_SET(c->connection.fd, &readfds);
-			
-			if(c->connection.HasOutData()) { // only add to writefds if we need to write
-				FD_SET(c->connection.fd, &writefds);
-			}
-		}
-
-		if(select(max_fd + 1, &readfds, &writefds, NULL, NULL) < 0) {
-			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
-			exit(1);
-		}
-
-#ifndef _WIN32
-		// Check select status on event thread notification pipe
-		if(FD_ISSET(event_thread_notification_pipe[0], &readfds)) {
-			char buf[64];
-			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
-			if(r < 0) {
-				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", strerror(errno));
-				exit(1);
-			}
-			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
-		}
-#endif
-		
-		// Check select status on server socket
-		if(FD_ISSET(fd, &readfds)) {
-			LogMessage(Debug, "incoming connection detected on %d", fd);
-
-			int client_fd = accept(fd, NULL, NULL);
-			if(client_fd < 0) {
-				LogMessage(Warning, "failed to accept incoming connection");
-			} else {
-				std::shared_ptr<Client> c = std::make_shared<Client>(client_fd, *this);
-				clients.push_back(c);
-				twibd.AddClient(c);
-			}
-		}
-		
-		// pump i/o
-		for(auto mci = clients.begin(); mci != clients.end(); mci++) {
-			std::shared_ptr<Client> &c = *mci;
-			if(FD_ISSET(c->connection.fd, &writefds)) {
-				if(!c->connection.PumpOutput()) {
-					c->deletion_flag = true;
-				}
-			}
-			if(FD_ISSET(c->connection.fd, &readfds)) {
-				LogMessage(Debug, "incoming data for client %x", c->client_id);
-				if(!c->connection.PumpInput()) {
-					c->deletion_flag = true;
-				}
-			}
-		}
-
-		for(auto i = clients.begin(); i != clients.end(); ) {
-			twibc::MessageConnection::Request *rq;
-			while((rq = (*i)->connection.Process()) != nullptr) {
-				LogMessage(Debug, "posting request");
-				twibd.PostRequest(
-					Request(
-						*i,
-						rq->mh.device_id,
-						rq->mh.object_id,
-						rq->mh.command_id,
-						rq->mh.tag,
-						std::vector<uint8_t>(rq->payload.Read(), rq->payload.Read() + rq->payload.ReadAvailable())));
-				LogMessage(Debug, "posted request");
-			}
-			
-			if((*i)->deletion_flag) {
-				twibd.RemoveClient(*i);
-				i = clients.erase(i);
-				continue;
-			}
-
-			i++;
-		}
-	}
+SocketFrontend::ServerSocket::ServerSocket(SocketFrontend &frontend) : frontend(frontend) {
 }
 
-void SocketFrontend::NotifyEventThread() {
-#ifdef _WIN32
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof(addr);
-	if(getsockname(fd, (struct sockaddr*) &addr, &addrlen) != 0) {
-		LogMessage(Fatal, "failed to get local server address: %s", NetErrStr());
-		exit(1);
-	}
+SocketFrontend::ServerSocket::ServerSocket(SocketFrontend &frontend, SOCKET fd) : Socket(fd), frontend(frontend) {
+}
 
-	// Connect to the server in order to wake it up
-	SOCKET cfd = socket(addr.ss_family, socktype, 0);
-	if(cfd < 0) {
-		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
-		exit(1);
-	}
+SocketFrontend::ServerSocket &SocketFrontend::ServerSocket::operator=(SOCKET fd) {
+	twibc::SocketServer::Socket::operator=(fd);
+	return *this;
+}
 
-	if(connect(cfd, (struct sockaddr*) &addr, addrlen) < 0) {
-		LogMessage(Fatal, "failed to connect for notification: %s", NetErrStr());
-		exit(1);
-	}
+bool SocketFrontend::ServerSocket::WantsRead() {
+	return true;
+}
+
+void SocketFrontend::ServerSocket::SignalRead() {
+	LogMessage(Debug, "incoming connection detected");
 	
-	closesocket(cfd);
-#else
-	char buf[] = ".";
-	if(write(event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
-		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", strerror(errno));
-		exit(1);
+	int client_fd = accept(fd, NULL, NULL);
+	if(client_fd < 0) {
+		LogMessage(Warning, "failed to accept incoming connection");
+	} else {
+		std::shared_ptr<Client> c = std::make_shared<Client>(client_fd, frontend);
+		frontend.clients.push_back(c);
+		frontend.twibd.AddClient(c);
 	}
-#endif
 }
 
-SocketFrontend::Client::Client(SOCKET fd, SocketFrontend &frontend) : connection(fd, frontend.notifier), frontend(frontend), twibd(frontend.twibd) {
+void SocketFrontend::ServerSocket::SignalError() {
+	LogMessage(Fatal, "error on server socket");
+	exit(1);
+}
+
+SocketFrontend::ServerLogic::ServerLogic(SocketFrontend &frontend) : frontend(frontend) {
+}
+
+void SocketFrontend::ServerLogic::Prepare(twibc::SocketServer &server) {
+	server.Clear();
+	server.AddSocket(frontend.server_socket);
+	for(auto i = frontend.clients.begin(); i != frontend.clients.end(); ) {
+		twibc::MessageConnection::Request *rq;
+		while((rq = (*i)->connection.Process()) != nullptr) {
+			LogMessage(Debug, "posting request");
+			frontend.twibd.PostRequest(
+				Request(
+					*i,
+					rq->mh.device_id,
+					rq->mh.object_id,
+					rq->mh.command_id,
+					rq->mh.tag,
+					std::vector<uint8_t>(rq->payload.Read(), rq->payload.Read() + rq->payload.ReadAvailable())));
+			LogMessage(Debug, "posted request");
+		}
+
+		if((*i)->connection.error_flag) {
+			(*i)->deletion_flag = true;
+		}
+		
+		if((*i)->deletion_flag) {
+			frontend.twibd.RemoveClient(*i);
+			i = frontend.clients.erase(i);
+			continue;
+		}
+
+		server.AddSocket((*i)->connection.socket);
+		
+		i++;
+	}
+}
+
+SocketFrontend::Client::Client(SOCKET fd, SocketFrontend &frontend) : connection(fd, frontend.socket_server.notifier), frontend(frontend), twibd(frontend.twibd) {
 }
 
 SocketFrontend::Client::~Client() {
@@ -271,13 +179,6 @@ void SocketFrontend::Client::PostResponse(Response &r) {
 		});
 
 	connection.SendMessage(mh, r.payload, object_ids);
-}
-
-SocketFrontend::EventThreadNotifier::EventThreadNotifier(SocketFrontend &frontend) : frontend(frontend) {
-}
-
-void SocketFrontend::EventThreadNotifier::Notify() {
-	frontend.NotifyEventThread();
 }
 
 } // namespace frontend

@@ -42,7 +42,28 @@ class SocketFrontend : public Frontend {
 
  private:
 	Twibd &twibd;
-	SOCKET fd;
+	class ServerSocket : public twibc::SocketServer::Socket {
+	 public:
+		ServerSocket(SocketFrontend &frontend);
+		ServerSocket(SocketFrontend &frontend, SOCKET fd);
+
+		ServerSocket &operator=(SOCKET fd);
+		
+		virtual bool WantsRead() override;
+		virtual void SignalRead() override;
+		virtual void SignalError() override;
+		
+	 private:
+		SocketFrontend &frontend;
+	} server_socket;
+
+	class ServerLogic : public twibc::SocketServer::Logic {
+	 public:
+		ServerLogic(SocketFrontend &frontend);
+		virtual void Prepare(twibc::SocketServer &server) override;
+	 private:
+		SocketFrontend &frontend;
+	} server_logic;
 
 	int address_family;
 	int socktype;
@@ -50,24 +71,8 @@ class SocketFrontend : public Frontend {
 	size_t bind_addrlen;
 	void UnlinkIfUnix();
 	
-	bool event_thread_destroy = false;
-	void event_thread_func();
-	std::thread event_thread;
-#ifndef _WIN32
-	int event_thread_notification_pipe[2];
-#endif
-	
 	std::list<std::shared_ptr<Client>> clients;
-
-	void NotifyEventThread();
-
-	class EventThreadNotifier : public twibc::SocketMessageConnection::EventThreadNotifier {
-	 public:
-		EventThreadNotifier(SocketFrontend &frontend);
-		virtual void Notify() override;
-	 private:
-		SocketFrontend &frontend;
-	} notifier;
+	twibc::SocketServer socket_server;
 };
 
 } // namespace frontend

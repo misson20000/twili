@@ -17,20 +17,15 @@ class SocketClient : public Client {
  protected:
 	virtual void SendRequestImpl(const Request &rq) override;
  private:
-	void NotifyEventThread();
-	bool event_thread_destroy = false;
-	void event_thread_func();
-	std::thread event_thread;
-	int event_thread_notification_pipe[2];
-
-	class EventThreadNotifier : public twibc::SocketMessageConnection::EventThreadNotifier {
+	class Logic : public twibc::SocketServer::Logic {
 	 public:
-		EventThreadNotifier(SocketClient &client);
-		void Notify();
+		Logic(SocketClient &client);
+		virtual void Prepare(twibc::SocketServer &server) override;
 	 private:
 		SocketClient &client;
-	} notifier;
-
+	} server_logic;
+	
+	twibc::SocketServer socket_server;
 	twibc::SocketMessageConnection connection;
 };
 

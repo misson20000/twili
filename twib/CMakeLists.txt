@@ -70,7 +70,7 @@ include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/../common/")
 
-set(COMMON_SOURCES Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp)
+set(COMMON_SOURCES Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp SocketServer.cpp)
 if(WIN32)
 	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp)
 endif()

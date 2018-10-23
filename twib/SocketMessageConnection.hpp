@@ -1,30 +1,35 @@
 #pragma once
 
 #include "MessageConnection.hpp"
+#include "SocketServer.hpp"
+#include "EventThreadNotifier.hpp"
 
 namespace twili {
 namespace twibc {
 
 class SocketMessageConnection : public MessageConnection {
  public:
-	class EventThreadNotifier {
-	 public:
-		virtual void Notify() = 0;
-	};
-	
-	SocketMessageConnection(SOCKET fd, EventThreadNotifier &notifier);
+	SocketMessageConnection(SOCKET fd, const EventThreadNotifier &notifier);
 	virtual ~SocketMessageConnection() override;
 
-	bool HasOutData();
-	bool PumpOutput(); // returns true if OK
-	bool PumpInput(); // returns true if OK
+	class MessageSocket : public SocketServer::Socket {
+	 public:
+		MessageSocket(SocketMessageConnection &connection, SOCKET fd);
 
-	SOCKET fd;
+		virtual bool WantsRead() override;
+		virtual bool WantsWrite() override;
+		virtual void SignalRead() override;
+		virtual void SignalWrite() override;
+		virtual void SignalError() override;
+	 private:
+		SocketMessageConnection &connection;
+	} socket;
+
  protected:
-	virtual void SignalInput() override;
-	virtual void SignalOutput() override;
+	virtual void RequestInput() override;
+	virtual void RequestOutput() override;
  private:
-	EventThreadNotifier &notifier;
+	const EventThreadNotifier &notifier;
 };
 
 } // namespace twibc

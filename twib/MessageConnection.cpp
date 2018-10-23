@@ -18,7 +18,7 @@ MessageConnection::Request *MessageConnection::Process() {
 				has_current_payload = false;
 			} else {
 				in_buffer.Reserve(sizeof(protocol::MessageHeader));
-				SignalInput();
+				RequestInput();
 				return nullptr;
 			}
 		}
@@ -29,7 +29,7 @@ MessageConnection::Request *MessageConnection::Process() {
 				current_rq.object_ids.Clear();
 			} else {
 				in_buffer.Reserve(current_rq.mh.payload_size);
-				SignalInput();
+				RequestInput();
 				return nullptr;
 			}
 		}
@@ -40,7 +40,7 @@ MessageConnection::Request *MessageConnection::Process() {
 			return &current_rq;
 		} else {
 			in_buffer.Reserve(current_rq.mh.object_count * sizeof(uint32_t));
-			SignalInput();
+			RequestInput();
 			return nullptr;
 		}
 	}
@@ -52,7 +52,7 @@ void MessageConnection::SendMessage(const protocol::MessageHeader &mh, const std
 	out_buffer.Write(mh);
 	out_buffer.Write(payload);
 	out_buffer.Write(object_ids);
-	SignalOutput();
+	RequestOutput();
 }
 
 } // namespace twibc
