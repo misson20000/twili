@@ -12,7 +12,7 @@
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
-#include "MessageConnection.hpp"
+#include "SocketMessageConnection.hpp"
 
 namespace twili {
 namespace twibd {
@@ -23,7 +23,7 @@ namespace backend {
 
 class TCPBackend {
  public:
-	TCPBackend(Twibd *twibd);
+	TCPBackend(Twibd &twibd);
 	~TCPBackend();
 
 	std::string Connect(std::string hostname, std::string port);
@@ -31,18 +31,18 @@ class TCPBackend {
 	
 	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
 	 public:
-		Device(twibc::MessageConnection<Device> &mc, TCPBackend *backend);
+		Device(SOCKET fd, TCPBackend &backend);
 		~Device();
 
 		void Begin();
-		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
 		void Identified(Response &r);
+		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
 		virtual void SendRequest(const Request &&r) override;
 		virtual int GetPriority() override;
 		virtual std::string GetBridgeType() override;
 		
-		TCPBackend *backend;
-		twibc::MessageConnection<Device> &connection;
+		TCPBackend &backend;
+		twibc::SocketMessageConnection connection;
 		std::list<WeakRequest> pending_requests;
 		Response response_in;
 		bool ready_flag = false;
@@ -50,8 +50,8 @@ class TCPBackend {
 	};
 
  private:
-	Twibd *twibd;
-	std::list<std::shared_ptr<twibc::MessageConnection<Device>>> connections;
+	Twibd &twibd;
+	std::list<std::shared_ptr<Device>> devices;
 
 	SOCKET listen_fd;
 	
@@ -59,6 +59,14 @@ class TCPBackend {
 	void event_thread_func();
 	std::thread event_thread;
 	void NotifyEventThread();
+
+	class EventThreadNotifier : public twibc::SocketMessageConnection::EventThreadNotifier {
+	 public:
+		EventThreadNotifier(TCPBackend &backend);
+		virtual void Notify() override;
+	 private:
+		TCPBackend &backend;
+	} notifier;
 };
 
 } // namespace backend

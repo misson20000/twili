@@ -29,7 +29,7 @@ namespace twibd {
 Twibd::Twibd() :
 	local_client(std::make_shared<LocalClient>(this)),
 	usb(this),
-	tcp(this) {
+	tcp(*this) {
 	AddClient(local_client);
 	usb.Probe();
 }
@@ -246,7 +246,7 @@ static std::shared_ptr<frontend::SocketFrontend> CreateTCPFrontend(Twibd &twibd,
 	addr.sin6_family = AF_INET6;
 	addr.sin6_port = htons(port);
 	addr.sin6_addr = in6addr_any;
-	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+	return std::make_shared<frontend::SocketFrontend>(twibd, AF_INET6, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
 #endif
 
@@ -256,7 +256,7 @@ static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path)-1);
-	return std::make_shared<frontend::SocketFrontend>(&twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
+	return std::make_shared<frontend::SocketFrontend>(twibd, AF_UNIX, SOCK_STREAM, (struct sockaddr*) &addr, sizeof(addr));
 }
 #endif
 
@@ -370,7 +370,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Info, "got %d sockets from systemd", num_fds);
 			for(int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + num_fds; fd++) {
 				if(sd_is_socket(fd, 0, SOCK_STREAM, 1) == 1) {
-					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(&twibd, fd));
+					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(twibd, fd));
 				} else {
 					LogMessage(Warning, "got an FD from systemd that wasn't a SOCK_STREAM: %d", fd);
 				}

@@ -2,7 +2,6 @@
 
 #include "platform.hpp"
 
-#include<random>
 #include<iomanip>
 
 #include<string.h>
@@ -15,6 +14,7 @@
 #include "ResultError.hpp"
 #include "config.hpp"
 #include "Protocol.hpp"
+#include "SocketClient.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
 #include "interfaces/ITwibDeviceInterface.hpp"
 #include "util.hpp"
@@ -22,151 +22,6 @@
 
 namespace twili {
 namespace twib {
-
-Twib::Twib(int fd) : mc(fd, this) {
-	// TODO: Figure out how to fix this.
-#ifndef _WIN32
-	if(pipe(event_thread_notification_pipe) < 0) {
-		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", strerror(errno));
-		exit(1);
-	}
-#endif
-	std::thread event_thread(&Twib::event_thread_func, this);
-	this->event_thread = std::move(event_thread);
-}
-
-Twib::~Twib() {
-	event_thread_destroy = true;
-	NotifyEventThread();
-	event_thread.join();
-}
-
-void Twib::event_thread_func() {
-	fd_set recvset;
-	fd_set sendset;
-	SOCKET maxfd = 0;
-	while(!event_thread_destroy) {
-		LogMessage(Debug, "event thread loop");
-
-		FD_ZERO(&recvset);
-		FD_ZERO(&sendset);
-#ifndef _WIN32
-		FD_SET(event_thread_notification_pipe[0], &recvset);
-		maxfd = std::max(maxfd, event_thread_notification_pipe[0]);
-#endif
-		FD_SET(mc.fd, &recvset);
-		maxfd = std::max(maxfd, mc.fd);
-		if(mc.out_buffer.ReadAvailable() > 0) {
-			FD_SET(mc.fd, &sendset);
-		}
-
-		if(select(maxfd + 1, &recvset, &sendset, NULL, NULL) < 0) {
-			LogMessage(Fatal, "failed to select file descriptors: %s", strerror(errno));
-			exit(1);
-		}
-
-#ifndef _WIN32
-		// check poll flags on event notification pipe
-		if(FD_ISSET(event_thread_notification_pipe[0], &recvset)) {
-			char buf[64];
-			ssize_t r = read(event_thread_notification_pipe[0], buf, sizeof(buf));
-			if(r < 0) {
-				LogMessage(Fatal, "failed to read from event thread notification pipe: %s", strerror(errno));
-				exit(1);
-			}
-			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
-		}
-#endif
-
-		// check poll flags on twibd socket
-		if(FD_ISSET(mc.fd, &sendset)) {
-			mc.PumpOutput();
-		}
-		if(FD_ISSET(mc.fd, &recvset)) {
-			mc.PumpInput();
-		}
-		mc.Process();
-	}
-}
-
-void Twib::NotifyEventThread() {
-	char buf[] = ".";
-	if(write(event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
-		LogMessage(Fatal, "failed to write to event thread notification pipe: %s", strerror(errno));
-		exit(1);
-	}
-}
-
-Client::Client(twibc::MessageConnection<Client> &mc, Twib *twib) : mc(mc), twib(twib) {
-	
-}
-
-void Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids) {
-	// create RAII objects for remote objects
-	std::vector<std::shared_ptr<RemoteObject>> objects(mh.object_count);
-	for(uint32_t i = 0; i < mh.object_count; i++) {
-		uint32_t id;
-		if(!object_ids.Read(id)) {
-			LogMessage(Error, "not enough object IDs");
-			return;
-		}
-		objects[i] = std::make_shared<RemoteObject>(shared_from_this(), mh.device_id, id);
-	}
-	
-	std::promise<Response> promise;
-	{
-		std::lock_guard<std::mutex> lock(response_map_mutex);
-		auto it = response_map.find(mh.tag);
-		if(it == response_map.end()) {
-			LogMessage(Warning, "dropping response for unknown tag 0x%x", mh.tag);
-			return;
-		}
-		promise.swap(it->second);
-		response_map.erase(it);
-	}
-	
-	promise.set_value(
-		Response(
-			shared_from_this(),
-			mh.device_id,
-			mh.object_id,
-			mh.result_code,
-			mh.tag,
-			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable()),
-			objects));
-}
-
-std::future<Response> Client::SendRequest(Request rq) {
-	std::future<Response> future;
-	{
-		std::lock_guard<std::mutex> lock(response_map_mutex);
-		static std::random_device rng;
-		
-		uint32_t tag = rng();
-		rq.tag = tag;
-		
-		std::promise<Response> promise;
-		future = promise.get_future();
-		response_map[tag] = std::move(promise);
-	}
-	{
-		std::lock_guard<std::mutex> lock(mc.out_buffer_mutex);
-		protocol::MessageHeader mh;
-		mh.device_id = rq.device_id;
-		mh.object_id = rq.object_id;
-		mh.command_id = rq.command_id;
-		mh.tag = rq.tag;
-		mh.payload_size = rq.payload.size();
-		mh.object_count = 0;
-
-		mc.out_buffer.Write(mh);
-		mc.out_buffer.Write(rq.payload);
-		twib->NotifyEventThread();
-		LogMessage(Debug, "sent request");
-	}
-	
-	return future;
-}
 
 template<size_t N>
 void PrintTable(std::vector<std::array<std::string, N>> rows) {
@@ -355,8 +210,8 @@ int main(int argc, char *argv[]) {
 		LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
 		exit(1);
 	}
-	twili::twib::Twib twib(fd);
-	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(twib.mc.obj, 0, 0));
+	twili::twib::client::SocketClient client(fd);
+	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(client, 0, 0));
 	
 	if(ld->parsed()) {
 		ListDevices(itmi);
@@ -383,7 +238,7 @@ int main(int argc, char *argv[]) {
 		}
 		device_id = devices[0]["device_id"].uint32_value();
 	}
-	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(twib.mc.obj, device_id, 0));
+	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(client, device_id, 0));
 	
 	if(run->parsed()) {
 		auto code_opt = twili::util::ReadFile(run_file.c_str());

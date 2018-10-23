@@ -15,11 +15,12 @@ namespace twili {
 namespace twibd {
 namespace frontend {
 
-SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
+SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
 	twibd(twibd),
 	address_family(address_family),
 	socktype(socktype),
-	bind_addrlen(bind_addrlen) {
+	bind_addrlen(bind_addrlen),
+	notifier(*this) {
 
 	if(bind_addr == NULL) {
 		LogMessage(Fatal, "failed to allocate bind_addr");
@@ -70,11 +71,12 @@ SocketFrontend::SocketFrontend(Twibd *twibd, int address_family, int socktype, s
 	this->event_thread = std::move(event_thread);
 }
 
-SocketFrontend::SocketFrontend(Twibd *twibd, int fd) :
+SocketFrontend::SocketFrontend(Twibd &twibd, int fd) :
 	twibd(twibd),
 	fd(fd),
 	address_family(0),
-	socktype(SOCK_STREAM) {
+	socktype(SOCK_STREAM),
+	notifier(*this) {
 
 #ifndef _WIN32
 	if(pipe(event_thread_notification_pipe) < 0) {
@@ -131,12 +133,12 @@ void SocketFrontend::event_thread_func() {
 #endif
 		
 		// add client sockets
-		for(auto &c : connections) {
-			max_fd = std::max(max_fd, c->fd);
-			FD_SET(c->fd, &readfds);
+		for(auto &c : clients) {
+			max_fd = std::max(max_fd, c->connection.fd);
+			FD_SET(c->connection.fd, &readfds);
 			
-			if(c->out_buffer.ReadAvailable() > 0) { // only add to writefds if we need to write
-				FD_SET(c->fd, &writefds);
+			if(c->connection.HasOutData()) { // only add to writefds if we need to write
+				FD_SET(c->connection.fd, &writefds);
 			}
 		}
 
@@ -166,30 +168,46 @@ void SocketFrontend::event_thread_func() {
 			if(client_fd < 0) {
 				LogMessage(Warning, "failed to accept incoming connection");
 			} else {
-				std::shared_ptr<twibc::MessageConnection<Client>> mc = std::make_shared<twibc::MessageConnection<Client>>(client_fd, this);
-				connections.push_back(mc);
-				twibd->AddClient(mc->obj);
+				std::shared_ptr<Client> c = std::make_shared<Client>(client_fd, *this);
+				clients.push_back(c);
+				twibd.AddClient(c);
 			}
 		}
 		
 		// pump i/o
-		for(auto mci = connections.begin(); mci != connections.end(); mci++) {
-			std::shared_ptr<twibc::MessageConnection<Client>> &mc = *mci;
-			if(FD_ISSET(mc->fd, &writefds)) {
-				mc->PumpOutput();
+		for(auto mci = clients.begin(); mci != clients.end(); mci++) {
+			std::shared_ptr<Client> &c = *mci;
+			if(FD_ISSET(c->connection.fd, &writefds)) {
+				if(!c->connection.PumpOutput()) {
+					c->deletion_flag = true;
+				}
 			}
-			if(FD_ISSET(mc->fd, &readfds)) {
-				LogMessage(Debug, "incoming data for client %x", mc->obj->client_id);
-				mc->PumpInput();
+			if(FD_ISSET(c->connection.fd, &readfds)) {
+				LogMessage(Debug, "incoming data for client %x", c->client_id);
+				if(!c->connection.PumpInput()) {
+					c->deletion_flag = true;
+				}
 			}
 		}
 
-		for(auto i = connections.begin(); i != connections.end(); ) {
-			(*i)->Process();
+		for(auto i = clients.begin(); i != clients.end(); ) {
+			twibc::MessageConnection::Request *rq;
+			while((rq = (*i)->connection.Process()) != nullptr) {
+				LogMessage(Debug, "posting request");
+				twibd.PostRequest(
+					Request(
+						*i,
+						rq->mh.device_id,
+						rq->mh.object_id,
+						rq->mh.command_id,
+						rq->mh.tag,
+						std::vector<uint8_t>(rq->payload.Read(), rq->payload.Read() + rq->payload.ReadAvailable())));
+				LogMessage(Debug, "posted request");
+			}
 			
-			if((*i)->obj->deletion_flag) {
-				twibd->RemoveClient((*i)->obj);
-				i = connections.erase(i);
+			if((*i)->deletion_flag) {
+				twibd.RemoveClient(*i);
+				i = clients.erase(i);
 				continue;
 			}
 
@@ -229,28 +247,14 @@ void SocketFrontend::NotifyEventThread() {
 #endif
 }
 
-SocketFrontend::Client::Client(twibc::MessageConnection<Client> &mc, SocketFrontend *frontend) : connection(mc), frontend(frontend), twibd(frontend->twibd) {
+SocketFrontend::Client::Client(SOCKET fd, SocketFrontend &frontend) : connection(fd, frontend.notifier), frontend(frontend), twibd(frontend.twibd) {
 }
 
 SocketFrontend::Client::~Client() {
 	LogMessage(Debug, "destroying client 0x%x", client_id);
 }
 
-void SocketFrontend::Client::IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids) {
-	LogMessage(Debug, "posting request");
-	twibd->PostRequest(
-		Request(
-			shared_from_this(),
-			mh.device_id,
-			mh.object_id,
-			mh.command_id,
-			mh.tag,
-			std::vector<uint8_t>(payload.Read(), payload.Read() + payload.ReadAvailable())));
-	LogMessage(Debug, "posted request");
-}
-
 void SocketFrontend::Client::PostResponse(Response &r) {
-	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex);
 	protocol::MessageHeader mh;
 	mh.device_id = r.device_id;
 	mh.object_id = r.object_id;
@@ -259,17 +263,21 @@ void SocketFrontend::Client::PostResponse(Response &r) {
 	mh.payload_size = r.payload.size();
 	mh.object_count = r.objects.size();
 	
-	connection.out_buffer.Write(mh);
-	connection.out_buffer.Write(r.payload);
 	std::vector<uint32_t> object_ids(r.objects.size(), 0);
 	std::transform(
 		r.objects.begin(), r.objects.end(), object_ids.begin(),
 		[](auto const &object) {
 			return object->object_id;
 		});
-	connection.out_buffer.Write(object_ids);
 
-	frontend->NotifyEventThread();
+	connection.SendMessage(mh, r.payload, object_ids);
+}
+
+SocketFrontend::EventThreadNotifier::EventThreadNotifier(SocketFrontend &frontend) : frontend(frontend) {
+}
+
+void SocketFrontend::EventThreadNotifier::Notify() {
+	frontend.NotifyEventThread();
 }
 
 } // namespace frontend

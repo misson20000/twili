@@ -10,8 +10,9 @@ namespace twili {
 namespace twibd {
 namespace backend {
 
-TCPBackend::TCPBackend(Twibd *twibd) :
-	twibd(twibd) {
+TCPBackend::TCPBackend(Twibd &twibd) :
+	twibd(twibd),
+	notifier(*this) {
 	listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(listen_fd == -1) {
 		LogMessage(Error, "Failed to create listening socket: %s", NetErrStr());
@@ -66,7 +67,7 @@ std::string TCPBackend::Connect(std::string hostname, std::string port) {
 	}
 	freeaddrinfo(res);
 
-	connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
+	devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
 	NotifyEventThread();
 	return "Ok";
 }
@@ -89,7 +90,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 			return;
 		}
 
-		connections.emplace_back(std::make_shared<twibc::MessageConnection<Device>>(fd, this))->obj->Begin();
+		devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
 		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
 		NotifyEventThread();
 	} else {
@@ -97,9 +98,9 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 	}
 }
 
-TCPBackend::Device::Device(twibc::MessageConnection<Device> &mc, TCPBackend *backend) :
+TCPBackend::Device::Device(SOCKET fd, TCPBackend &backend) :
 	backend(backend),
-	connection(mc) {
+	connection(fd, backend.notifier) {
 }
 
 TCPBackend::Device::~Device() {
@@ -125,7 +126,7 @@ void TCPBackend::Device::IncomingMessage(protocol::MessageHeader &mh, util::Buff
 			LogMessage(Error, "not enough object IDs");
 			return;
 		}
-		response_in.objects[i] = std::make_shared<BridgeObject>(*backend->twibd, mh.device_id, id);
+		response_in.objects[i] = std::make_shared<BridgeObject>(backend.twibd, mh.device_id, id);
 	}
 
 	// remove from pending requests
@@ -136,7 +137,7 @@ void TCPBackend::Device::IncomingMessage(protocol::MessageHeader &mh, util::Buff
 	if(response_in.client_id == 0xFFFFFFFF) { // identification meta-client
 		Identified(response_in);
 	} else {
-		backend->twibd->PostResponse(std::move(response_in));
+		backend.twibd.PostResponse(std::move(response_in));
 	}
 }
 
@@ -174,8 +175,6 @@ void TCPBackend::Device::SendRequest(const Request &&r) {
 
 	pending_requests.push_back(r.Weak());
 
-	connection.out_buffer.Write(mhdr);
-	connection.out_buffer.Write(r.payload);
 	/* TODO: request objects
 	std::vector<uint32_t> object_ids(r.objects.size(), 0);
 	std::transform(
@@ -184,7 +183,7 @@ void TCPBackend::Device::SendRequest(const Request &&r) {
 			return object->object_id;
 		});
 	connection.out_buffer.Write(object_ids); */
-	connection.PumpOutput();
+	connection.SendMessage(mhdr, r.payload, std::vector<uint32_t>());
 }
 
 int TCPBackend::Device::GetPriority() {
@@ -211,18 +210,18 @@ void TCPBackend::event_thread_func() {
 		FD_SET(listen_fd, &readfds);
 		
 		// add device connections
-		for(auto &c : connections) {
-			if(c->obj->ready_flag && !c->obj->added_flag) {
-				twibd->AddDevice(c->obj);
-				c->obj->added_flag = true;
+		for(auto &c : devices) {
+			if(c->ready_flag && !c->added_flag) {
+				twibd.AddDevice(c);
+				c->added_flag = true;
 			}
 			
-			max_fd = std::max(max_fd, c->fd);
-			FD_SET(c->fd, &errorfds);
-			FD_SET(c->fd, &readfds);
+			max_fd = std::max(max_fd, c->connection.fd);
+			FD_SET(c->connection.fd, &errorfds);
+			FD_SET(c->connection.fd, &readfds);
 			
-			if(c->out_buffer.ReadAvailable() > 0) { // only add to writefds if we need to write
-				FD_SET(c->fd, &writefds);
+			if(c->connection.HasOutData()) { // only add to writefds if we need to write
+				FD_SET(c->connection.fd, &writefds);
 			}
 		}
 
@@ -252,30 +251,40 @@ void TCPBackend::event_thread_func() {
 		}
 		
 		// pump i/o
-		for(auto mci = connections.begin(); mci != connections.end(); mci++) {
-			std::shared_ptr<twibc::MessageConnection<Device>> &mc = *mci;
-			if(FD_ISSET(mc->fd, &errorfds)) {
+		for(auto mci = devices.begin(); mci != devices.end(); mci++) {
+			std::shared_ptr<Device> &c = *mci;
+			if(FD_ISSET(c->connection.fd, &errorfds)) {
 				LogMessage(Info, "detected connection error");
-				mc->obj->deletion_flag = true;
+				c->deletion_flag = true;
 				continue;
 			}
-			if(FD_ISSET(mc->fd, &writefds)) {
-				mc->PumpOutput();
+			if(FD_ISSET(c->connection.fd, &writefds)) {
+				if(!c->connection.PumpOutput()) {
+					c->deletion_flag = true;
+					continue;
+				}
 			}
-			if(FD_ISSET(mc->fd, &readfds)) {
-				LogMessage(Debug, "incoming data for device %x", mc->obj->device_id);
-				mc->PumpInput();
+			
+			if(FD_ISSET(c->connection.fd, &readfds)) {
+				LogMessage(Debug, "incoming data for device %x", c->device_id);
+				if(!c->connection.PumpInput()) {
+					c->deletion_flag = true;
+					continue;
+				}
 			}
 		}
 
-		for(auto i = connections.begin(); i != connections.end(); ) {
-			(*i)->Process();
+		for(auto i = devices.begin(); i != devices.end(); ) {
+			twibc::MessageConnection::Request *rq;
+			while((rq = (*i)->connection.Process()) != nullptr) {
+				(*i)->IncomingMessage(rq->mh, rq->payload, rq->object_ids);
+			}
 			
-			if((*i)->obj->deletion_flag) {
-				if((*i)->obj->added_flag) {
-					twibd->RemoveDevice((*i)->obj);
+			if((*i)->deletion_flag) {
+				if((*i)->added_flag) {
+					twibd.RemoveDevice(*i);
 				}
-				i = connections.erase(i);
+				i = devices.erase(i);
 				continue;
 			}
 
@@ -296,6 +305,13 @@ void TCPBackend::NotifyEventThread() {
 		LogMessage(Error, "failed to notify event thread");
 		exit(1);
 	}
+}
+
+TCPBackend::EventThreadNotifier::EventThreadNotifier(TCPBackend &backend) : backend(backend) {
+}
+
+void TCPBackend::EventThreadNotifier::Notify() {
+	backend.NotifyEventThread();
 }
 
 } // namespace backend

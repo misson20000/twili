@@ -12,7 +12,7 @@
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
-#include "MessageConnection.hpp"
+#include "SocketMessageConnection.hpp"
 
 namespace twili {
 namespace twibd {
@@ -22,26 +22,25 @@ class Twibd;
 namespace frontend {
 
 class SocketFrontend {
-	public:
-	SocketFrontend(Twibd *twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen);
-	SocketFrontend(Twibd *twibd, int fd);
+ public:
+	SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen);
+	SocketFrontend(Twibd &twibd, int fd);
 	~SocketFrontend();
 
 	class Client : public twibd::Client {
 		public:
-		Client(twibc::MessageConnection<Client> &mc, SocketFrontend *frontend);
+		Client(SOCKET fd, SocketFrontend &frontend);
 		~Client();
 
-		void IncomingMessage(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
-		virtual void PostResponse(Response &r);
+		virtual void PostResponse(Response &r) override;
 
-		twibc::MessageConnection<Client> &connection;
-		SocketFrontend *frontend;
-		Twibd *twibd;
+		twibc::SocketMessageConnection connection;
+		SocketFrontend &frontend;
+		Twibd &twibd;
 	};
 
-	private:
-	Twibd *twibd;
+ private:
+	Twibd &twibd;
 	SOCKET fd;
 
 	int address_family;
@@ -57,9 +56,17 @@ class SocketFrontend {
 	int event_thread_notification_pipe[2];
 #endif
 	
-	std::list<std::shared_ptr<twibc::MessageConnection<Client>>> connections;
+	std::list<std::shared_ptr<Client>> clients;
 
 	void NotifyEventThread();
+
+	class EventThreadNotifier : public twibc::SocketMessageConnection::EventThreadNotifier {
+	 public:
+		EventThreadNotifier(SocketFrontend &frontend);
+		virtual void Notify() override;
+	 private:
+		SocketFrontend &frontend;
+	} notifier;
 };
 
 } // namespace frontend
