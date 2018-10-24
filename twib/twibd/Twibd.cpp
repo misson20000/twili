@@ -266,7 +266,7 @@ static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd
 
 #if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
 static std::shared_ptr<frontend::NamedPipeFrontend> CreateNamedPipeFrontend(Twibd &twibd) {
-	return std::make_shared<frontend::NamedPipeFrontend>(&twibd, "foo");
+	return std::make_shared<frontend::NamedPipeFrontend>(twibd, "foo");
 }
 #endif
 
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
 
 	CLI::App app {"Twili debug monitor daemon"};
 
-	int verbosity = false;
+	int verbosity = 3;
 	app.add_flag("-v,--verbose", verbosity, "Enable verbose messages. Use twice to enable debug messages");
 	
 	bool systemd_mode = false;

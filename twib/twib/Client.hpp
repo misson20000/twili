@@ -16,7 +16,7 @@ class Client {
  public:
 	std::future<Response> SendRequest(Request &&rq);
 	
-	bool deletion_flag;
+	bool deletion_flag = false;
 	
  protected:
 	virtual void SendRequestImpl(const Request &rq) = 0;

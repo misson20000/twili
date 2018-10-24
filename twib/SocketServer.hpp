@@ -41,6 +41,11 @@ class SocketServer {
 		virtual void SignalWrite();
 		virtual void SignalError();
 
+#ifdef _WIN32
+		platform::windows::Event event;
+		size_t last_service = 0;
+#endif
+
 		SOCKET fd;
 	 private:
 		bool is_valid = false;
@@ -66,7 +71,9 @@ class SocketServer {
 	bool event_thread_destroy = false;
 	void event_thread_func();
 	std::thread event_thread;
-#ifndef _WIN32
+#ifdef _WIN32
+	platform::windows::Event notification_event;
+#else
 	int event_thread_notification_pipe[2];
 #endif
 };

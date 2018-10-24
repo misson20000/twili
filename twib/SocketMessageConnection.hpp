@@ -26,8 +26,8 @@ class SocketMessageConnection : public MessageConnection {
 	} socket;
 
  protected:
-	virtual void RequestInput() override;
-	virtual void RequestOutput() override;
+	virtual bool RequestInput() override;
+	virtual bool RequestOutput() override;
  private:
 	const EventThreadNotifier &notifier;
 };

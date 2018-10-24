@@ -32,7 +32,7 @@ set(TWIB_UNIX_FRONTEND_DEFAULT_PATH "/var/run/twibd.sock" CACHE FILEPATH "Defaul
 set(TWIB_TCP_FRONTEND_ENABLED ON CACHE BOOL "Enable TCP socket frontend")
 set(TWIB_TCP_FRONTEND_DEFAULT_PORT 15151 CACHE STRING "Default port for twibd TCP socket frontend")
 
-set(TWIB_NAMED_PIPE_FRONTEND_DEFAULT_NAME "\\\\.\\pipe\\twibd" CACHE STRING "Default name for twibd named pipe frontend (windows only)")
+set(TWIB_NAMED_PIPE_FRONTEND_DEFAULT_NAME "\\\\\\\\.\\\\pipe\\\\twibd" CACHE STRING "Default name for twibd named pipe frontend (windows only)")
 
 set(TWILI_VENDOR_ID 0x1209 CACHE STRING "Vendor ID for Twili USB device")
 set(TWILI_PRODUCT_ID 0x8b00 CACHE STRING "Product ID for Twili USB device")
@@ -72,7 +72,7 @@ include_directories("${PROJECT_SOURCE_DIR}/../common/")
 
 set(COMMON_SOURCES Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp SocketServer.cpp)
 if(WIN32)
-	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp)
+	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp NamedPipeMessageConnection.cpp NamedPipeServer.cpp)
 endif()
 add_library(twib-common ${COMMON_SOURCES})
 add_subdirectory(externals EXCLUDE_FROM_ALL)

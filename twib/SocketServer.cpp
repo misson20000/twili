@@ -1,5 +1,7 @@
 #include "SocketServer.hpp"
 
+#include<algorithm>
+
 #include "Logger.hpp"
 
 namespace twili {
@@ -92,26 +94,10 @@ SocketServer::EventThreadNotifier::EventThreadNotifier(SocketServer &server) : s
 
 void SocketServer::EventThreadNotifier::Notify() const {
 #ifdef _WIN32
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof(addr);
-	if(getsockname(fd, (struct sockaddr*) &addr, &addrlen) != 0) {
-		LogMessage(Fatal, "failed to get local server address: %s", NetErrStr());
+	if(!SetEvent(server.notification_event.handle)) {
+		LogMessage(Fatal, "failed to set notification event");
 		exit(1);
 	}
-
-	// Connect to the server in order to wake it up
-	SOCKET cfd = socket(addr.ss_family, socktype, 0);
-	if(cfd < 0) {
-		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
-		exit(1);
-	}
-
-	if(connect(cfd, (struct sockaddr*) &addr, addrlen) < 0) {
-		LogMessage(Fatal, "failed to connect for notification: %s", NetErrStr());
-		exit(1);
-	}
-	
-	closesocket(cfd);
 #else
 	char buf[] = ".";
 	if(write(server.event_thread_notification_pipe[1], buf, sizeof(buf)) != sizeof(buf)) {
@@ -122,15 +108,67 @@ void SocketServer::EventThreadNotifier::Notify() const {
 }
 
 void SocketServer::event_thread_func() {
-	fd_set readfds;
-	fd_set writefds;
-	fd_set errorfds;
-	SOCKET max_fd = 0;
 	while(!event_thread_destroy) {
 		LogMessage(Debug, "socket event thread loop");
 
 		logic.Prepare(*this);
 		
+#ifdef _WIN32
+		std::sort(sockets.begin(), sockets.end(), [](Socket &a, Socket &b) { return a.last_service > b.last_service; });
+		std::vector<HANDLE> event_handles;
+		event_handles.push_back(notification_event.handle);
+		for(Socket &socket : sockets) {
+			long events = FD_CLOSE;
+			if(socket.WantsRead()) {
+				events |= FD_READ;
+				events |= FD_ACCEPT;
+			}
+			if(socket.WantsWrite()) {
+				events |= FD_WRITE;
+			}
+			if(WSAEventSelect(socket.fd, socket.event.handle, events)) {
+				LogMessage(Fatal, "failed to WSAEventSelect");
+				exit(1);
+			}
+			event_handles.push_back(socket.event.handle);
+		}
+		DWORD r = WaitForMultipleObjects(event_handles.size(), event_handles.data(), false, INFINITE);
+		if(r == WAIT_FAILED || r < WAIT_OBJECT_0 || r - WAIT_OBJECT_0 >= sockets.size() + 1) {
+			LogMessage(Fatal, "WaitForMultipleObjects failed");
+			exit(1);
+		}
+		if(r == WAIT_OBJECT_0) { // notification event
+			continue;
+		}
+		sockets[r - WAIT_OBJECT_0 - 1].get().last_service = 0;
+		for(auto i = sockets.begin() + (r - WAIT_OBJECT_0 - 1); i != sockets.end(); i++) {
+			i->get().last_service++; // increment age on sockets that didn't get a change to signal
+		}
+
+		Socket &signalled = sockets[r - WAIT_OBJECT_0 - 1].get();
+		WSANETWORKEVENTS netevents;
+		if(!WSAEnumNetworkEvents(signalled.fd, signalled.event.handle, &netevents)) {
+			LogMessage(Fatal, "WSAEnumNetworkEvents failed");
+			exit(1);
+		}
+		for(size_t i = 0; i < netevents.lNetworkEvents; i++) {
+			int event = netevents.iErrorCode[i];
+			if(event == FD_CLOSE_BIT) {
+				signalled.SignalError();
+			}
+			if(event == FD_READ_BIT || event == FD_ACCEPT_BIT) {
+				signalled.SignalRead();
+			}
+			if(event == FD_WRITE_BIT) {
+				signalled.SignalWrite();
+			}
+		}
+#else
+		fd_set readfds;
+		fd_set writefds;
+		fd_set errorfds;
+		SOCKET max_fd = 0;
+
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
 		FD_ZERO(&errorfds);
@@ -146,18 +184,15 @@ void SocketServer::event_thread_func() {
 			max_fd = std::max(max_fd, socket.fd);
 		}
 		
-#ifndef _WIN32
 		// add event thread notification pipe
 		max_fd = std::max(max_fd, event_thread_notification_pipe[0]);
 		FD_SET(event_thread_notification_pipe[0], &readfds);
-#endif
 		
 		if(select(max_fd + 1, &readfds, &writefds, &errorfds, NULL) < 0) {
 			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
 			exit(1);
 		}
 
-#ifndef _WIN32
 		// Check select status on event thread notification pipe
 		if(FD_ISSET(event_thread_notification_pipe[0], &readfds)) {
 			char buf[64];
@@ -168,7 +203,6 @@ void SocketServer::event_thread_func() {
 			}
 			LogMessage(Debug, "event thread notified: '%.*s'", r, buf);
 		}
-#endif
 
 		for(Socket &socket : sockets) {
 			if(FD_ISSET(socket.fd, &readfds)) {
@@ -181,6 +215,7 @@ void SocketServer::event_thread_func() {
 				socket.SignalError();
 			}
 		}
+#endif
 	}
 }
 

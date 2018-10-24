@@ -1,19 +1,19 @@
-#include "SocketClient.hpp"
+#include "NamedPipeClient.hpp"
 
 namespace twili {
 namespace twib {
 namespace client {
 
-SocketClient::SocketClient(SOCKET fd) : server_logic(*this), socket_server(server_logic), connection(fd, socket_server.notifier) {
-	socket_server.Begin();
+NamedPipeClient::NamedPipeClient(platform::windows::Pipe &&pipe) : Client(), pipe_logic(*this), pipe_server(pipe_logic), connection(std::move(pipe), pipe_server.notifier) {
+	pipe_server.Begin();
 }
 
-SocketClient::~SocketClient() {
-	socket_server.Destroy();
-	connection.socket.Close();
+NamedPipeClient::~NamedPipeClient() {
+	pipe_server.Destroy();
+	connection.pipe.Close();
 }
 
-void SocketClient::SendRequestImpl(const Request &rq) {
+void NamedPipeClient::SendRequestImpl(const Request &rq) {
 	protocol::MessageHeader mh;
 	mh.device_id = rq.device_id;
 	mh.object_id = rq.object_id;
@@ -26,20 +26,21 @@ void SocketClient::SendRequestImpl(const Request &rq) {
 	LogMessage(Debug, "sent request");
 }
 
-SocketClient::Logic::Logic(SocketClient &client) : client(client) {
+NamedPipeClient::Logic::Logic(NamedPipeClient &client) : client(client) {
+
 }
 
-void SocketClient::Logic::Prepare(twibc::SocketServer &server) {
+void NamedPipeClient::Logic::Prepare(twibc::NamedPipeServer &server) {
 	server.Clear();
 	twibc::MessageConnection::Request *rq;
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}
 	if(client.connection.error_flag) {
-		LogMessage(Fatal, "socket error");
+		LogMessage(Fatal, "pipe error");
 		exit(1);
 	}
-	server.AddSocket(client.connection.socket);
+	server.AddPipe(client.connection.pipe);
 }
 
 } // namespace client

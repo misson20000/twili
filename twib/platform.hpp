@@ -15,6 +15,8 @@
 #include<Winsock2.h>
 #include<WS2tcpip.h>
 #include<io.h>
+#include "platform/windows.hpp";
+
 typedef signed long long ssize_t;
 
 static inline char *NetErrStr() {

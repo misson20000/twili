@@ -17,7 +17,7 @@ bool SocketMessageConnection::MessageSocket::WantsRead() {
 }
 
 bool SocketMessageConnection::MessageSocket::WantsWrite() {
-	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex); // ReadAvailable() might not be atomic
+	std::lock_guard<std::recursive_mutex> lock(connection.out_buffer_mutex); // ReadAvailable() might not be atomic
 	return connection.out_buffer.ReadAvailable() > 0;
 }
 
@@ -33,7 +33,7 @@ void SocketMessageConnection::MessageSocket::SignalRead() {
 
 void SocketMessageConnection::MessageSocket::SignalWrite() {
 	LogMessage(Debug, "pumping out 0x%lx bytes", connection.out_buffer.ReadAvailable());
-	std::lock_guard<std::mutex> lock(connection.out_buffer_mutex);
+	std::lock_guard<std::recursive_mutex> lock(connection.out_buffer_mutex);
 	if(connection.out_buffer.ReadAvailable() > 0) {
 		ssize_t r = send(fd, (char*) connection.out_buffer.Read(), connection.out_buffer.ReadAvailable(), 0);
 		if(r < 0) {
@@ -51,12 +51,14 @@ void SocketMessageConnection::MessageSocket::SignalError() {
 	connection.error_flag = true;
 }
 
-void SocketMessageConnection::RequestInput() {
+bool SocketMessageConnection::RequestInput() {
 	// unnecessary
+	return false;
 }
 
-void SocketMessageConnection::RequestOutput() {
+bool SocketMessageConnection::RequestOutput() {
 	notifier.Notify();
+	return false;
 }
 
 } // namespace twibc

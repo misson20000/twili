@@ -10,6 +10,7 @@ namespace windows {
 
 class KObject {
 public:
+	KObject();
 	KObject(KObject &&);
 	KObject &operator=(KObject &&);
 	KObject(const KObject &) = delete;
@@ -19,16 +20,22 @@ public:
 	~KObject();
 
 	HANDLE handle;
+
+	void Close();
 };
 
 class Event : public KObject {
 public:
 	Event(SECURITY_ATTRIBUTES *event_attributes, bool manual_reset, bool initial_state, const char *name);
+	Event();
 };
 
 class Pipe : public KObject {
 public:
 	Pipe(const char *name, uint32_t open_mode, uint32_t pipe_mode, uint32_t max_instances, uint32_t out_buffer_size, uint32_t in_buffer_size, uint32_t default_timeout, SECURITY_ATTRIBUTES *security_attributes);
+	Pipe();
+
+	Pipe &operator=(HANDLE handle);
 };
 
 } // namespace windows

@@ -33,11 +33,12 @@ class MessageConnection {
  protected:
 	util::Buffer in_buffer;
 
-	std::mutex out_buffer_mutex;
+	std::recursive_mutex out_buffer_mutex;
 	util::Buffer out_buffer;
 
-	virtual void RequestInput() = 0;
-	virtual void RequestOutput() = 0;
+	// these turn true if more data was obtained
+	virtual bool RequestInput() = 0;
+	virtual bool RequestOutput() = 0;
 
  private:
 	Request current_rq;
