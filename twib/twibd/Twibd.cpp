@@ -11,7 +11,6 @@
 #include<systemd/sd-daemon.h>
 #endif
 
-#include<libusb.h>
 #include<msgpack11.hpp>
 #include<CLI/CLI.hpp>
 
@@ -31,11 +30,19 @@ namespace twili {
 namespace twibd {
 
 Twibd::Twibd() :
-	local_client(std::make_shared<LocalClient>(this)),
-	usb(this),
-	tcp(*this) {
+	local_client(std::make_shared<LocalClient>(this))
+// this comma placement is really gross, but for some reason C++ doesn't seem to allow commas at the end of member initializer lists
+#if TWIBD_TCP_BACKEND_ENABLED
+	, tcp(*this)
+#endif
+#if TWIBD_LIBUSB_BACKEND_ENABLED
+	, usb(this)
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+	, usbk(*this)
+#endif
+	{
 	AddClient(local_client);
-	usb.Probe();
 }
 
 Twibd::~Twibd() {
