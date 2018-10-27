@@ -40,7 +40,7 @@ void AppletProcess::Launch(bridge::ResponseOpener opener) {
 void AppletProcess::ChangeState(State state) {
 	MonitoredProcess::ChangeState(state);
 	if(state == State::Attached && run_opener) {
-		auto w = run_opener->BeginOk();
+		auto w = run_opener->BeginOk(sizeof(uint64_t));
 		w.Write<uint64_t>(GetPid());
 		w.Finalize();
 		run_opener.reset();
