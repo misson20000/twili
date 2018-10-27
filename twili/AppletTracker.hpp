@@ -35,9 +35,13 @@ class AppletTracker {
 	//  - queued
 	//  - created
 	//  - attached
-	std::deque<std::shared_ptr<process::AppletProcess>> queued;
+
+	// weak pointer used here so we can skip launching the
+	// process if there is no longer interest in it (like
+	// if the ITwibProcessMonitor is closed).
+	std::deque<std::weak_ptr<process::AppletProcess>> queued;
 	std::deque<std::shared_ptr<process::AppletProcess>> created;
-	
+
 	bool has_control_process = false;
 	trn::KEvent process_queued_event;
 	trn::KWEvent process_queued_wevent;

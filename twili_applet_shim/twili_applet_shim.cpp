@@ -158,9 +158,19 @@ void ControlMode(ipc::client::Object &iappletshim) {
 
 					trn::ipc::client::Object controller; // twili::IAppletController
 					
-					ResultCode::AssertOk(
-						iappletshim.SendSyncRequest<102>(
-							ipc::OutObject(controller))); // PopApplet
+					auto r = iappletshim.SendSyncRequest<102>(
+							ipc::OutObject(controller)); // PopApplet
+
+					if(!r) {
+						if(r.error().code == TWILI_ERR_APPLET_TRACKER_NO_PROCESS) {
+							// it's possible for us to get dispatched the CREATE_APPLET
+							// command and then for the ITwibProcessMonitor to die before
+							// we pop the applet.
+							continue;
+						} else {
+							ResultCode::AssertOk(std::move(r));
+						}
+					}
 					
 					ipc::client::Object ilaa;
 					ResultCode::AssertOk(
