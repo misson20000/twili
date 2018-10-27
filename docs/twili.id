@@ -48,4 +48,6 @@ interface twili::IAppletShim {
 
 interface twili::IAppletController {
 	[0] SetResult(u32 result);
+	[1] GetEvent() -> handle<event, copy> event;
+	[2] GetCommand() -> u32 command;
 }

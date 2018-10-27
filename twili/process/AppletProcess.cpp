@@ -13,7 +13,8 @@ namespace twili {
 namespace process {
 
 AppletProcess::AppletProcess(Twili &twili) :
-	MonitoredProcess(twili) {
+	MonitoredProcess(twili),
+	command_wevent(command_event) {
 
 	// build virtual exefs
 	virtual_exefs.SetRtld(std::make_shared<fs::ActualFile>(fopen("/squash/twili_applet_shim.nso", "rb")));
@@ -66,6 +67,24 @@ void AppletProcess::ChangeState(State state) {
 		run_opener->BeginError(GetResult()).Finalize();
 		run_opener.reset();
 	}
+	if(state == State::Exited) {
+		kill_timeout.reset();
+	}
+}
+
+void AppletProcess::Kill() {
+	std::shared_ptr<MonitoredProcess> self = shared_from_this();
+
+	// if we don't exit within 10 seconds, go ahead and terminate it
+	kill_timeout = twili.event_waiter.AddDeadline(
+		svcGetSystemTick() + 10000000000uLL,
+		[self]() -> uint64_t {
+			self->Terminate();
+			return 0; // don't rearm
+		});
+
+	printf("AppletProcess: requesting to exit cleanly...\n");
+	PushCommand(0); // REQUEST_EXIT
 }
 
 void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries) {
@@ -89,6 +108,24 @@ void AppletProcess::PrepareForLaunch() {
 	printf("installed ExternalContentSource\n");
 	ResultCode::AssertOk(
 		twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
+}
+
+trn::KEvent &AppletProcess::GetCommandEvent() {
+	return command_event;
+}
+
+uint32_t AppletProcess::PopCommand() {
+	if(commands.size() == 0) {
+		throw trn::ResultError(TWILI_ERR_APPLET_SHIM_NO_COMMANDS_LEFT);
+	}
+	uint32_t cmd = commands.front();
+	commands.pop_front();
+	return cmd;
+}
+
+void AppletProcess::PushCommand(uint32_t command) {
+	commands.push_back(command);
+	command_wevent.Signal();
 }
 
 } // namespace process

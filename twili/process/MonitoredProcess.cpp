@@ -42,6 +42,10 @@ void MonitoredProcess::Terminate() {
 	ResultCode::AssertOk(trn::svc::TerminateProcess(*this->proc));
 }
 
+void MonitoredProcess::Kill() {
+	Terminate();
+}
+
 MonitoredProcess::State MonitoredProcess::GetState() {
 	return state;
 }

@@ -30,23 +30,54 @@ class ControlledApplet {
 		
 		ResultCode::AssertOk(
 			ilaa.SendSyncRequest<0>( // GetAppletStateChangedEvent
-				ipc::OutHandle<trn::KEvent, ipc::copy>(event)));
+				ipc::OutHandle<trn::KEvent, ipc::copy>(applet_event)));
+
+		ResultCode::AssertOk(
+			controller.SendSyncRequest<1>( // GetEvent
+				ipc::OutHandle<trn::KEvent, ipc::copy>(controller_event)));
 		
-		wh = waiter.Add(
-			event,
+		applet_wh = waiter.Add(
+			applet_event,
 			[&]() -> bool {
 				printf("controlled applet state change event signalled\n");
-				event.ResetSignal();
-				Result<std::nullopt_t> r = ilaa.SendSyncRequest<30>();
-				if(r) {
-					printf("  result: OK\n");
-				} else {
-					printf("  result: 0x%x\n", r.error().code);
-					ResultCode::AssertOk(controller.SendSyncRequest<0>(ipc::InRaw<uint32_t>(r.error().code))); // SetResult
+				applet_event.ResetSignal();
+				SetResult();
+				return true;
+			});
+
+		controller_wh = waiter.Add(
+			controller_event,
+			[&]() -> bool {
+				printf("controlled applet got controller event signal\n");
+				controller_event.ResetSignal();
+				uint32_t command;
+				trn::Result<std::nullopt_t> r = std::nullopt;
+				while((r = controller.SendSyncRequest<2>(ipc::OutRaw<uint32_t>(command)))) {
+					switch(command) {
+					case 0: // REQUEST_EXIT
+						printf("requesting exit\n");
+						ResultCode::AssertOk(ilaa.SendSyncRequest<20>()); // RequestExit
+						break;
+					default:
+						// TODO: fatal
+						break;
+					}
+				}
+				if(r.error().code != TWILI_ERR_APPLET_SHIM_NO_COMMANDS_LEFT) {
+					// TODO: fatal
 				}
 				return true;
 			});
 	}
+
+	~ControlledApplet() {
+		//SetResult();
+	}
+
+	ControlledApplet(ControlledApplet &&other) = delete;
+	ControlledApplet(const ControlledApplet &other) = delete;
+	ControlledApplet &operator=(ControlledApplet &&other) = delete;
+	ControlledApplet &operator=(const ControlledApplet &other) = delete;
 	
 	bool IsCompleted() {
 		bool is;
@@ -59,10 +90,24 @@ class ControlledApplet {
 		ResultCode::AssertOk(ilaa.SendSyncRequest<150>()); // RequestForAppletToGetForeground
 	}
 
-	std::shared_ptr<trn::WaitHandle> wh;
+	void SetResult() {
+		Result<std::nullopt_t> r = ilaa.SendSyncRequest<30>();
+		if(r) {
+			printf("  result: OK\n");
+		} else {
+			printf("  result: 0x%x\n", r.error().code);
+			// TODO: debug why we're closing controller before we reach this point
+			r = controller.SendSyncRequest<0>(ipc::InRaw<uint32_t>(r.error().code)); // SetResult
+			printf("set result (0x%x)\n", r ? 0 : r.error().code);
+		}
+	}
+	
 	ipc::client::Object ilaa;
 	ipc::client::Object controller; // twili::IAppletController
-	trn::KEvent event;
+	trn::KEvent applet_event;
+	trn::KEvent controller_event;
+	std::shared_ptr<trn::WaitHandle> applet_wh;
+	std::shared_ptr<trn::WaitHandle> controller_wh;
 };
 
 void ControlMode(ipc::client::Object &iappletshim) {
@@ -330,7 +375,7 @@ int main(int argc, char *argv[]) {
 		
 		return 0;
 	} catch(trn::ResultError &e) {
-		printf("caught 0x%x\n", e.code.code);
+		printf("applet_shim: caught 0x%x\n", e.code.code);
 		return e.code.code;
 	}
 

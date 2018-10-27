@@ -18,6 +18,10 @@ namespace bridge {
 ITwibProcessMonitor::ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process) : Object(object_id), process(process) {
 }
 
+ITwibProcessMonitor::~ITwibProcessMonitor() {
+	process->Kill(); // attempt to exit cleanly
+}
+
 void ITwibProcessMonitor::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
 	switch((protocol::ITwibProcessMonitor::Command) command_id) {
 	case protocol::ITwibProcessMonitor::Command::LAUNCH:
