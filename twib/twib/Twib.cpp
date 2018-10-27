@@ -161,6 +161,8 @@ int main(int argc, char *argv[]) {
 	bool run_applet;
 	run->add_flag("-a,--applet", run_applet, "Run as an applet");
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
+	bool run_quiet = false;
+	run->add_flag("-q,--quiet", run_quiet, "Suppress any output except from the program being run");
 	
 	CLI::App *reboot = app.add_subcommand("reboot", "Reboot the device");
 
@@ -249,7 +251,10 @@ int main(int argc, char *argv[]) {
 		
 		twili::twib::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_applet ? "applet" : "managed");
 		mon.AppendCode(*code_opt);
-		printf("PID: 0x%x\n", mon.Launch());
+		uint64_t pid = mon.Launch();
+		if(!run_quiet) {
+			printf("PID: 0x%x\n", pid);
+		}
 		volatile bool running = true;
 		auto pump_output =
 			[&running](twili::twib::ITwibPipeReader reader, FILE *stream) {
