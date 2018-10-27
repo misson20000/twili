@@ -44,6 +44,23 @@ void AppletProcess::ChangeState(State state) {
 		w.Write<uint64_t>(GetPid());
 		w.Finalize();
 		run_opener.reset();
+
+		// find target entry...
+		memory_info_t mi = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, 0)));
+		int coderegions_found = 0;
+		while((uint64_t) mi.base_addr + mi.size > 0) {
+			if(mi.memory_type == 3 && mi.permission == 5) {
+				coderegions_found++;
+				if(coderegions_found == 2) { // first region is AppletShim, second region is target
+					printf("found target entry at 0x%lx\n", (uint64_t) mi.base_addr);
+					target_entry = (uint64_t) mi.base_addr;
+				}
+			}
+			mi = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, (uint64_t) mi.base_addr + mi.size)));
+		}
+		if(coderegions_found != 2) {
+			printf("CODE REGION COUNT MISMATCH (expected 2, counted %d)\n", coderegions_found);
+		}
 	}
 	if(state == State::Exited && run_opener) {
 		run_opener->BeginError(GetResult()).Finalize();
