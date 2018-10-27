@@ -164,10 +164,6 @@ static void substitute_handle(ipc::client::Object &shimservice, handle_t *handle
 void HostMode(ipc::client::Object &iappletshim) {
 	printf("AppletShim entering host mode\n");
 
-	ResultCode::AssertOk(iappletshim.SendSyncRequest<201>()); // SetupTarget
-
-	printf("twili has set up our target\n");
-	
 	ipc::client::Object shimservice;
 	ResultCode::AssertOk(
 		iappletshim.SendSyncRequest<202>( // OpenHBABIShim
