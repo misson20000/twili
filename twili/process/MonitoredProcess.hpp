@@ -17,18 +17,20 @@ class Twili;
 
 namespace process {
 
+class ProcessMonitor;
+
 class MonitoredProcess : public Process, public std::enable_shared_from_this<MonitoredProcess> {
  public:
 	MonitoredProcess(Twili &twili);
 	virtual ~MonitoredProcess();
 
 	enum class State {
-		Created,
-		Started,
-		Attached,
-		Running,
-		Crashed,
-		Exited
+		Created, // process has been created, but not yet started
+		Started, // process has been started, but not yet attached
+		Attached, // process has been attached and is in HBABIShim
+		Running, // process has entered target
+		Crashed, // process has crashed
+		Exited // process has extied cleanly
 	};
 	
 	virtual void Launch(bridge::ResponseOpener response) = 0;
