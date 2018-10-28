@@ -73,6 +73,12 @@ void MonitoredProcess::ChangeState(State new_state) {
 		twili.monitored_processes.push_back(shared_from_this());
 		printf("  began monitoring 0x%x\n", GetPid());
 	}
+	if(new_state == State::Exited) {
+		// close pipes
+		tp_stdin->Close();
+		tp_stdout->Close();
+		tp_stderr->Close();
+	}
 	state = new_state;
 	for(auto mon : monitors) {
 		mon->StateChanged(new_state);
