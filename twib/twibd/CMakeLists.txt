@@ -35,6 +35,9 @@ if(TWIBD_LIBUSBK_BACKEND_ENABLED)
 	find_package(libusbK REQUIRED)
 	include_directories(${LIBUSBK_INCLUDE_DIRS} INTERFACE)
 	target_link_libraries(twibd ${LIBUSBK_LIBRARIES})
+
+	find_package(SetupAPI REQUIRED)
+	target_link_libraries(twibd ${SETUPAPI_LIBRARIES})
 endif()
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
