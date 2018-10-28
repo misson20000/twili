@@ -18,6 +18,7 @@ class ITwibProcessMonitor {
 	ITwibPipeWriter OpenStdin();
 	ITwibPipeReader OpenStdout();
 	ITwibPipeReader OpenStderr();
+	uint32_t WaitStateChange();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

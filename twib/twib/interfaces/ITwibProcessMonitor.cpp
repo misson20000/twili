@@ -34,5 +34,14 @@ ITwibPipeReader ITwibProcessMonitor::OpenStderr() {
 	return ITwibPipeReader(obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::OPEN_STDERR).objects[0]);
 }
 
+uint32_t ITwibProcessMonitor::WaitStateChange() {
+	Response rs = obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::WAIT_STATE_CHANGE);
+	if(rs.payload.size() < sizeof(uint32_t)) {
+		LogMessage(Fatal, "response size invalid");
+		exit(1);
+	}
+	return *(uint32_t*) rs.payload.data();
+}
+
 } // namespace twib
 } // namespace twili

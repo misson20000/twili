@@ -4,6 +4,7 @@
 #include<libtransistor/util.h>
 
 #include "Process.hpp"
+#include "ProcessMonitor.hpp"
 #include "../twili.hpp"
 #include "../ELFCrashReport.hpp"
 #include "../bridge/interfaces/ITwibPipeReader.hpp"
@@ -73,6 +74,9 @@ void MonitoredProcess::ChangeState(State new_state) {
 		printf("  began monitoring 0x%x\n", GetPid());
 	}
 	state = new_state;
+	for(auto mon : monitors) {
+		mon->StateChanged(new_state);
+	}
 }
 
 std::shared_ptr<trn::KProcess> MonitoredProcess::GetProcess() {
@@ -96,6 +100,14 @@ void MonitoredProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entri
 			0xffffffffffffffff
 		}
 	});
+}
+
+void MonitoredProcess::AddMonitor(ProcessMonitor &monitor) {
+	monitors.push_back(&monitor);
+}
+
+void MonitoredProcess::RemoveMonitor(ProcessMonitor &monitor) {
+	monitors.remove(&monitor);
 }
 
 MonitoredProcess::~MonitoredProcess() {

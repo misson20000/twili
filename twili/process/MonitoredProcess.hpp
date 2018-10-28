@@ -5,6 +5,7 @@
 #include<libtransistor/loader_config.h>
 
 #include<memory>
+#include<list>
 
 #include "Process.hpp"
 #include "../TwibPipe.hpp"
@@ -52,6 +53,9 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
+
+	void AddMonitor(ProcessMonitor &monitor);
+	void RemoveMonitor(ProcessMonitor &monitor);
 	
  protected:
 	std::shared_ptr<trn::KProcess> proc;
@@ -60,6 +64,8 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
  private:
 	State state = State::Created;
 	trn::ResultCode result = RESULT_OK;
+	
+	std::list<ProcessMonitor*> monitors;
 };
 
 } // namespace process

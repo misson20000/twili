@@ -317,6 +317,12 @@ int main(int argc, char *argv[]) {
 			}, mon.OpenStdin());
 		stdout_pump.join();
 		stderr_pump.join();
+		LogMessage(Debug, "output pump threads exited");
+		uint32_t state;
+		while((state = mon.WaitStateChange()) != 5) {
+			LogMessage(Debug, "  state %d change...", state);
+		}
+		LogMessage(Debug, "  process exited");
 		exit(0); // skip calling stdin_pump thread destructor, since it will std::terminate
 	}
 

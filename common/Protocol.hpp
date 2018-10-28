@@ -89,6 +89,7 @@ class ITwibProcessMonitor {
 		OPEN_STDIN = 14,
 		OPEN_STDOUT = 15,
 		OPEN_STDERR = 16,
+		WAIT_STATE_CHANGE = 17,
 	};
 };
 
