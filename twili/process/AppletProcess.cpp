@@ -73,13 +73,19 @@ void AppletProcess::ChangeState(State state) {
 }
 
 void AppletProcess::Kill() {
+	if(GetState() == State::Exited) {
+		return; // nothing to do here
+	}
+	
 	std::shared_ptr<MonitoredProcess> self = shared_from_this();
 
 	// if we don't exit within 10 seconds, go ahead and terminate it
 	kill_timeout = twili.event_waiter.AddDeadline(
 		svcGetSystemTick() + 10000000000uLL,
-		[self]() -> uint64_t {
+		[self, this]() -> uint64_t {
+			printf("AppletProcess: clean exit timeout expired, terminating...\n");
 			self->Terminate();
+			kill_timeout.reset(); // make sure self ptr gets cleaned up
 			return 0; // don't rearm
 		});
 

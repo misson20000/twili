@@ -30,7 +30,7 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 		Attached, // process has been attached and is in HBABIShim
 		Running, // process has entered target
 		Crashed, // process has crashed
-		Exited // process has extied cleanly
+		Exited // process has exited cleanly
 	};
 	
 	virtual void Launch(bridge::ResponseOpener response) = 0;

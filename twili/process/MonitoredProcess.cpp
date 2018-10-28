@@ -37,6 +37,9 @@ void MonitoredProcess::AddNotes(ELFCrashReport &report) {
 }
 
 void MonitoredProcess::Terminate() {
+	if(state == State::Exited) {
+		return; // already dead
+	}
 	if(!proc) {
 		return; // silently fail...
 	}
@@ -44,6 +47,9 @@ void MonitoredProcess::Terminate() {
 }
 
 void MonitoredProcess::Kill() {
+	if(state == State::Exited) {
+		return; // already dead
+	}
 	Terminate();
 }
 
