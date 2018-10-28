@@ -43,6 +43,12 @@ Twibd::Twibd() :
 #endif
 	{
 	AddClient(local_client);
+#if TWIBD_LIBUSB_BACKEND_ENABLED
+	usb.Probe();
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+	usbk.Probe();
+#endif
 }
 
 Twibd::~Twibd() {

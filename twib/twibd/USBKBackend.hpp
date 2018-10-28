@@ -27,6 +27,8 @@ class USBKBackend {
 	USBKBackend(Twibd &twibd);
 	~USBKBackend();
 	
+	void Probe();
+
 	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
 	 public:
 		Device(USBKBackend &backend, KUSB_HANDLE handle, uint8_t endp_addrs[4], uint8_t interface_number);
@@ -52,15 +54,19 @@ class USBKBackend {
 		KUSB_HANDLE handle;
 	};
 
+	void AddDevice(KLST_DEVINFO_HANDLE device_info);
+
  private:
 	Twibd &twibd;
 	std::list<std::shared_ptr<Device>> devices;
 	
-	KUSB_DRIVER_API usb;
+	KHOT_HANDLE hot_handle = nullptr;
 
 	bool event_thread_destroy = false;
 	void event_thread_func();
 	std::thread event_thread;
+
+	static void hotplug_notify_shim(KHOT_HANDLE hot_handle, KLST_DEVINFO_HANDLE device_info, KLST_SYNC_FLAG plug_type);
 };
 
 } // namespace backend
