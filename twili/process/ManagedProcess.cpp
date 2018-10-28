@@ -62,8 +62,6 @@ void ManagedProcess::Launch(bridge::ResponseOpener response) {
 		
 		response.BeginError(r.error()).Finalize();
 	} else {
-		ChangeState(State::Running);
-		
 		auto w = response.BeginOk(sizeof(uint64_t));
 		w.Write<uint64_t>(GetPid());
 		w.Finalize();
