@@ -37,7 +37,7 @@ class Process {
 	virtual uint64_t GetPid() = 0;
 	virtual void AddNotes(ELFCrashReport &report);
 	virtual void Terminate() = 0;
- protected:
+
 	Twili &twili;
 };
 

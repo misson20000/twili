@@ -87,6 +87,9 @@ void ITwibProcessMonitor::Launch(std::vector<uint8_t> payload, bridge::ResponseO
 		throw ResultError(TWILI_ERR_BAD_REQUEST);
 	}
 
+	process->twili.monitored_processes.push_back(process);
+	printf("  began monitoring 0x%x\n", process->GetPid());
+
 	process->Launch(opener);
 }
 

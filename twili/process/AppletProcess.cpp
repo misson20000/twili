@@ -93,6 +93,11 @@ void AppletProcess::ChangeState(State state) {
 }
 
 void AppletProcess::Kill() {
+	if(state == State::Created) {
+		ChangeState(State::Exited);
+		return;
+	}
+
 	if(GetState() == State::Exited) {
 		return; // nothing to do here
 	}
