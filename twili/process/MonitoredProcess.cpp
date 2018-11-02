@@ -57,6 +57,10 @@ void MonitoredProcess::AddNotes(ELFCrashReport &report) {
 }
 
 void MonitoredProcess::Terminate() {
+	if(state == State::Created) {
+		ChangeState(State::Exited);
+		return;
+	}
 	if(state == State::Exited) {
 		return; // already dead
 	}
@@ -67,6 +71,10 @@ void MonitoredProcess::Terminate() {
 }
 
 void MonitoredProcess::Kill() {
+	if(state == State::Created) {
+		ChangeState(State::Exited);
+		return;
+	}
 	if(state == State::Exited) {
 		return; // already dead
 	}
@@ -95,10 +103,6 @@ void MonitoredProcess::SetResult(trn::ResultCode r) {
 
 void MonitoredProcess::ChangeState(State new_state) {
 	printf("process [0x%lx] changing to state %d\n", GetPid(), (int) new_state);
-	if(new_state == State::Running) {
-		twili.monitored_processes.push_back(shared_from_this());
-		printf("  began monitoring 0x%x\n", GetPid());
-	}
 	if(new_state == State::Exited) {
 		// close pipes
 		tp_stdin->Close();
