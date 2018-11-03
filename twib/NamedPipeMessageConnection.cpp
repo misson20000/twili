@@ -4,64 +4,48 @@ namespace twili {
 namespace twibc {
 
 NamedPipeMessageConnection::NamedPipeMessageConnection(platform::windows::Pipe &&pipe, const EventThreadNotifier &notifier) :
-	pipe(*this, std::move(pipe)),
+	input_member(*this),
+	output_member(*this),
+	pipe(std::move(pipe)),
 	notifier(notifier),
 	out_buffer_lock(out_buffer_mutex, std::defer_lock) {
-}
-
-NamedPipeMessageConnection::NamedPipeMessageConnection(NamedPipeServer::Pipe &&pipe, const EventThreadNotifier &notifier) :
-	pipe(*this, std::move(pipe)),
-	notifier(notifier),
-	out_buffer_lock(out_buffer_mutex, std::defer_lock) {
+	if(this->pipe.handle == INVALID_HANDLE_VALUE) {
+		LogMessage(Error, "invalid pipe");
+		exit(1);
+	}
 }
 
 NamedPipeMessageConnection::~NamedPipeMessageConnection() {
 
 }
 
-NamedPipeMessageConnection::MessagePipe::MessagePipe(NamedPipeMessageConnection &connection, platform::windows::Pipe &&pipe) : Pipe(std::move(pipe)), connection(connection) {
-	if(this->pipe.handle == INVALID_HANDLE_VALUE) {
-		LogMessage(Error, "invalid pipe");
-		exit(1);
-	}
-
-	if(event_in.handle == INVALID_HANDLE_VALUE) {
+NamedPipeMessageConnection::InputMember::InputMember(NamedPipeMessageConnection &connection) : connection(connection) {
+	if(event.handle == INVALID_HANDLE_VALUE) {
 		LogMessage(Error, "invalid event");
 		exit(1);
 	}
 
-	if(event_out.handle == INVALID_HANDLE_VALUE) {
-		LogMessage(Error, "invalid event");
-		exit(1);
-	}
+	overlap.hEvent = event.handle;
 }
 
-NamedPipeMessageConnection::MessagePipe::MessagePipe(NamedPipeMessageConnection &connection, Pipe &&other) : Pipe(std::move(other)), connection(connection) {
-	if(this->pipe.handle == INVALID_HANDLE_VALUE) {
-		LogMessage(Error, "invalid pipe");
-		exit(1);
-	}
-
-	if(event_in.handle == INVALID_HANDLE_VALUE) {
+NamedPipeMessageConnection::OutputMember::OutputMember(NamedPipeMessageConnection &connection) : connection(connection) {
+	if(event.handle == INVALID_HANDLE_VALUE) {
 		LogMessage(Error, "invalid event");
 		exit(1);
 	}
 
-	if(event_out.handle == INVALID_HANDLE_VALUE) {
-		LogMessage(Error, "invalid event");
-		exit(1);
-	}
+	overlap.hEvent = event.handle;
 }
 
-bool NamedPipeMessageConnection::MessagePipe::WantsSignalIn() {
+bool NamedPipeMessageConnection::InputMember::WantsSignal() {
 	return connection.is_reading;
 }
 
-bool NamedPipeMessageConnection::MessagePipe::WantsSignalOut() {
+bool NamedPipeMessageConnection::OutputMember::WantsSignal() {
 	return connection.is_writing;
 }
 
-void NamedPipeMessageConnection::MessagePipe::SignalIn() {
+void NamedPipeMessageConnection::InputMember::Signal() {
 	LogMessage(Debug, "NPMC MessagePipe signalled in");
 	std::lock_guard<std::mutex> guard(connection.state_mutex);
 
@@ -73,7 +57,7 @@ void NamedPipeMessageConnection::MessagePipe::SignalIn() {
 	}
 
 	DWORD bytes_transferred = 0;
-	if(!GetOverlappedResult(pipe.handle, &overlap_in, &bytes_transferred, false)) {
+	if(!GetOverlappedResult(connection.pipe.handle, &overlap, &bytes_transferred, false)) {
 		LogMessage(Debug, "GetOverlappedResult failed: %d", GetLastError());
 		connection.error_flag = true;
 		return;
@@ -84,7 +68,7 @@ void NamedPipeMessageConnection::MessagePipe::SignalIn() {
 	connection.is_reading = false;
 }
 
-void NamedPipeMessageConnection::MessagePipe::SignalOut() {
+void NamedPipeMessageConnection::OutputMember::Signal() {
 	LogMessage(Debug, "NPMC MessagePipe signalled out");
 	std::lock_guard<std::mutex> guard(connection.state_mutex);
 
@@ -96,7 +80,7 @@ void NamedPipeMessageConnection::MessagePipe::SignalOut() {
 	}
 
 	DWORD bytes_transferred = 0;
-	if(!GetOverlappedResult(pipe.handle, &overlap_out, &bytes_transferred, false)) {
+	if(!GetOverlappedResult(connection.pipe.handle, &overlap, &bytes_transferred, false)) {
 		LogMessage(Debug, "GetOverlappedResult failed: %d", GetLastError());
 		connection.error_flag = true;
 		return;
@@ -108,6 +92,14 @@ void NamedPipeMessageConnection::MessagePipe::SignalOut() {
 	connection.is_writing = false;
 }
 
+platform::windows::Event &NamedPipeMessageConnection::InputMember::GetEvent() {
+	return event;
+}
+
+platform::windows::Event &NamedPipeMessageConnection::OutputMember::GetEvent() {
+	return event;
+}
+
 bool NamedPipeMessageConnection::RequestInput() {
 	LogMessage(Debug, "requesting input");
 	std::lock_guard<std::mutex> guard(state_mutex);
@@ -115,7 +107,7 @@ bool NamedPipeMessageConnection::RequestInput() {
 		LogMessage(Debug, "was in idle state");
 		std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
 		DWORD bytes_read;
-		if(ReadFile(pipe.pipe.handle, (void*)std::get<0>(target), std::get<1>(target), &bytes_read, &pipe.overlap_in)) {
+		if(ReadFile(pipe.handle, (void*)std::get<0>(target), std::get<1>(target), &bytes_read, &input_member.overlap)) {
 			in_buffer.MarkWritten(bytes_read);
 			LogMessage(Debug, "completed synchronously");
 			return true;
@@ -143,7 +135,7 @@ bool NamedPipeMessageConnection::RequestOutput() {
 		LogMessage(Debug, "locked out_buffer_lock");
 		if(out_buffer.ReadAvailable() > 0) {
 			DWORD bytes_written;
-			if(WriteFile(pipe.pipe.handle, (void*)out_buffer.Read(), out_buffer.ReadAvailable(), &bytes_written, &pipe.overlap_out)) {
+			if(WriteFile(pipe.handle, (void*)out_buffer.Read(), out_buffer.ReadAvailable(), &bytes_written, &output_member.overlap)) {
 				out_buffer.MarkRead(bytes_written);
 				out_buffer_lock.unlock();
 				LogMessage(Debug, "completed synchronously");

@@ -1,5 +1,7 @@
 #include "windows.hpp"
 
+#include<optional>
+
 #include "Logger.hpp"
 
 namespace twili {
@@ -10,14 +12,12 @@ KObject::KObject() : handle(INVALID_HANDLE_VALUE) {
 
 }
 
-KObject::KObject(KObject &&other) : handle(other.handle) {
-	other.handle = INVALID_HANDLE_VALUE;
+KObject::KObject(KObject &&other) : handle(other.Claim()) {
 }
 
 KObject &KObject::operator=(KObject &&other) {
 	Close();
-	handle = other.handle;
-	other.handle = INVALID_HANDLE_VALUE;
+	handle = other.Claim();
 	return *this;
 }
 
@@ -29,6 +29,12 @@ KObject::~KObject() {
 	Close();
 }
 
+HANDLE KObject::Claim() {
+	HANDLE hnd = handle;
+	handle = INVALID_HANDLE_VALUE;
+	return hnd;
+}
+
 void KObject::Close() {
 	if(handle != INVALID_HANDLE_VALUE) {
 		CloseHandle(handle);
@@ -36,6 +42,9 @@ void KObject::Close() {
 }
 
 Event::Event(SECURITY_ATTRIBUTES *event_attributes, bool manual_reset, bool initial_state, const char *name) : KObject(CreateEventA(event_attributes, manual_reset, initial_state, name)) {
+}
+
+Event::Event(HANDLE handle) : KObject(handle) {
 }
 
 Event::Event() : Event(nullptr, false, false, nullptr) {

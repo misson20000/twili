@@ -21,12 +21,14 @@ public:
 
 	HANDLE handle;
 
+	HANDLE Claim();
 	void Close();
 };
 
 class Event : public KObject {
 public:
 	Event(SECURITY_ATTRIBUTES *event_attributes, bool manual_reset, bool initial_state, const char *name);
+	Event(HANDLE handle);
 	Event();
 };
 

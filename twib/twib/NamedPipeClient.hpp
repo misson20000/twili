@@ -5,6 +5,7 @@
 #include "platform.hpp"
 #include "Buffer.hpp"
 #include "NamedPipeMessageConnection.hpp"
+#include "platform/windows/EventLoop.hpp"
 
 namespace twili {
 namespace twib {
@@ -17,14 +18,14 @@ public:
 protected:
 	virtual void SendRequestImpl(const Request &rq) override;
 private:
-	class Logic : public twibc::NamedPipeServer::Logic {
+	class Logic : public platform::windows::EventLoop::Logic {
 	public:
 		Logic(NamedPipeClient &client);
-		virtual void Prepare(twibc::NamedPipeServer &server) override;
+		virtual void Prepare(platform::windows::EventLoop &loop) override;
 	private:
 		NamedPipeClient &client;
 	} pipe_logic;
-	twibc::NamedPipeServer pipe_server;
+	platform::windows::EventLoop event_loop;
 	twibc::NamedPipeMessageConnection connection;
 };
 

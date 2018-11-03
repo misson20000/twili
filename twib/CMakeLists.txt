@@ -92,7 +92,7 @@ include_directories("${PROJECT_SOURCE_DIR}/../common/")
 
 set(COMMON_SOURCES Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp SocketServer.cpp)
 if(WIN32)
-	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp NamedPipeMessageConnection.cpp NamedPipeServer.cpp)
+	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp NamedPipeMessageConnection.cpp platform/windows/EventLoop.cpp)
 endif()
 add_library(twib-common ${COMMON_SOURCES})
 add_subdirectory(externals EXCLUDE_FROM_ALL)

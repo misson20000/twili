@@ -4,13 +4,12 @@ namespace twili {
 namespace twib {
 namespace client {
 
-NamedPipeClient::NamedPipeClient(platform::windows::Pipe &&pipe) : Client(), pipe_logic(*this), pipe_server(pipe_logic), connection(std::move(pipe), pipe_server.notifier) {
-	pipe_server.Begin();
+NamedPipeClient::NamedPipeClient(platform::windows::Pipe &&pipe) : Client(), pipe_logic(*this), event_loop(pipe_logic), connection(std::move(pipe), event_loop.notifier) {
+	event_loop.Begin();
 }
 
 NamedPipeClient::~NamedPipeClient() {
-	pipe_server.Destroy();
-	connection.pipe.Close();
+	event_loop.Destroy();
 }
 
 void NamedPipeClient::SendRequestImpl(const Request &rq) {
@@ -30,8 +29,8 @@ NamedPipeClient::Logic::Logic(NamedPipeClient &client) : client(client) {
 
 }
 
-void NamedPipeClient::Logic::Prepare(twibc::NamedPipeServer &server) {
-	server.Clear();
+void NamedPipeClient::Logic::Prepare(platform::windows::EventLoop &loop) {
+	loop.Clear();
 	twibc::MessageConnection::Request *rq;
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
@@ -40,7 +39,8 @@ void NamedPipeClient::Logic::Prepare(twibc::NamedPipeServer &server) {
 		LogMessage(Fatal, "pipe error");
 		exit(1);
 	}
-	server.AddPipe(client.connection.pipe);
+	loop.AddMember(client.connection.input_member);
+	loop.AddMember(client.connection.output_member);
 }
 
 } // namespace client

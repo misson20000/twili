@@ -10,15 +10,16 @@ namespace twili {
 namespace twibd {
 namespace frontend {
 
-NamedPipeFrontend::NamedPipeFrontend(Twibd &twibd, const char *name) : twibd(twibd), pipe_logic(*this), pending_pipe(*this), pipe_server(pipe_logic) {
+NamedPipeFrontend::NamedPipeFrontend(Twibd &twibd, const char *name) : twibd(twibd), pipe_logic(*this), pending_pipe(*this), event_loop(pipe_logic) {
 	LogMessage(Debug, "created NamedPipeFrontend");
-	pipe_server.Begin();
+	event_loop.Begin();
 }
 
 NamedPipeFrontend::~NamedPipeFrontend() {
+	event_loop.Destroy();
 }
 
-NamedPipeFrontend::Client::Client(twibc::NamedPipeServer::Pipe &&pipe, NamedPipeFrontend &frontend) : connection(std::move(pipe), frontend.pipe_server.notifier), frontend(frontend), twibd(frontend.twibd) {
+NamedPipeFrontend::Client::Client(Pipe &&pipe, NamedPipeFrontend &frontend) : connection(std::move(pipe), frontend.event_loop.notifier), frontend(frontend), twibd(frontend.twibd) {
 }
 
 NamedPipeFrontend::Client::~Client() {
@@ -48,10 +49,10 @@ NamedPipeFrontend::Logic::Logic(NamedPipeFrontend &frontend) : frontend(frontend
 
 }
 
-void NamedPipeFrontend::Logic::Prepare(twibc::NamedPipeServer &server) {
+void NamedPipeFrontend::Logic::Prepare(EventLoop &loop) {
 	LogMessage(Debug, "NamedPipeFrontend preparing");
-	server.Clear();
-	server.AddPipe(frontend.pending_pipe);
+	loop.Clear();
+	loop.AddMember(frontend.pending_pipe);
 
 	for(auto i = frontend.clients.begin(); i != frontend.clients.end(); ) {
 		twibc::MessageConnection::Request *rq;
@@ -78,31 +79,33 @@ void NamedPipeFrontend::Logic::Prepare(twibc::NamedPipeServer &server) {
 			continue;
 		}
 
-		server.AddPipe((*i)->connection.pipe);
+		loop.AddMember((*i)->connection.input_member);
+		loop.AddMember((*i)->connection.output_member);
 		
 		i++;
 	}
 }
 
 NamedPipeFrontend::PendingPipe::PendingPipe(NamedPipeFrontend &frontend) :
-	Pipe(),
+	Member(),
 	frontend(frontend) {
+	overlap.hEvent = event.handle;
 	Reset();
 }
 
 void NamedPipeFrontend::PendingPipe::Reset() {
-	Pipe::operator=(platform::windows::Pipe("\\\\.\\pipe\\twibd",
+	pipe = platform::windows::Pipe("\\\\.\\pipe\\twibd",
 		PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
 		PIPE_TYPE_MESSAGE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
-		PIPE_UNLIMITED_INSTANCES, 8192, 8192, 0, nullptr));
+		PIPE_UNLIMITED_INSTANCES, 8192, 8192, 0, nullptr);
 
 	// attempt to connect
 	LogMessage(Debug, "PendingPipe attempting to connect...");
-	if(ConnectNamedPipe(pipe.handle, &overlap_in)) {
+	if(ConnectNamedPipe(pipe.handle, &overlap)) {
 		LogMessage(Error, "ConnectNamedPipe failed: %d", GetLastError());
 		exit(1);
 	}
-
+	
 	switch(GetLastError()) {
 	case ERROR_IO_PENDING:
 		LogMessage(Debug, "  -> ERROR_IO_PENDING");
@@ -118,25 +121,29 @@ void NamedPipeFrontend::PendingPipe::Reset() {
 }
 
 void NamedPipeFrontend::PendingPipe::Connected() {
-	std::shared_ptr<Client> &client = frontend.clients.emplace_back(std::make_shared<Client>(std::forward<Pipe>(*this), frontend));
+	std::shared_ptr<Client> &client = frontend.clients.emplace_back(std::make_shared<Client>(std::forward<Pipe>(pipe), frontend));
 	frontend.twibd.AddClient(client);
 	Reset();
 }
 
-bool NamedPipeFrontend::PendingPipe::WantsSignalIn() {
+bool NamedPipeFrontend::PendingPipe::WantsSignal() {
 	LogMessage(Debug, "PendingPipe asked if wants signal");
 	return true;
 }
 
-void NamedPipeFrontend::PendingPipe::SignalIn() {
+void NamedPipeFrontend::PendingPipe::Signal() {
 	LogMessage(Debug, "PendingPipe signalled");
 	DWORD bytes_transferred = 0;
-	if(!GetOverlappedResult(pipe.handle, &overlap_in, &bytes_transferred, false)) {
+	if(!GetOverlappedResult(pipe.handle, &overlap, &bytes_transferred, false)) {
 		LogMessage(Debug, "GetOverlappedResult failed: %d", GetLastError());
 		Reset();
 	} else {
 		Connected();
 	}
+}
+
+Event &NamedPipeFrontend::PendingPipe::GetEvent() {
+	return event;
 }
 
 } // namespace frontend
