@@ -14,6 +14,7 @@
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
+#include "platform/windows/EventLoop.hpp"
 
 namespace twili {
 namespace twibd {
@@ -29,9 +30,37 @@ class USBKBackend {
 	
 	void Probe();
 
+	void DetectDevice(KLST_DEVINFO_HANDLE device_info);
+	void AddDevice(KLST_DEVINFO_HANDLE device_info);
+
+ private:
+	Twibd &twibd;
+	
+	KHOT_HANDLE hot_handle = nullptr;
+
+	bool event_thread_destroy = false;
+	void event_thread_func();
+	std::thread event_thread;
+
+	static void hotplug_notify_shim(KHOT_HANDLE hot_handle, KLST_DEVINFO_HANDLE device_info, KLST_SYNC_FLAG plug_type);
+
+	class UsbHandle {
+	public:
+		UsbHandle();
+		UsbHandle(KUSB_HANDLE handle);
+		~UsbHandle();
+
+		UsbHandle(UsbHandle &&other);
+		UsbHandle(const UsbHandle &other) = delete;
+		UsbHandle &operator=(UsbHandle &&other);
+		UsbHandle &operator=(const UsbHandle &other) = delete;
+
+		KUSB_HANDLE handle = nullptr;
+	};
+
 	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
 	 public:
-		Device(USBKBackend &backend, KUSB_HANDLE handle, uint8_t endp_addrs[4], uint8_t interface_number);
+		Device(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&handle);
 		~Device();
 
 		enum class State {
@@ -50,23 +79,54 @@ class USBKBackend {
 		bool added_flag = false;
 	 private:
 		USBKBackend &backend;
-		
-		KUSB_HANDLE handle;
+		KUSB_DRIVER_API Usb;
+
+		UsbHandle handle;
 	};
 
-	void AddDevice(KLST_DEVINFO_HANDLE device_info);
+	class StdoutTransferState : public platform::windows::EventLoop::Member {
+	public:
+		StdoutTransferState(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&handle, uint8_t ep_addr);
+		~StdoutTransferState();
 
- private:
-	Twibd &twibd;
+		void Submit();
+		void Kill();
+		
+		virtual bool WantsSignal();
+		virtual void Signal();
+		virtual platform::windows::Event &GetEvent();
+
+		bool deletion_flag = false;
+	private:
+		USBKBackend &backend;
+		KUSB_DRIVER_API Usb;
+		UsbHandle handle;
+		uint8_t ep_addr;
+
+		KOVL_POOL_HANDLE pool;
+		KOVL_HANDLE overlap;
+
+		platform::windows::Event event;
+
+		uint8_t io_buffer[512];
+		util::Buffer string_buffer;
+	};
+
+	class Logic : public platform::windows::EventLoop::Logic {
+	public:
+		Logic(USBKBackend &backend);
+		virtual void Prepare(platform::windows::EventLoop &server) override;
+	private:
+		USBKBackend &backend;
+	} logic;
+
+	void AddTwiliDevice(KLST_DEVINFO_HANDLE device_info);
+	void AddSerialConsole(KLST_DEVINFO_HANDLE device_info);
+
 	std::list<std::shared_ptr<Device>> devices;
-	
-	KHOT_HANDLE hot_handle = nullptr;
+	std::list<std::shared_ptr<StdoutTransferState>> stdout_transfers;
 
-	bool event_thread_destroy = false;
-	void event_thread_func();
-	std::thread event_thread;
-
-	static void hotplug_notify_shim(KHOT_HANDLE hot_handle, KLST_DEVINFO_HANDLE device_info, KLST_SYNC_FLAG plug_type);
+	platform::windows::EventLoop event_loop;
 };
 
 } // namespace backend
