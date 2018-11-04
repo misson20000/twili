@@ -1,6 +1,7 @@
 #include "USBKBackend.hpp"
 
 #include "Logger.hpp"
+#include "Twibd.hpp"
 
 namespace twili {
 namespace twibd {
@@ -109,6 +110,7 @@ USBKBackend::UsbHandle::UsbHandle(UsbHandle &&other) : handle(other.handle) {
 
 USBKBackend::UsbHandle::~UsbHandle() {
 	if(handle != nullptr) {
+		LogMessage(Debug, "closing %p", handle);
 		UsbK_Free(handle);
 	}
 }
@@ -122,20 +124,204 @@ USBKBackend::UsbHandle &USBKBackend::UsbHandle::operator=(UsbHandle &&other) {
 	return *this;
 }
 
-USBKBackend::Device::Device(USBKBackend &backend, KUSB_DRIVER_API Usb,  UsbHandle &&handle) : backend(backend), Usb(Usb), handle(std::move(handle)) {
+USBKBackend::UsbOvlPool::UsbOvlPool(USBKBackend::UsbHandle &usbd, int count) {
+	OvlK_Init(&handle, usbd.handle, count, (KOVL_POOL_FLAG) 0);
+}
 
+USBKBackend::UsbOvlPool::~UsbOvlPool() {
+	OvlK_Free(handle);
+}
+
+USBKBackend::Device::Device(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&hnd, uint8_t ep_addrs[4]) :
+	backend(backend), Usb(Usb), handle(std::move(hnd)),
+	pool(handle, 4),
+	member_meta_out(*this, pool, ep_addrs[0], &Device::MetaOutTransferCompleted),
+	member_meta_in(*this, pool, ep_addrs[1], &Device::MetaInTransferCompleted),
+	member_data_out(*this, pool, ep_addrs[2], &Device::DataOutTransferCompleted),
+	member_data_in(*this, pool, ep_addrs[3], &Device::DataInTransferCompleted) {
+	LogMessage(Debug, "Device constructor moved %p to %p", hnd.handle, handle.handle);
 }
 
 USBKBackend::Device::~Device() {
-
 }
 
 void USBKBackend::Device::Begin() {
-
+	ResubmitMetaInTransfer();
+	
+// request identification
+	SendRequest(Request(std::shared_ptr<Client>(), 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
 }
 
-void USBKBackend::Device::SendRequest(const Request &&r) {
+void USBKBackend::Device::AddMembers(platform::windows::EventLoop &loop) {
+	loop.AddMember(member_data_in);
+	loop.AddMember(member_data_out);
+	loop.AddMember(member_meta_in);
+	loop.AddMember(member_meta_out);
+}
 
+void USBKBackend::Device::SendRequest(const Request &&request) {
+	std::unique_lock<std::mutex> lock(state_mutex);
+	while(state != State::AVAILABLE) {
+		state_cv.wait(lock);
+	}
+	state = State::BUSY;
+
+	mhdr.client_id = request.client ? request.client->client_id : 0xffffffff;
+	mhdr.object_id = request.object_id;
+	mhdr.command_id = request.command_id;
+	mhdr.tag = request.tag;
+	mhdr.payload_size = request.payload.size();
+	mhdr.object_count = 0;
+
+	request_out = request.Weak();
+	pending_requests.push_back(request_out);
+
+	member_meta_out.Submit((uint8_t*)&mhdr, sizeof(mhdr));
+	transferring_data = false;
+	transferring_meta = true;
+}
+
+void USBKBackend::Device::MetaOutTransferCompleted(size_t size) {
+	LogMessage(Debug, "finished transferring meta");
+	std::unique_lock<std::mutex> lock(state_mutex);
+
+	if(request_out.payload.size() > 0) {
+		LogMessage(Debug, "transferring data");
+		data_out_transferred = 0;
+		member_data_out.Submit((uint8_t*)request_out.payload.data(), LimitTransferSize(request_out.payload.size()));
+		transferring_data = true;
+	}
+
+	transferring_meta = false;
+	if(!transferring_meta && !transferring_data) {
+		LogMessage(Debug, "entering AVAILABLE state");
+		state = State::AVAILABLE;
+		state_cv.notify_one();
+	}
+}
+
+void USBKBackend::Device::DataOutTransferCompleted(size_t size) {
+	data_out_transferred += size;
+	size_t remaining = mhdr.payload_size - data_out_transferred;
+
+	if(remaining > 0) {
+		member_data_out.Submit((uint8_t*)request_out.payload.data() + data_out_transferred, LimitTransferSize(remaining));
+		return;
+	} else {
+		std::unique_lock<std::mutex> lock(state_mutex);
+		
+		transferring_data = false;
+		if(!transferring_meta && !transferring_data) {
+			LogMessage(Debug, "entering AVAILABLE state");
+			state = State::AVAILABLE;
+			state_cv.notify_one();
+		}
+	}
+}
+
+void USBKBackend::Device::MetaInTransferCompleted(size_t size) {
+	response_in.device_id = device_id;
+	response_in.client_id = mhdr_in.client_id;
+	response_in.object_id = mhdr_in.object_id;
+	response_in.result_code = mhdr_in.result_code;
+	response_in.tag = mhdr_in.tag;
+	response_in.payload.resize(mhdr_in.payload_size);
+	object_ids_in.resize(mhdr_in.object_count);
+	
+	data_in_transferred = 0;
+	read_in_objects = 0;
+	if(mhdr_in.payload_size > 0) {
+		member_data_in.Submit(response_in.payload.data(), LimitTransferSize(response_in.payload.size()));
+	} else if(mhdr_in.object_count > 0) {
+		member_data_in.Submit((uint8_t*) object_ids_in.data(), object_ids_in.size() * sizeof(uint32_t));
+	} else {
+		DispatchResponse();
+	}
+}
+
+void USBKBackend::Device::DataInTransferCompleted(size_t size) {
+	if(data_in_transferred < mhdr_in.payload_size) {
+		data_in_transferred += size;
+		size_t remaining = mhdr_in.payload_size - data_in_transferred;
+
+		if(remaining > 0) {
+			// continue transferring
+			member_data_in.Submit(response_in.payload.data() + data_in_transferred, LimitTransferSize(remaining));
+			return;
+		}
+
+		if(mhdr_in.object_count > 0) {
+			member_data_in.Submit((uint8_t*)object_ids_in.data(), object_ids_in.size() * sizeof(uint32_t));
+			return;
+		} else {
+			DispatchResponse();
+		}
+	} else {
+		if(size != object_ids_in.size() * sizeof(uint32_t)) {
+			LogMessage(Error, "bad object ids in size");
+			deletion_flag = true;
+			return;
+		}
+		DispatchResponse();
+	}
+}
+
+void USBKBackend::Device::DispatchResponse() {
+	// create BridgeObjects
+	response_in.objects.resize(object_ids_in.size());
+	std::transform(
+		object_ids_in.begin(), object_ids_in.end(), response_in.objects.begin(),
+		[this](uint32_t id) {
+			return std::make_shared<BridgeObject>(backend.twibd, response_in.device_id, id);
+		});
+
+	// remove from pending requests
+	pending_requests.remove_if([this](WeakRequest &r) {
+			return r.tag == response_in.tag;
+		});
+	
+	if(response_in.client_id == 0xFFFFFFFF) { // identification meta-client
+		Identified(response_in);
+	} else {
+		backend.twibd.PostResponse(std::move(response_in));
+	}
+	ResubmitMetaInTransfer();
+}
+
+void USBKBackend::Device::Identified(Response &r) {
+	LogMessage(Debug, "got identification response back");
+	LogMessage(Debug, "payload size: 0x%x", r.payload.size());
+	if(r.result_code != 0) {
+		LogMessage(Warning, "device identification error: 0x%x", r.result_code);
+		deletion_flag = true;
+		return;
+	}
+	std::string err;
+	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin(), r.payload.end()), err);
+	identification = obj;
+	device_nickname = obj["device_nickname"].string_value();
+	serial_number = obj["serial_number"].string_value();
+
+	LogMessage(Info, "nickname: %s", device_nickname.c_str());
+	LogMessage(Info, "serial number: %s", serial_number.c_str());
+	
+	device_id = std::hash<std::string>()(serial_number);
+	LogMessage(Info, "assigned device id: %08x", device_id);
+	ready_flag = true;
+}
+
+void USBKBackend::Device::ResubmitMetaInTransfer() {
+	LogMessage(Debug, "submitting meta in transfer");
+	member_meta_in.Submit((uint8_t*)&mhdr_in, sizeof(mhdr_in));
+}
+
+size_t USBKBackend::Device::LimitTransferSize(size_t sz) {
+	const size_t max_size = 0x10000;
+	if(sz > max_size) {
+		return max_size;
+	} else {
+		return sz;
+	}
 }
 
 int USBKBackend::Device::GetPriority() {
@@ -144,6 +330,65 @@ int USBKBackend::Device::GetPriority() {
 
 std::string USBKBackend::Device::GetBridgeType() {
 	return "usbk";
+}
+
+USBKBackend::Device::TransferMember::TransferMember(Device &device, UsbOvlPool &pool, uint8_t ep_addr, void (Device::*callback)(size_t)) :
+	device(device),
+	ep_addr(ep_addr),
+	callback(callback),
+	event(INVALID_HANDLE_VALUE) {
+	OvlK_Acquire(&overlap, pool.handle);
+	event = OvlK_GetEventHandle(overlap);
+}
+
+USBKBackend::Device::TransferMember::~TransferMember() {
+	event.Claim();
+	OvlK_Release(overlap);
+}
+
+void USBKBackend::Device::TransferMember::Submit(uint8_t *buffer, size_t size) {
+	if(is_active) {
+		LogMessage(Error, "tried to submit transfer while already transferring");
+		return;
+	}
+	OvlK_ReUse(overlap);
+	bool ret;
+	if(USB_ENDPOINT_DIRECTION_IN(ep_addr)) {
+		ret = device.Usb.ReadPipe(device.handle.handle, ep_addr, buffer, size, nullptr, (LPOVERLAPPED)overlap);
+	} else {
+		ret = device.Usb.WritePipe(device.handle.handle, ep_addr, buffer, size, nullptr, (LPOVERLAPPED)overlap);
+	}
+	if(ret) {
+		LogMessage(Debug, "succeeded instantly?");
+	} else {
+		int err = GetLastError();
+		if(err != ERROR_IO_PENDING) {
+			LogMessage(Debug, "submit failed: %d", GetLastError());
+			device.deletion_flag = true;
+		} else {
+			is_active = true;
+		}
+	}
+}
+
+bool USBKBackend::Device::TransferMember::WantsSignal() {
+	return true;
+}
+
+void USBKBackend::Device::TransferMember::Signal() {
+	UINT actual_length;
+	if(OvlK_Wait(overlap, 0, KOVL_WAIT_FLAG_NONE, &actual_length)) {
+		is_active = false;
+		ResetEvent(event.handle);
+		std::invoke(callback, device, (size_t) actual_length);
+	} else {
+		LogMessage(Debug, "a transfer member signalled failure");
+		device.deletion_flag = true;
+	}
+}
+
+platform::windows::Event &USBKBackend::Device::TransferMember::GetEvent() {
+	return event;
 }
 
 void USBKBackend::AddTwiliDevice(KLST_DEVINFO_HANDLE device_info) {
@@ -163,12 +408,12 @@ void USBKBackend::AddTwiliDevice(KLST_DEVINFO_HANDLE device_info) {
 	WINUSB_PIPE_INFORMATION pipe_data_out_info;
 	WINUSB_PIPE_INFORMATION pipe_meta_in_info;
 	WINUSB_PIPE_INFORMATION pipe_data_in_info;
-	bool fail = false;
-	fail |= Usb.QueryPipe(handle.handle, 0, 0, &pipe_meta_out_info);
-	fail |= Usb.QueryPipe(handle.handle, 0, 1, &pipe_data_out_info);
-	fail |= Usb.QueryPipe(handle.handle, 0, 2, &pipe_meta_in_info);
-	fail |= Usb.QueryPipe(handle.handle, 0, 3, &pipe_data_in_info);
-	if(fail) {
+	bool success = true;
+	success &= Usb.QueryPipe(handle.handle, 0, 0, &pipe_meta_out_info);
+	success &= Usb.QueryPipe(handle.handle, 0, 1, &pipe_data_out_info);
+	success &= Usb.QueryPipe(handle.handle, 0, 2, &pipe_meta_in_info);
+	success &= Usb.QueryPipe(handle.handle, 0, 3, &pipe_data_in_info);
+	if(!success) {
 		LogMessage(Error, "failed to query pipe: %d", GetLastError());
 		return;
 	}
@@ -189,7 +434,15 @@ void USBKBackend::AddTwiliDevice(KLST_DEVINFO_HANDLE device_info) {
 		return;
 	}
 
-	devices.emplace_back(std::make_shared<Device>(*this, Usb, std::move(handle)))->Begin();
+	uint8_t addrs[] = {
+		pipe_meta_out_info.PipeId,
+		pipe_meta_in_info.PipeId,
+		pipe_data_out_info.PipeId,
+		pipe_data_in_info.PipeId
+	};
+
+	devices.emplace_back(std::make_shared<Device>(*this, Usb, std::move(handle), addrs))->Begin();
+	event_loop.notifier.Notify();
 }
 
 void USBKBackend::AddSerialConsole(KLST_DEVINFO_HANDLE device_info) {
@@ -304,8 +557,31 @@ USBKBackend::Logic::Logic(USBKBackend &backend) : backend(backend) {
 
 void USBKBackend::Logic::Prepare(platform::windows::EventLoop &loop) {
 	loop.Clear();
-	for(std::shared_ptr<StdoutTransferState> &ptr : backend.stdout_transfers) {
-		loop.AddMember(*ptr);
+	for(auto i = backend.stdout_transfers.begin(); i != backend.stdout_transfers.end();) {
+		if((*i)->deletion_flag) {
+			i = backend.stdout_transfers.erase(i);
+			continue;
+		}
+		loop.AddMember(**i);
+		i++;
+	}
+	for(auto i = backend.devices.begin(); i != backend.devices.end(); ) {
+		auto d = *i;
+		if(d->deletion_flag) {
+			if(d->added_flag) {
+				backend.twibd.RemoveDevice(d);
+			}
+			i = backend.devices.erase(i);
+			continue;
+		}
+
+		if(d->ready_flag && !d->added_flag) {
+			backend.twibd.AddDevice(d);
+			d->added_flag = true;
+		}
+
+		d->AddMembers(loop);
+		i++;
 	}
 }
 
