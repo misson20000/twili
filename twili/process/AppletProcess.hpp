@@ -52,10 +52,11 @@ class AppletProcess : public MonitoredProcess {
 	// used to communicate with host shim
 	trn::KEvent &GetCommandEvent();
 	uint32_t PopCommand();
+
+	fs::ProcessFileSystem virtual_exefs;
  private:
 	bool has_code = false;
 	std::optional<bridge::ResponseOpener> run_opener;
-	fs::ProcessFileSystem virtual_exefs;
 
 	std::shared_ptr<trn::WaitHandle> kill_timeout;
 

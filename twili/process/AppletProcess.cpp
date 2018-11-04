@@ -41,11 +41,11 @@ AppletProcess::AppletProcess(Twili &twili) :
 	virtual_exefs.SetNpdm(std::make_shared<fs::ActualFile>(fopen("/squash/applet_host.npdm", "rb")));
 }
 
-void AppletProcess::AppendCode(std::vector<uint8_t> nso) {
+void AppletProcess::AppendCode(std::vector<uint8_t> nro) {
 	if(has_code) {
 		throw ResultError(TWILI_ERR_ALREADY_HAS_CODE);
 	} else {
-		virtual_exefs.SetMain(std::make_shared<fs::VectorFile>(nso));
+		virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(std::make_shared<fs::VectorFile>(nro)));
 		has_code = true;
 	}
 }
