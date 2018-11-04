@@ -12,7 +12,7 @@ ATMOSPHERE_TWILI_TITLE_ID := 0100000000006480
 ATMOSPHERE_TWILI_TITLE_DIR := build/atmosphere/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
 ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
 
-all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS)
+all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS) build/atmosphere/hbl.nsp
 
 $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main: build/twili.nso
 	mkdir -p $(@D)
@@ -21,6 +21,18 @@ $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main: build/twili.nso
 $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main.npdm: twili/twili.json
 	mkdir -p $(@D)
 	npdmtool $< $@
+
+build/atmosphere/hbl.nsp: build/applet_control_exefs/main build/applet_control_exefs/main.npdm
+	mkdir -p $(@D)
+	$(BUILD_PFS0) build/applet_control_exefs/ $@
+
+build/applet_control_exefs/main: build/applet_control.nso
+	mkdir -p $(@D)
+	cp $< $@
+
+build/applet_control_exefs/main.npdm: build/twili_applet_shim/applet_control.npdm
+	mkdir -p $(@D)
+	cp $< $@
 
 build/%.npdm: %.json
 	mkdir -p $(@D)
