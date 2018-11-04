@@ -37,8 +37,8 @@ AppletProcess::AppletProcess(Twili &twili) :
 	command_wevent(command_event) {
 
 	// build virtual exefs
-	virtual_exefs.SetRtld(std::make_shared<fs::ActualFile>(fopen("/squash/twili_applet_shim.nso", "rb")));
-	virtual_exefs.SetNpdm(std::make_shared<fs::ActualFile>(fopen("/squash/default.npdm", "rb")));
+	virtual_exefs.SetRtld(std::make_shared<fs::ActualFile>(fopen("/squash/applet_host.nso", "rb")));
+	virtual_exefs.SetNpdm(std::make_shared<fs::ActualFile>(fopen("/squash/applet_host.npdm", "rb")));
 }
 
 void AppletProcess::AppendCode(std::vector<uint8_t> nso) {

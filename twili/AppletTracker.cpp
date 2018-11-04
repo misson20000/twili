@@ -33,8 +33,8 @@ AppletTracker::AppletTracker(Twili &twili) :
 	twili(twili),
 	process_queued_wevent(process_queued_event) {
 	printf("building AppletTracker\n");
-	control_exevfs.SetMain(std::make_shared<process::fs::ActualFile>(fopen("/squash/twili_applet_shim.nso", "rb")));
-	control_exevfs.SetNpdm(std::make_shared<process::fs::ActualFile>(fopen("/squash/default.npdm", "rb")));
+	control_exevfs.SetMain(std::make_shared<process::fs::ActualFile>(fopen("/squash/applet_control.nso", "rb")));
+	control_exevfs.SetNpdm(std::make_shared<process::fs::ActualFile>(fopen("/squash/applet_control.npdm", "rb")));
 	printf("prepared control_exevfs\n");
 	PrepareForControlAppletLaunch();
 }
