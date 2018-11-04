@@ -24,17 +24,17 @@
 
 #include "Twibd.hpp"
 
-#include<netdb.h>
-
 namespace twili {
 namespace twibd {
 namespace backend {
 
 TCPBackend::TCPBackend(Twibd &twibd) :
 	twibd(twibd),
-	notifier(*this) {
-	listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if(listen_fd == -1) {
+	server_logic(*this),
+	socket_server(server_logic),
+	listen_socket(*this) {
+	listen_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(listen_socket.fd < 0) {
 		LogMessage(Error, "Failed to create listening socket: %s", NetErrStr());
 		exit(1);
 	}
@@ -43,7 +43,7 @@ TCPBackend::TCPBackend(Twibd &twibd) :
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(15153);
-	if(bind(listen_fd, (sockaddr*) &addr, sizeof(addr)) != 0) {
+	if(bind(listen_socket.fd, (sockaddr*) &addr, sizeof(addr)) != 0) {
 		LogMessage(Error, "Failed to bind listening socket: %s", NetErrStr());
 		exit(1);
 	}
@@ -51,18 +51,17 @@ TCPBackend::TCPBackend(Twibd &twibd) :
 	ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("224.0.53.55");
 	mreq.imr_interface.s_addr = INADDR_ANY;
-	if(setsockopt(listen_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0) {
+	if(setsockopt(listen_socket.fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*) &mreq, sizeof(mreq)) != 0) {
 		LogMessage(Error, "Failed to join multicast group");
 		exit(1);
 	}
 
-	event_thread = std::thread(&TCPBackend::event_thread_func, this);
+	socket_server.Begin();
 }
 
 TCPBackend::~TCPBackend() {
-	event_thread_destroy = true;
-	closesocket(listen_fd);
-	event_thread.join();
+	socket_server.Destroy();
+	listen_socket.Close();
 }
 
 std::string TCPBackend::Connect(std::string hostname, std::string port) {
@@ -88,7 +87,7 @@ std::string TCPBackend::Connect(std::string hostname, std::string port) {
 	freeaddrinfo(res);
 
 	devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
-	NotifyEventThread();
+	socket_server.notifier.Notify();
 	return "Ok";
 }
 
@@ -112,7 +111,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 
 		devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
 		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
-		NotifyEventThread();
+		socket_server.notifier.Notify();
 	} else {
 		LogMessage(Info, "not an IPv4 address");
 	}
@@ -120,7 +119,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 
 TCPBackend::Device::Device(SOCKET fd, TCPBackend &backend) :
 	backend(backend),
-	connection(fd, backend.notifier) {
+	connection(fd, backend.socket_server.notifier) {
 }
 
 TCPBackend::Device::~Device() {
@@ -214,124 +213,73 @@ std::string TCPBackend::Device::GetBridgeType() {
 	return "tcp";
 }
 
-void TCPBackend::event_thread_func() {
-	fd_set readfds;
-	fd_set writefds;
-	fd_set errorfds;
-	SOCKET max_fd = 0;
-	while(!event_thread_destroy) {
-		LogMessage(Debug, "tcp backend event thread loop");
-		
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
-
-		// add listen socket
-		max_fd = std::max(max_fd, listen_fd);
-		FD_SET(listen_fd, &readfds);
-		
-		// add device connections
-		for(auto &c : devices) {
-			if(c->ready_flag && !c->added_flag) {
-				twibd.AddDevice(c);
-				c->added_flag = true;
-			}
-			
-			max_fd = std::max(max_fd, c->connection.fd);
-			FD_SET(c->connection.fd, &errorfds);
-			FD_SET(c->connection.fd, &readfds);
-			
-			if(c->connection.HasOutData()) { // only add to writefds if we need to write
-				FD_SET(c->connection.fd, &writefds);
-			}
-		}
-
-		if(select(max_fd + 1, &readfds, &writefds, &errorfds, NULL) < 0) {
-			LogMessage(Fatal, "failed to select file descriptors: %s", NetErrStr());
-			exit(1);
-		}
-
-		// check for announcements or thread notifications
-		if(FD_ISSET(listen_fd, &readfds)) {
-			char buffer[256];
-			sockaddr_storage addr_storage;
-			sockaddr *addr = (sockaddr*) &addr_storage;
-			socklen_t addr_len = sizeof(addr);
-			ssize_t r = recvfrom(listen_fd, buffer, sizeof(buffer)-1, 0, addr, &addr_len);
-			LogMessage(Debug, "got 0x%x bytes from listen socket", r);
-			if(r < 0) {
-				LogMessage(Fatal, "listen socket error: %s", NetErrStr());
-				exit(1);
-			} else {
-				buffer[r] = 0;
-				if(!strcmp(buffer, "twili-announce")) {
-					LogMessage(Info, "received twili device announcement");
-					Connect(addr, addr_len);
-				}
-			}
-		}
-		
-		// pump i/o
-		for(auto mci = devices.begin(); mci != devices.end(); mci++) {
-			std::shared_ptr<Device> &c = *mci;
-			if(FD_ISSET(c->connection.fd, &errorfds)) {
-				LogMessage(Info, "detected connection error");
-				c->deletion_flag = true;
-				continue;
-			}
-			if(FD_ISSET(c->connection.fd, &writefds)) {
-				if(!c->connection.PumpOutput()) {
-					c->deletion_flag = true;
-					continue;
-				}
-			}
-			
-			if(FD_ISSET(c->connection.fd, &readfds)) {
-				LogMessage(Debug, "incoming data for device %x", c->device_id);
-				if(!c->connection.PumpInput()) {
-					c->deletion_flag = true;
-					continue;
-				}
-			}
-		}
-
-		for(auto i = devices.begin(); i != devices.end(); ) {
-			twibc::MessageConnection::Request *rq;
-			while((rq = (*i)->connection.Process()) != nullptr) {
-				(*i)->IncomingMessage(rq->mh, rq->payload, rq->object_ids);
-			}
-			
-			if((*i)->deletion_flag) {
-				if((*i)->added_flag) {
-					twibd.RemoveDevice(*i);
-				}
-				i = devices.erase(i);
-				continue;
-			}
-
-			i++;
-		}
-	}
+TCPBackend::ListenSocket::ListenSocket(TCPBackend &backend) : backend(backend) {
 }
 
-void TCPBackend::NotifyEventThread() {
-	sockaddr_storage addr;
-	socklen_t len = sizeof(addr);
-	if(getsockname(listen_fd, (sockaddr*) &addr, &len) != 0) {
-		LogMessage(Error, "failed to get listen socket address");
+TCPBackend::ListenSocket::ListenSocket(TCPBackend &backend, SOCKET fd) : Socket(fd), backend(backend) {
+}
+
+TCPBackend::ListenSocket &TCPBackend::ListenSocket::operator=(SOCKET fd) {
+	twibc::SocketServer::Socket::operator=(fd);
+	return *this;
+}
+
+bool TCPBackend::ListenSocket::WantsRead() {
+	return true;
+}
+
+void TCPBackend::ListenSocket::SignalRead() {
+	char buffer[256];
+	sockaddr_storage addr_storage;
+	sockaddr *addr = (sockaddr*) &addr_storage;
+	socklen_t addr_len = sizeof(addr);
+	ssize_t r = recvfrom(backend.listen_socket.fd, buffer, sizeof(buffer)-1, 0, addr, &addr_len);
+	LogMessage(Debug, "got 0x%x bytes from listen socket", r);
+	if(r < 0) {
+		LogMessage(Fatal, "listen socket error: %s", NetErrStr());
 		exit(1);
-	}
-	char msg[] = "notify";
-	if(sendto(listen_fd, msg, sizeof(msg)-1, 0, (sockaddr*) &addr, len) != sizeof(msg)-1) {
-		LogMessage(Error, "failed to notify event thread");
-		exit(1);
+	} else {
+		buffer[r] = 0;
+		if(!strcmp(buffer, "twili-announce")) {
+			LogMessage(Info, "received twili device announcement");
+			backend.Connect(addr, addr_len);
+		}
 	}
 }
 
-TCPBackend::EventThreadNotifier::EventThreadNotifier(TCPBackend &backend) : backend(backend) {
+void TCPBackend::ListenSocket::SignalError() {
+	LogMessage(Fatal, "listen socket error: %s", NetErrStr());
+	exit(1);
 }
 
-void TCPBackend::EventThreadNotifier::Notify() {
-	backend.NotifyEventThread();
+TCPBackend::ServerLogic::ServerLogic(TCPBackend &backend) : backend(backend) {
+}
+
+void TCPBackend::ServerLogic::Prepare(twibc::SocketServer &server) {
+	server.Clear();
+	server.AddSocket(backend.listen_socket);
+	for(auto i = backend.devices.begin(); i != backend.devices.end(); ) {
+		twibc::MessageConnection::Request *rq;
+		while((rq = (*i)->connection.Process()) != nullptr) {
+			(*i)->IncomingMessage(rq->mh, rq->payload, rq->object_ids);
+		}
+
+		if((*i)->connection.error_flag) {
+			(*i)->deletion_flag = true;
+		}
+		
+		if((*i)->deletion_flag) {
+			if((*i)->added_flag) {
+				backend.twibd.RemoveDevice(*i);
+			}
+			i = backend.devices.erase(i);
+			continue;
+		}
+
+		server.AddSocket((*i)->connection.socket);
+		
+		i++;
+	}
 }
 
 } // namespace backend

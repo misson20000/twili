@@ -31,9 +31,12 @@
 #include<systemd/sd-daemon.h>
 #endif
 
-#include<libusb.h>
 #include<msgpack11.hpp>
 #include<CLI/CLI.hpp>
+
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+#include "NamedPipeFrontend.hpp"
+#endif
 
 #include "SocketFrontend.hpp"
 #include "Protocol.hpp"
@@ -47,11 +50,25 @@ namespace twili {
 namespace twibd {
 
 Twibd::Twibd() :
-	local_client(std::make_shared<LocalClient>(this)),
-	usb(this),
-	tcp(*this) {
+	local_client(std::make_shared<LocalClient>(this))
+// this comma placement is really gross, but for some reason C++ doesn't seem to allow commas at the end of member initializer lists
+#if TWIBD_TCP_BACKEND_ENABLED
+	, tcp(*this)
+#endif
+#if TWIBD_LIBUSB_BACKEND_ENABLED
+	, usb(this)
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+	, usbk(*this)
+#endif
+	{
 	AddClient(local_client);
+#if TWIBD_LIBUSB_BACKEND_ENABLED
 	usb.Probe();
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+	usbk.Probe();
+#endif
 }
 
 Twibd::~Twibd() {
@@ -280,6 +297,12 @@ static std::shared_ptr<frontend::SocketFrontend> CreateUNIXFrontend(Twibd &twibd
 }
 #endif
 
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+static std::shared_ptr<frontend::NamedPipeFrontend> CreateNamedPipeFrontend(Twibd &twibd) {
+	return std::make_shared<frontend::NamedPipeFrontend>(twibd, "foo");
+}
+#endif
+
 } // namespace twibd
 } // namespace twili
 
@@ -296,7 +319,7 @@ int main(int argc, char *argv[]) {
 
 	CLI::App app {"Twili debug monitor daemon"};
 
-	int verbosity = false;
+	int verbosity = 3;
 	app.add_flag("-v,--verbose", verbosity, "Enable verbose messages. Use twice to enable debug messages");
 	
 	bool systemd_mode = false;
@@ -342,6 +365,20 @@ int main(int argc, char *argv[]) {
 		->envname("TWIB_TCP_FRONTEND_PORT");
 #endif
 
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+	bool named_pipe_frontend_enabled = true;
+	app.add_flag_function(
+		"--named-pipe",
+		[&named_pipe_frontend_enabled](int count) {
+			named_pipe_frontend_enabled = true;
+		}, "Enable named pipe frontend");
+	app.add_flag_function(
+		"--no-named-pipe",
+		[&named_pipe_frontend_enabled](int count) {
+			named_pipe_frontend_enabled = false;
+		}, "Disable named pipe frontend");
+#endif
+
 	try {
 		app.parse(argc, argv);
 	} catch(const CLI::ParseError &e) {
@@ -361,13 +398,14 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 	if(!systemd_mode) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
+		twili::log::init_color();
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	}
 
 	LogMessage(Message, "starting twibd");
 	twili::twibd::Twibd twibd;
-	std::vector<std::shared_ptr<twili::twibd::frontend::SocketFrontend>> frontends;
+	std::vector<std::shared_ptr<twili::twibd::frontend::Frontend>> frontends;
 	if(!systemd_mode) {
 #if TWIB_TCP_FRONTEND_ENABLED == 1
 		if(tcp_frontend_enabled) {
@@ -377,6 +415,11 @@ int main(int argc, char *argv[]) {
 #if TWIB_UNIX_FRONTEND_ENABLED == 1
 		if(unix_frontend_enabled) {
 			frontends.push_back(twili::twibd::CreateUNIXFrontend(twibd, unix_frontend_path));
+		}
+#endif
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+		if(named_pipe_frontend_enabled) {
+			frontends.push_back(twili::twibd::CreateNamedPipeFrontend(twibd));
 		}
 #endif
 	}

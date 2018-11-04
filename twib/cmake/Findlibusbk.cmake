@@ -10,9 +10,9 @@ else (LIBUSBK_LIBRARIES AND LIBUSBK_INCLUDE_DIRS)
 
   find_library(LIBUSBK_LIBRARY
     NAMES
-      usbK
+      libusbK
     PATHS
-      C:/libusbk-dev-kit
+      C:/libusbK-dev-kit
     PATH_SUFFIXES bin/lib/static/amd64
   )
 

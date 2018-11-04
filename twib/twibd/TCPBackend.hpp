@@ -73,20 +73,30 @@ class TCPBackend {
 	Twibd &twibd;
 	std::list<std::shared_ptr<Device>> devices;
 
-	SOCKET listen_fd;
-	
-	bool event_thread_destroy = false;
-	void event_thread_func();
-	std::thread event_thread;
-	void NotifyEventThread();
-
-	class EventThreadNotifier : public twibc::SocketMessageConnection::EventThreadNotifier {
+	class ListenSocket : public twibc::SocketServer::Socket {
 	 public:
-		EventThreadNotifier(TCPBackend &backend);
-		virtual void Notify() override;
+		ListenSocket(TCPBackend &backend);
+		ListenSocket(TCPBackend &backend, SOCKET fd);
+
+		ListenSocket &operator=(SOCKET fd);
+		
+		virtual bool WantsRead() override;
+		virtual void SignalRead() override;
+		virtual void SignalError() override;
+		
 	 private:
 		TCPBackend &backend;
-	} notifier;
+	} listen_socket;
+
+	class ServerLogic : public twibc::SocketServer::Logic {
+	 public:
+		ServerLogic(TCPBackend &backend);
+		virtual void Prepare(twibc::SocketServer &server) override;
+	 private:
+		TCPBackend &backend;
+	} server_logic;
+	
+	twibc::SocketServer socket_server;
 };
 
 } // namespace backend

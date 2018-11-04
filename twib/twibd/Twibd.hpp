@@ -29,12 +29,18 @@
 #include<map>
 #include<random>
 
-#include<libusb.h>
-
 #include "blockingconcurrentqueue.h"
 
-#include "USBBackend.hpp"
+#include "config.hpp"
+#if TWIBD_TCP_BACKEND_ENABLED
 #include "TCPBackend.hpp"
+#endif
+#if TWIBD_LIBUSB_BACKEND_ENABLED
+#include "USBBackend.hpp"
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+#include "USBKBackend.hpp"
+#endif
 
 #include "Logger.hpp"
 #include "Messages.hpp"
@@ -62,8 +68,15 @@ class Twibd {
 
 	std::shared_ptr<LocalClient> local_client;
  private:
-	backend::USBBackend usb;
+#if TWIBD_TCP_BACKEND_ENABLED
 	backend::TCPBackend tcp;
+#endif
+#if TWIBD_LIBUSB_BACKEND_ENABLED
+	backend::USBBackend usb;
+#endif
+#if TWIBD_LIBUSBK_BACKEND_ENABLED
+	backend::USBKBackend usbk;
+#endif
 
 	moodycamel::BlockingConcurrentQueue<std::variant<Request, Response>> dispatch_queue;
 	

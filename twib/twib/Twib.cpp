@@ -34,9 +34,17 @@
 #include "ResultError.hpp"
 #include "config.hpp"
 #include "Protocol.hpp"
-#include "SocketClient.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
 #include "interfaces/ITwibDeviceInterface.hpp"
+
+#if TWIB_TCP_FRONTEND_ENABLED == 1 || TWIB_UNIX_FRONTEND_ENABLED == 1
+#include "SocketClient.hpp"
+#endif
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+#include "NamedPipeClient.hpp"
+#endif
+
+
 #include "util.hpp"
 #include "err.hpp"
 
@@ -106,11 +114,12 @@ void ListProcesses(ITwibDeviceInterface &iface) {
 	PrintTable(rows);
 }
 
+std::unique_ptr<client::Client> connect_tcp(uint16_t port);
+std::unique_ptr<client::Client> connect_unix(std::string path);
+std::unique_ptr<client::Client> connect_named_pipe(std::string path);
+
 } // namespace twib
 } // namespace twili
-
-int connect_tcp(uint16_t port);
-int connect_unix(std::string path);
 
 void show(msgpack11::MsgPack const& blob);
 
@@ -138,14 +147,20 @@ int main(int argc, char *argv[]) {
 	std::string frontend;
 	std::string unix_frontend_path = TWIB_UNIX_FRONTEND_DEFAULT_PATH;
 	uint16_t tcp_frontend_port = TWIB_TCP_FRONTEND_DEFAULT_PORT;
+	std::string named_pipe_frontend_path = TWIB_NAMED_PIPE_FRONTEND_DEFAULT_NAME;
 	
-#if TWIB_UNIX_FRONTEND_ENABLED == 1
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+	frontend = "named_pipe";
+#elif TWIB_UNIX_FRONTEND_ENABLED == 1
 	frontend = "unix";
 #else
 	frontend = "tcp";
 #endif
 	
 	app.add_set("-f,--frontend", frontend, {
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+			"named_pipe",
+#endif
 #if TWIB_UNIX_FRONTEND_ENABLED == 1
 			"unix",
 #endif
@@ -166,6 +181,13 @@ int main(int argc, char *argv[]) {
 		"-p,--tcp-port", tcp_frontend_port,
 		"Port for the twibd TCP socket")
 		->envname("TWIB_TCP_FRONTEND_PORT");
+#endif
+
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
+	app.add_option(
+		"-n,--pipe-name", named_pipe_frontend_path,
+		"Named for the twibd pipe")
+		->envname("TWIB_NAMED_PIPE_FRONTEND_NAME");
 #endif
 	
 	CLI::App *ld = app.add_subcommand("list-devices", "List devices");
@@ -216,24 +238,26 @@ int main(int argc, char *argv[]) {
 		return app.exit(e);
 	}
 
+	twili::log::init_color();
 	if(is_verbose) {
-		add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
 	}
-	add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
+	twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	
 	LogMessage(Message, "starting twib");
 
-	int fd;
+	std::unique_ptr<twili::twib::client::Client> client;
 	if(TWIB_UNIX_FRONTEND_ENABLED && frontend == "unix") {
-		fd = connect_unix(unix_frontend_path);
+		client = twili::twib::connect_unix(unix_frontend_path);
 	} else if(TWIB_TCP_FRONTEND_ENABLED && frontend == "tcp") {
-		fd = connect_tcp(tcp_frontend_port);
+		client = twili::twib::connect_tcp(tcp_frontend_port);
+	} else if(TWIB_NAMED_PIPE_FRONTEND_ENABLED && frontend == "named_pipe") {
+		client = twili::twib::connect_named_pipe(named_pipe_frontend_path);
 	} else {
 		LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
 		exit(1);
 	}
-	twili::twib::client::SocketClient client(fd);
-	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(client, 0, 0));
+	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(*client, 0, 0));
 	
 	if(ld->parsed()) {
 		ListDevices(itmi);
@@ -247,7 +271,7 @@ int main(int argc, char *argv[]) {
 
 	uint32_t device_id;
 	if(device_id_str.size() > 0) {
-		device_id = std::stoull(device_id_str, NULL, 16);
+		device_id = std::stoul(device_id_str, NULL, 16);
 	} else {
 		std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
 		if(devices.size() == 0) {
@@ -260,7 +284,7 @@ int main(int argc, char *argv[]) {
 		}
 		device_id = devices[0]["device_id"].uint32_value();
 	}
-	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(client, device_id, 0));
+	twili::twib::ITwibDeviceInterface itdi(std::make_shared<twili::twib::RemoteObject>(*client, device_id, 0));
 	
 	if(run->parsed()) {
 		auto code_opt = twili::util::ReadFile(run_file.c_str());
@@ -273,7 +297,7 @@ int main(int argc, char *argv[]) {
 		mon.AppendCode(*code_opt);
 		uint64_t pid = mon.Launch();
 		if(!run_quiet) {
-			printf("PID: 0x%x\n", pid);
+			printf("PID: 0x%lx\n", pid);
 		}
 		volatile bool running = true;
 		auto pump_output =
@@ -435,15 +459,18 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-int connect_tcp(uint16_t port) {
+namespace twili {
+namespace twib {
+
+std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 #if TWIB_TCP_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "TCP socket not supported");
 	exit(1);
-	return -1;
+	return std::unique_ptr<client::Client>();
 #else
 	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
-		LogMessage(Fatal, "failed to create TCP socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create TCP socket: %s", NetErrStr());
 		exit(1);
 	}
 
@@ -454,38 +481,75 @@ int connect_tcp(uint16_t port) {
 	addr.sin6_port = htons(port);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		closesocket(fd);
 		exit(1);
 	}
 	LogMessage(Info, "connected to twibd: %d", fd);
-	return fd;
+	return std::make_unique<client::SocketClient>(fd);
 #endif
 }
 
-int connect_unix(std::string path) {
+std::unique_ptr<client::Client> connect_unix(std::string path) {
 #if TWIB_UNIX_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "UNIX domain socket not supported");
 	exit(1);
-	return -1;
+	return std::unique_ptr<client::Client>();
 #else
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(fd < 0) {
-		LogMessage(Fatal, "failed to create UNIX domain socket: %s", strerror(errno));
+		LogMessage(Fatal, "failed to create UNIX domain socket: %s", NetErrStr());
 		exit(1);
 	}
 
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
-	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path)-1);
+	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
 
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", strerror(errno));
+		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		close(fd);
 		exit(1);
 	}
 	LogMessage(Info, "connected to twibd: %d", fd);
-	return fd;
+	return std::make_unique<client::SocketClient>(fd);
 #endif
 }
+
+std::unique_ptr<client::Client> connect_named_pipe(std::string path) {
+#if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 0
+	LogMessage(Fatal, "Named pipe not supported");
+	exit(1);
+	return std::unique_ptr<client::Client>();
+#else
+	twili::platform::windows::Pipe pipe; 
+	LogMessage(Debug, "connecting to %s...", path.c_str());
+	while(1) {
+		pipe = CreateFile(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+		if(pipe.handle != INVALID_HANDLE_VALUE) {
+			break;
+		}
+
+		if(GetLastError() != ERROR_PIPE_BUSY) {
+			LogMessage(Fatal, "Could not open pipe. GLE=%d", GetLastError());
+			exit(1);
+		}
+
+		LogMessage(Info, "got ERROR_PIPE_BUSY, waiting...");
+		if(!WaitNamedPipe(path.c_str(), 20000)) {
+			LogMessage(Fatal, "Could not open pipe: 20 second wait timed out");
+			exit(1);
+		}
+	}
+	/*DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
+	if(!SetNamedPipeHandleState(pipe.handle, &mode, nullptr, nullptr)) {
+		LogMessage(Fatal, "Failed to set named pipe handle state. GLE=%d", GetLastError());
+		exit(1);
+	}*/
+	return std::make_unique<client::NamedPipeClient>(std::move(pipe));
+#endif
+}
+
+} // namespace twib
+} // namespace twili

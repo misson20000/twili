@@ -35,6 +35,8 @@
 #include<Winsock2.h>
 #include<WS2tcpip.h>
 #include<io.h>
+#include "platform/windows.hpp";
+
 typedef signed long long ssize_t;
 
 static inline char *NetErrStr() {
@@ -54,6 +56,7 @@ static inline char *NetErrStr() {
 #include<netinet/in.h>
 #include<netinet/ip.h>
 #include<arpa/inet.h>
+#include<netdb.h>
 #include<unistd.h>
 #include<errno.h>
 #include<string.h>

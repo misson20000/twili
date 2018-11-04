@@ -24,6 +24,10 @@
 #include<stdarg.h>
 #include<string.h>
 
+#ifdef _WIN32
+#include<Windows.h>
+#endif
+
 #ifdef _MSC_VER
 #include<io.h>
 #else
@@ -44,6 +48,26 @@ namespace log {
 const size_t BUFFER_SIZE = 2048;
 
 std::forward_list<std::shared_ptr<Logger>> logs;
+
+void init_color() {
+#ifdef _WIN32
+	// Set output mode to handle virtual terminal sequences
+	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if(hOut == INVALID_HANDLE_VALUE) {
+		exit(GetLastError());
+	}
+
+	DWORD dwMode = 0;
+	if (!GetConsoleMode(hOut, &dwMode)) {
+		exit(GetLastError());
+	}
+
+	dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	if (!SetConsoleMode(hOut, dwMode)) {
+		exit(GetLastError());
+	}
+#endif
+}
 
 void _log(Level lvl,
           const char *fname,
@@ -73,10 +97,16 @@ static const char *trim_filename(const char *fname) {
 // utility function
 char *Logger::format(char *buf, int size, bool color, Level lvl, const char *fname, int line, const char *msg) {
   time_t rawtime;
+  struct tm timeinfo_storage;
   struct tm *timeinfo;
   
   time(&rawtime);
-  timeinfo = localtime(&rawtime);
+#ifdef _WIN32
+  localtime_s(&timeinfo_storage, &rawtime);
+  timeinfo = &timeinfo_storage;
+#else
+  timeinfo = localtime_r(&rawtime, &timeinfo_storage);
+#endif
   
   char timebuf[64];
   strftime(timebuf, 64,

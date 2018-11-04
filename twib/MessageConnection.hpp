@@ -48,15 +48,17 @@ class MessageConnection {
 	// The use of a pointer here is truly lamentable. I would've much preferred to use std::optional<Request&>
 	Request *Process(); // NULL pointer means no message
 	void SendMessage(const protocol::MessageHeader &mh, const std::vector<uint8_t> &payload, const std::vector<uint32_t> &object_ids);
-	
+
+	bool error_flag = false;
  protected:
 	util::Buffer in_buffer;
 
-	std::mutex out_buffer_mutex;
+	std::recursive_mutex out_buffer_mutex;
 	util::Buffer out_buffer;
 
-	virtual void SignalInput() = 0;
-	virtual void SignalOutput() = 0;
+	// these turn true if more data was obtained
+	virtual bool RequestInput() = 0;
+	virtual bool RequestOutput() = 0;
 
  private:
 	Request current_rq;
