@@ -12,7 +12,7 @@ ATMOSPHERE_TWILI_TITLE_ID := 0100000000006480
 ATMOSPHERE_TWILI_TITLE_DIR := build/atmosphere/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
 ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
 
-all: build/twili.nro build/twili.nso build/twili.kip $(ATMOSPHERE_TWILI_TARGETS)
+all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS)
 
 $(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main: build/twili.nso
 	mkdir -p $(@D)
@@ -60,9 +60,6 @@ build/%.squashfs.o: build/%.squashfs
 build/twili/twili.squashfs: $(TWILI_RESOURCES)
 	mkdir -p $(@D)
 	mksquashfs $^ $@ -comp xz -nopad -noappend
-
-build/twili.kip: build/twili.nso.so twili/twili_kip.json
-	elf2kip build/twili.nso.so twili/twili_kip.json build/twili.kip
 
 # main twili service
 TWILI_DEPS = $(addprefix build/twili/,$(TWILI_OBJECTS)) $(addprefix build/common/,$(COMMON_OBJECTS))
