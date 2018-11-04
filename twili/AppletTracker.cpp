@@ -31,8 +31,12 @@ namespace twili {
 
 AppletTracker::AppletTracker(Twili &twili) :
 	twili(twili),
-	process_queued_wevent(process_queued_event) {
+	process_queued_wevent(process_queued_event),
+	monitor(*this) {
 	printf("building AppletTracker\n");
+	hbmenu_transmute = process::fs::NRONSOTransmutationFile::Create(
+		std::make_shared<process::fs::ActualFile>("/sd/hbmenu.nro"));
+	process_queued_wevent.Signal(); // for hbmenu launch
 }
 
 bool AppletTracker::HasControlProcess() {
@@ -58,7 +62,10 @@ const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
 }
 
 bool AppletTracker::ReadyToLaunch() {
-	return queued.size() > 0 && created.size() == 0;
+	return
+		created.size() == 0 && // there are no processes created but not yet attached
+		(!monitor.process || // either there is no applet currently running
+		 monitor.process->GetState() == process::MonitoredProcess::State::Exited); // or it has exited
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
@@ -74,7 +81,12 @@ std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
 		proc->PrepareForLaunch();
 		return proc;
 	} else {
-		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
+		// launch hbmenu if there's nothing else to launch
+		printf("launching hbmenu\n");
+		hbmenu = CreateHbmenu();
+		created.push_back(hbmenu);
+		hbmenu->PrepareForLaunch();
+		return hbmenu;
 	}
 }
 
@@ -88,6 +100,7 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 	proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
 	printf("  attached\n");
 	created.pop_front();
+	monitor.Reattach(proc);
 	if(ReadyToLaunch()) {
 		process_queued_wevent.Signal();
 	}
@@ -95,11 +108,35 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 }
 
 void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process) {
+	if(hbmenu) {
+		// exit out of hbmenu, if it's running, before launching
+		hbmenu->Kill();
+	}
 	queued.push_back(process);
 	if(ReadyToLaunch()) {
 		process_queued_wevent.Signal();
 	}
 }
 
+std::shared_ptr<process::AppletProcess> AppletTracker::CreateHbmenu() {
+	std::shared_ptr<process::AppletProcess> proc = std::make_shared<process::AppletProcess>(twili);
+	// note: we skip over the Started state through this non-standard launch procedure
+
+	proc->virtual_exefs.SetMain(hbmenu_transmute);
+	return proc;
+}
+
+AppletTracker::Monitor::Monitor(AppletTracker &tracker) : process::ProcessMonitor(std::shared_ptr<process::MonitoredProcess>()), tracker(tracker) {
+}
+
+void AppletTracker::Monitor::StateChanged(process::MonitoredProcess::State new_state) {
+	if(tracker.ReadyToLaunch()) {
+		tracker.process_queued_wevent.Signal();
+	}
+	if(process == tracker.hbmenu && new_state == process::MonitoredProcess::State::Exited) {
+		tracker.hbmenu.reset();
+		Reattach(std::shared_ptr<process::MonitoredProcess>()); // clear this reference since hbmenu likes to hog memory
+	}
+}
 
 } // namespace twili

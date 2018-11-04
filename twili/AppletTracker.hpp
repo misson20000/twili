@@ -25,6 +25,8 @@
 #include<deque>
 
 #include "process/AppletProcess.hpp"
+#include "process/ProcessMonitor.hpp"
+#include "process/fs/NRONSOTransmutationFile.hpp"
 
 namespace twili {
 
@@ -66,9 +68,17 @@ class AppletTracker {
 	trn::KEvent process_queued_event;
 	trn::KWEvent process_queued_wevent;
 
-	// control applet launch
-	void PrepareForControlAppletLaunch();
-	process::fs::ProcessFileSystem control_exevfs;
+	std::shared_ptr<process::AppletProcess> CreateHbmenu();
+	std::shared_ptr<process::fs::NSOTransmutationFile> hbmenu_transmute;
+	std::shared_ptr<process::AppletProcess> hbmenu;
+
+	class Monitor : public process::ProcessMonitor {
+	 public:
+		Monitor(AppletTracker &tracker);
+		virtual void StateChanged(process::MonitoredProcess::State new_state);
+	 private:
+		AppletTracker &tracker;
+	} monitor;
 };
 
 } // namespace twili
