@@ -2,7 +2,7 @@ if (SETUPAPI_LIBRARIES)
   # in cache already
   set(SETUPAPI_FOUND TRUE)
 else()
-  find_library(SETUPAPI_LIBRARY NAMES SetupAPI)
+  find_library(SETUPAPI_LIBRARY NAMES SetupAPI PATHS "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.17134.0/um/x64")
 
   set(SETUPAPI_LIBRARIES ${SETUPAPI_LIBRARY})
 
