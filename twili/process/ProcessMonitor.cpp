@@ -24,11 +24,21 @@ namespace twili {
 namespace process {
 
 ProcessMonitor::ProcessMonitor(std::shared_ptr<process::MonitoredProcess> process) : process(process) {
-	process->AddMonitor(*this);
+	Reattach(process);
 }
 
 ProcessMonitor::~ProcessMonitor() {
-	process->RemoveMonitor(*this);
+	Reattach(std::shared_ptr<MonitoredProcess>());
+}
+
+void ProcessMonitor::Reattach(std::shared_ptr<process::MonitoredProcess> new_process) {
+	if(process) {
+		process->RemoveMonitor(*this);
+	}
+	process = new_process;
+	if(process) {
+		process->AddMonitor(*this);
+	}
 }
 
 void ProcessMonitor::StateChanged(MonitoredProcess::State new_state) {

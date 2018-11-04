@@ -60,11 +60,13 @@ void AppletProcess::Launch(bridge::ResponseOpener opener) {
 
 void AppletProcess::ChangeState(State state) {
 	MonitoredProcess::ChangeState(state);
-	if(state == State::Attached && run_opener) {
-		auto w = run_opener->BeginOk(sizeof(uint64_t));
-		w.Write<uint64_t>(GetPid());
-		w.Finalize();
-		run_opener.reset();
+	if(state == State::Attached) {
+		if(run_opener) {
+			auto w = run_opener->BeginOk(sizeof(uint64_t));
+			w.Write<uint64_t>(GetPid());
+			w.Finalize();
+			run_opener.reset();
+		}
 
 		// find target entry...
 		memory_info_t mi = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, 0)));

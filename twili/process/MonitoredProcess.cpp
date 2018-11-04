@@ -110,7 +110,8 @@ void MonitoredProcess::ChangeState(State new_state) {
 		tp_stderr->Close();
 	}
 	state = new_state;
-	for(auto mon : monitors) {
+	const std::list<ProcessMonitor*> monitors_immut(monitors);
+	for(auto mon : monitors_immut) {
 		mon->StateChanged(new_state);
 	}
 }

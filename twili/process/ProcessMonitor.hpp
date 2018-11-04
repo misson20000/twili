@@ -33,10 +33,11 @@ class ProcessMonitor {
 	// don't copy or move us please, since process keeps track of us via pointer
 	ProcessMonitor(const ProcessMonitor &other) = delete;
 	ProcessMonitor(ProcessMonitor &&other) = delete;
+
+	void Reattach(std::shared_ptr<process::MonitoredProcess> new_process);
 	
 	virtual void StateChanged(MonitoredProcess::State new_state);
 	
- protected:
 	std::shared_ptr<process::MonitoredProcess> process;
 };
 
