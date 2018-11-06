@@ -50,6 +50,8 @@ trn::ResultCode IHBABIShim::Dispatch(trn::ipc::Message msg, uint32_t request_id)
 		return trn::ipc::server::RequestHandler<&IHBABIShim::SetExitCode>::Handle(this, msg);
 	case 7:
 		return trn::ipc::server::RequestHandler<&IHBABIShim::WaitToStart>::Handle(this, msg);
+	case 8:
+		return trn::ipc::server::RequestHandler<&IHBABIShim::GetArgv>::Handle(this, msg);
 	}
 	return 1;
 }
@@ -102,6 +104,11 @@ trn::ResultCode IHBABIShim::SetExitCode(trn::ipc::InRaw<uint32_t> code) {
 trn::ResultCode IHBABIShim::WaitToStart(std::function<void(trn::ResultCode)> cb) {
 	process->ChangeState(process::MonitoredProcess::State::Running);
 	cb(RESULT_OK);
+	return RESULT_OK;
+}
+
+trn::ResultCode IHBABIShim::GetArgv(trn::ipc::Buffer<char, 0x6, 0> buffer) {
+	process->argv.copy(buffer.data, buffer.size);
 	return RESULT_OK;
 }
 

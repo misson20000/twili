@@ -143,7 +143,8 @@ void AppletTracker::HBLLoad(std::string path, std::string argv) {
 	
 	std::shared_ptr<process::AppletProcess> next_proc = std::make_shared<process::AppletProcess>(twili);
 	next_proc->virtual_exefs.SetMain(transmute);
-
+	next_proc->argv = argv;
+	
 	printf("prepared hbl next load process. queueing...\n");
 	QueueLaunch(next_proc);
 }

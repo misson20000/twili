@@ -45,6 +45,7 @@ class IHBABIShim : public trn::ipc::server::Object {
 	trn::ResultCode GetTargetEntryPoint(trn::ipc::OutRaw<uint64_t> out);
 	trn::ResultCode SetExitCode(trn::ipc::InRaw<uint32_t> code);
 	trn::ResultCode WaitToStart(std::function<void(trn::ResultCode)> cb);
+	trn::ResultCode GetArgv(trn::ipc::Buffer<char, 0x6, 0> argv);
  private:
 	std::shared_ptr<process::MonitoredProcess> process;
 	std::vector<loader_config_entry_t> entries;

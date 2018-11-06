@@ -30,6 +30,7 @@ interface twili::IHBABIShim {
 	[5] GetTargetEntryPoint() -> u64;
 	[6] SetExitCode(u32);
 	[7] WaitToStart();
+	[8] GetArgv() -> buffer<char[2048], 0x6>;
 }
 
 interface twili::IAppletShim {

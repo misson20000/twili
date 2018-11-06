@@ -159,6 +159,20 @@ int main(int argc, char *argv[]) {
 				}
 			});
 
+		// This key is also best handled by us, since Twili
+		// would have a hard time sending this data otherwise.
+		char current_argv[2048] = {0};
+		ResultCode::AssertOk( // GetArgv
+			shimservice.SendSyncRequest<8>(
+				ipc::Buffer<char, 0x6>(current_argv, sizeof(current_argv))));
+		entries.push_back(loader_config_entry_t {
+				.key = LCONFIG_KEY_ARGV,
+				.flags = 0,
+				.argv = {
+					.argv = (char**) current_argv
+				}
+			});
+
 		entries.push_back(loader_config_entry_t {
 				.key = LCONFIG_KEY_END_OF_LIST,
 				.flags = LOADER_CONFIG_FLAG_RECOGNITION_MANDATORY
