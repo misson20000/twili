@@ -69,12 +69,8 @@ bool AppletTracker::ReadyToLaunch() {
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
-	std::shared_ptr<process::AppletProcess> proc;
-	while(queued.size() > 0 && !(proc = queued.front().lock())) {
-		// skip dead weak pointers
-		queued.pop_front();
-	}
 	if(queued.size() > 0) {
+		std::shared_ptr<process::AppletProcess> proc = queued.front();
 		created.push_back(proc);
 		queued.pop_front();
 
