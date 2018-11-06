@@ -46,17 +46,13 @@ void ProcessFileSystem::SetNpdm(std::shared_ptr<ProcessFile> file) {
 trn::ResultCode ProcessFileSystem::IFileSystem::OpenFile(trn::ipc::InRaw<uint32_t> mode, trn::ipc::Buffer<char, 0x19, 0> path, trn::ipc::OutObject<service::fs::IFile> &out) {
 	std::shared_ptr<ProcessFile> file;
 	if(!strncmp(path.data, "/main", path.size)) {
-		printf("PFS: opening main\n");
 		file = pfs.main;
 	} else if(!strncmp(path.data, "/rtld", path.size)) {
-		printf("PFS: opening rtld\n");
 		file = pfs.rtld;
 	} else if(!strncmp(path.data, "/main.npdm", path.size)) {
-		printf("PFS: opening main.npdm\n");
 		file = pfs.npdm;
 	}
 	if(!file) {
-		printf("PFS: couldn't find %s\n", path.data);
 		return 0x202; // file or directory does not exist
 	}
 	auto r = server->CreateObject<IFile>(this, file);
