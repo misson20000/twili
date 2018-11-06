@@ -34,6 +34,7 @@ namespace client {
 
 class Client {
  public:
+	virtual ~Client() = default;
 	std::future<Response> SendRequest(Request &&rq);
 	
 	bool deletion_flag = false;
