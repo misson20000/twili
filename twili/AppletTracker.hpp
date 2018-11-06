@@ -49,7 +49,8 @@ class AppletTracker {
 
 	// for twili
 	void QueueLaunch(std::shared_ptr<process::AppletProcess> process);
-	
+
+	void HBLLoad(std::string path, std::string argv);
  private:
 	Twili &twili;
 	

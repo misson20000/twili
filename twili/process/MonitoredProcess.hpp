@@ -76,6 +76,9 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
 
+	std::string next_load_path;
+	std::string next_load_argv;
+	
 	void AddMonitor(ProcessMonitor &monitor);
 	void RemoveMonitor(ProcessMonitor &monitor);
 	

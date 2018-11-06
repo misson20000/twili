@@ -83,6 +83,8 @@ trn::ResultCode IHBABIShim::GetLoaderConfigHandle(trn::ipc::InRaw<uint32_t> plac
 
 trn::ResultCode IHBABIShim::SetNextLoadPath(trn::ipc::Buffer<uint8_t, 0x5, 0> path, trn::ipc::Buffer<uint8_t, 0x5, 0> argv) {
 	printf("[HBABIShim(0x%lx)] next load path: %s[%s]\n", process->GetPid(), path.data, argv.data);
+	process->next_load_path = (const char*) path.data;
+	process->next_load_argv = (const char*) argv.data;
 	return RESULT_OK;
 }
 

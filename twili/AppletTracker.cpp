@@ -122,6 +122,32 @@ std::shared_ptr<process::AppletProcess> AppletTracker::CreateHbmenu() {
 	return proc;
 }
 
+void AppletTracker::HBLLoad(std::string path, std::string argv) {
+	// transmute sdmc:/switch/application.nro path to /sd/switch/application.nro
+	const std::string prefix("sdmc:/");
+	if(path.compare(0, prefix.size(), prefix)) {
+		printf("  invalid path\n");
+		return;
+	}
+	char transmute_path[0x301];
+	snprintf(transmute_path, sizeof(transmute_path), "/sd/%s", path.c_str() + prefix.size());
+
+	FILE *file = fopen(transmute_path, "rb");
+	if(!file) {
+		printf("  failed to open\n");
+		return;
+	}
+
+	std::shared_ptr<process::fs::ProcessFile> transmute = process::fs::NRONSOTransmutationFile::Create(
+		std::make_shared<process::fs::ActualFile>(file));
+	
+	std::shared_ptr<process::AppletProcess> next_proc = std::make_shared<process::AppletProcess>(twili);
+	next_proc->virtual_exefs.SetMain(transmute);
+
+	printf("prepared hbl next load process. queueing...\n");
+	QueueLaunch(next_proc);
+}
+
 AppletTracker::Monitor::Monitor(AppletTracker &tracker) : process::ProcessMonitor(std::shared_ptr<process::MonitoredProcess>()), tracker(tracker) {
 }
 
@@ -130,6 +156,11 @@ void AppletTracker::Monitor::StateChanged(process::MonitoredProcess::State new_s
 		tracker.process_queued_wevent.Signal();
 	}
 	if(process == tracker.hbmenu && new_state == process::MonitoredProcess::State::Exited) {
+		printf("AppletTracker: hbmenu exited\n");
+		if(!tracker.hbmenu->next_load_path.empty()) {
+			printf("AppletTracker: hbmenu requested next load: %s[%s]\n", tracker.hbmenu->next_load_path.c_str(), tracker.hbmenu->next_load_argv.c_str());
+			tracker.HBLLoad(tracker.hbmenu->next_load_path, tracker.hbmenu->next_load_argv);
+		}
 		tracker.hbmenu.reset();
 		Reattach(std::shared_ptr<process::MonitoredProcess>()); // clear this reference since hbmenu likes to hog memory
 	}
