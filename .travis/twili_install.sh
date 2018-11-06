@@ -1,5 +1,5 @@
 set -x
-wget -nv https://github.com/reswitched/libtransistor/releases/download/$LIBTRANSISTOR_VERSION/libtransistor_$LIBTRANSISTOR_VERSION.tar.gz
+wget -nv https://github.com/$LIBTRANSISTOR_REPO/releases/download/$LIBTRANSISTOR_VERSION/libtransistor_$LIBTRANSISTOR_VERSION.tar.gz
 mkdir libtransistor
 tar xzf libtransistor_$LIBTRANSISTOR_VERSION.tar.gz -C libtransistor
 pip3 install --user --upgrade pip setuptools wheel
