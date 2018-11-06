@@ -155,14 +155,19 @@ void AppletTracker::Monitor::StateChanged(process::MonitoredProcess::State new_s
 	if(tracker.ReadyToLaunch()) {
 		tracker.process_queued_wevent.Signal();
 	}
-	if(process == tracker.hbmenu && new_state == process::MonitoredProcess::State::Exited) {
-		printf("AppletTracker: hbmenu exited\n");
-		if(!tracker.hbmenu->next_load_path.empty()) {
-			printf("AppletTracker: hbmenu requested next load: %s[%s]\n", tracker.hbmenu->next_load_path.c_str(), tracker.hbmenu->next_load_argv.c_str());
-			tracker.HBLLoad(tracker.hbmenu->next_load_path, tracker.hbmenu->next_load_argv);
+	if(new_state == process::MonitoredProcess::State::Exited) {
+		if(process == tracker.hbmenu) {
+			printf("AppletTracker: hbmenu exited\n");
+			if(!tracker.hbmenu->next_load_path.empty()) {
+				printf("AppletTracker: hbmenu requested next load: %s[%s]\n", tracker.hbmenu->next_load_path.c_str(), tracker.hbmenu->next_load_argv.c_str());
+				tracker.HBLLoad(tracker.hbmenu->next_load_path, tracker.hbmenu->next_load_argv);
+			}
+			tracker.hbmenu.reset();
 		}
-		tracker.hbmenu.reset();
-		Reattach(std::shared_ptr<process::MonitoredProcess>()); // clear this reference since hbmenu likes to hog memory
+		// we are no longer interested in monitoring the applet after it exits,
+		// and we need to clear this reference pretty fast anyway since libnx
+		// applets like to hog memory.
+		Reattach(std::shared_ptr<process::MonitoredProcess>());
 	}
 }
 
