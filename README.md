@@ -22,6 +22,7 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
 - [Building From Source](#building-from-source)
   * [Twili](#twili-1)
   * [Twib](#twib)
+    + [Linux / OSX](#linux---osx)
 - [Twib Usage](#twib-usage)
   * [twib list-devices](#twib-list-devices)
   * [twib connect-tcp](#twib-connect-tcp)
@@ -81,7 +82,7 @@ OSX users can download `twib_osx64` and `twibd_osx64` from the [latest release](
 
 ## Windows
 
-Windows support is experimental and is being improved. Windows users may download `twib_win64.exe` and `twibd_win64.exe` from the [latest release](https://github.com/misson20000/twili/releases/latest). Boot your switch with Twili installed, then run Zadig and set both of the `TransistorUSB` interfaces to `libusb-win32`. Run `twibd_win64.exe`, and leave it running in the background. Hotplug is not yet supported on Windows, so you will have to exit `twibd_win64` and restart it if you reconnect a Switch. `twib_win64.exe` should be run from the command prompt.
+Windows support is experimental and is being improved. Windows users may download `twib_win64.exe` and `twibd_win64.exe` from the [latest release](https://github.com/misson20000/twili/releases/latest). Boot your switch with Twili installed, then run Zadig and set both of the `TransistorUSB` interfaces to `libusbK`. Run `twibd_win64.exe`, and leave it running in the background. `twib_win64.exe` should be run from the command prompt.
 
 # Building From Source
 
@@ -90,6 +91,8 @@ Windows support is experimental and is being improved. Windows users may downloa
 First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. After that, building Twili should be as simple as running `make`. To use Atmosphère-boot2 to launch Twili, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card.
 
 ## Twib
+
+### Linux / OSX
 
 You will need libusb development headers installed. On Debian-based distros, these are usually in the `libusb-1.0.0-dev` package.
 
@@ -179,11 +182,11 @@ $ twib connect-tcp 10.0.0.218
 
 ## twib run
 
-Runs an executable on the target console. If the `-a` flag is not used, the executable will be run in a "managed" sysmodule process that is invisible to the rest of the system. The executable format for managed processes is NRO. If the `-a` flag is used, the process will be launched as a library applet instead. If you want to run a typical homebrew application, you will need to use the `-a` flag. The executable format for applet processes is NSO.
+Runs an executable on the target console. If the `-a` flag is not used, the executable will be run in a "managed" sysmodule process that is invisible to the rest of the system. The executable format for managed processes is NRO. If the `-a` flag is used, the process will be launched as a library applet instead. If you want to run a typical homebrew application, you will need to use the `-a` flag. The executable format for applet processes is also NRO.
 
 In the future, both managed and applet processes will be able to be launched from ExeFS NSP, NSO, NRO, or ELF.
 
-Twib will stay alive until the process exits. If the application implements Twili stdio, any output from the process will come out of twib and any input given to Twib will be sent to the target process.
+Twib will stay alive until the process exits. If the application implements Twili stdio, any output from the process will come out of twib and any input given to Twib will be sent to the target process. You can use the `-q` flag to silence the PID output if you are using twib in a shell script.
 
 ```
 $ twib run test_helloworld.nro
