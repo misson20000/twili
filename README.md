@@ -71,7 +71,9 @@ These are temporary and are planned to be addressed.
 
 # Installation
 
-Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère (v0.7.1+). Running Twili on piracy firmware will make me cry, so don't do it. :cry:
+Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère (v0.7.4+). Running Twili on piracy firmware will make me cry, so don't do it. :cry:
+
+Note that as of writing this, the latest release (v0.7.3) of Atmosphère does not yet include the External Content Source extension that Twili depends on, so you will have to build Atmosphère from source.
 
 You will also need to install the workstation-side tools, `twib` and `twibd`.
 
