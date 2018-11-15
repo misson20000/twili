@@ -94,6 +94,15 @@ ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 	return *reader;
 }
 
+ITwibDebugger ITwibDeviceInterface::OpenActiveDebugger(uint64_t pid) {
+	std::optional<ITwibDebugger> debugger;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_ACTIVE_DEBUGGER,
+		in<uint64_t>(pid),
+		out_object<ITwibDebugger>(debugger));
+	return *debugger;
+}
+
 msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
 	msgpack11::MsgPack pack;
 	obj->SendSmartSyncRequest(
