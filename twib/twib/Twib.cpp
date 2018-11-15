@@ -36,6 +36,7 @@
 #include "Protocol.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
 #include "interfaces/ITwibDeviceInterface.hpp"
+#include "GdbStub.hpp"
 
 #if TWIB_TCP_FRONTEND_ENABLED == 1 || TWIB_UNIX_FRONTEND_ENABLED == 1
 #include "SocketClient.hpp"
@@ -229,6 +230,8 @@ int main(int argc, char *argv[]) {
 	open_named_pipe->add_option("name", open_named_pipe_name, "Name of pipe to open")->required();
 
 	CLI::App *get_memory_info = app.add_subcommand("get-memory-info", "Gets memory usage information from the device");
+
+	CLI::App *gdb = app.add_subcommand("gdb", "Opens an enhanced GDB stub for the device");
 	
 	app.require_subcommand(1);
 	
@@ -240,7 +243,12 @@ int main(int argc, char *argv[]) {
 
 	twili::log::init_color();
 	if(is_verbose) {
-		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+		if(gdb->parsed()) {
+			// for gdb stub, all logging should go to stderr
+			twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Debug, twili::log::Level::Error));
+		} else {
+			twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, twili::log::Level::Debug, twili::log::Level::Error));
+		}
 	}
 	twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
 	
@@ -454,6 +462,12 @@ int main(int argc, char *argv[]) {
 				cat_info["current_value"].uint64_value() * 100 / cat_info["limit_value"].uint64_value());
 		}
 		return 0;
+	}
+
+	if(gdb->parsed()) {
+		twili::twib::gdb::GdbStub stub(itdi);
+		stub.Run();
+		exit(0);
 	}
 	
 	return 0;

@@ -85,6 +85,16 @@ ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 	return rs.objects[*(uint32_t*) rs.payload.data()];
 }
 
+ITwibDebugger ITwibDeviceInterface::OpenActiveDebugger(uint64_t pid) {
+	uint8_t *pid_bytes = (uint8_t*) &pid;
+	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::OPEN_ACTIVE_DEBUGGER, std::vector<uint8_t>(pid_bytes, pid_bytes + sizeof(pid)));
+	if(rs.payload.size() < sizeof(uint32_t)) {
+		LogMessage(Fatal, "response size invalid");
+		exit(1);
+	}
+	return rs.objects[*(uint32_t*) rs.payload.data()];
+}
+
 msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
 	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO);
 	std::string err;
