@@ -53,6 +53,7 @@ class GdbStub {
 	class Thread {
 	 public:
 		Thread(Process &process, uint64_t thread_id);
+		std::vector<uint64_t> GetRegisters();
 		Process &process;
 		uint64_t thread_id = 0;
 	};
@@ -97,6 +98,7 @@ class GdbStub {
 	void HandleGeneralSetQuery(util::Buffer &packet);
 	void HandleMultiletterPacket(util::Buffer &packet);
 	void HandleGetStopReason();
+	void HandleReadGeneralRegisters();
 	void HandleSetCurrentThread(util::Buffer &packet);
 	
 	// multiletter packets

@@ -35,6 +35,7 @@ class ITwibDebugger {
 	using CommandID = protocol::ITwibDebugger::Command;
 	
 	nx::DebugEvent GetDebugEvent();
+	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

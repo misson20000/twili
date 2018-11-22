@@ -140,6 +140,23 @@ void GdbStub::HandleGetStopReason() {
 	connection.Respond(buf);
 }
 
+void GdbStub::HandleReadGeneralRegisters() {
+	if(current_thread == nullptr) {
+		LogMessage(Warning, "attempt to read registers with no selected thread");
+		connection.RespondError(1);
+	}
+
+	util::Buffer response;
+	std::vector<uint64_t> registers = current_thread->GetRegisters();
+	GdbConnection::Encode((uint8_t*) registers.data(), 284, response);
+	std::string str;
+	size_t sz = response.ReadAvailable();
+	response.Read(str, sz);
+	response.MarkRead(-sz);
+	LogMessage(Debug, "responding with '%s'", str.c_str());
+	connection.Respond(response);
+}
+
 void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 	if(packet.ReadAvailable() < 2) {
 		LogMessage(Warning, "invalid thread id");
@@ -298,6 +315,10 @@ void GdbStub::ProcessEvents(Process &process) {
 GdbStub::Thread::Thread(Process &process, uint64_t thread_id) : process(process), thread_id(thread_id) {
 }
 
+std::vector<uint64_t> GdbStub::Thread::GetRegisters() {
+	return process.debugger.GetThreadContext(thread_id);
+}
+
 GdbStub::Process::Process(uint64_t pid, ITwibDebugger debugger) : pid(pid), debugger(debugger) {
 }
 
@@ -322,6 +343,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		case '?': // stop reason
 			stub.HandleGetStopReason();
+			break;
+		case 'g': // read general registers
+			stub.HandleReadGeneralRegisters();
 			break;
 		case 'H': // set current thread
 			stub.HandleSetCurrentThread(*buffer);

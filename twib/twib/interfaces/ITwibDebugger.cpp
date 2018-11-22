@@ -38,5 +38,16 @@ nx::DebugEvent ITwibDebugger::GetDebugEvent() {
 	return event;
 }
 
+std::vector<uint64_t> ITwibDebugger::GetThreadContext(uint64_t thread_id) {
+	struct ThreadContext {
+		uint64_t regs[100];
+	} tc;
+	obj->SendSmartSyncRequest(
+		CommandID::GET_THREAD_CONTEXT,
+		in<uint64_t>(thread_id),
+		out<ThreadContext>(tc));
+	return std::vector<uint64_t>(&tc.regs[0], &tc.regs[100]);
+}
+
 } // namespace twib
 } // namespace twili
