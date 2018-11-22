@@ -24,6 +24,8 @@
 
 #include "../RemoteObject.hpp"
 
+#include "../DebugTypes.hpp"
+
 namespace twili {
 namespace twib {
 
@@ -31,7 +33,7 @@ class ITwibDebugger {
  public:
 	ITwibDebugger(std::shared_ptr<RemoteObject> obj);
 
-	void GetDebugEvent();
+	nx::DebugEvent GetDebugEvent();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

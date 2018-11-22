@@ -48,13 +48,25 @@ class GdbStub {
 		const bool should_advertise;
 	};
 
+	class Process;
+	
 	class Thread {
 	 public:
-		uint64_t pid = 0;
+		Thread(Process &process, uint64_t thread_id);
+		Process &process;
 		uint64_t thread_id = 0;
 	};
 
-	Thread current_thread;
+	class Process {
+	 public:
+		Process(uint64_t pid, ITwibDebugger debugger);
+		uint64_t pid;
+		ITwibDebugger debugger;
+		std::map<uint64_t, Thread> threads;
+	};
+	
+	Thread *current_thread = nullptr;
+	std::map<uint64_t, Process> attached_processes;
 	
 	void AddFeature(std::string feature);
 	void AddGettableQuery(Query query);
@@ -62,7 +74,6 @@ class GdbStub {
 	void AddMultiletterHandler(std::string name, void (GdbStub::*handler)(util::Buffer&));
 	
 	std::string stop_reason = "W00";
-	std::map<uint64_t, ITwibDebugger> debuggers;
 	
  private:
 	ITwibDeviceInterface &itdi;
@@ -97,6 +108,8 @@ class GdbStub {
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);
+
+	void ProcessEvents(Process &process);
 };
 
 } // namespace gdb
