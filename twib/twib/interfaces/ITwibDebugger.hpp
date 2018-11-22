@@ -23,6 +23,7 @@
 #include<vector>
 
 #include "../RemoteObject.hpp"
+#include "../DebugTypes.hpp"
 
 namespace twili {
 namespace twib {
@@ -33,7 +34,7 @@ class ITwibDebugger {
 
 	using CommandID = protocol::ITwibDebugger::Command;
 	
-	void GetDebugEvent();
+	nx::DebugEvent GetDebugEvent();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

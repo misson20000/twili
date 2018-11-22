@@ -19,9 +19,11 @@
 //
 
 #include "GdbStub.hpp"
-#include "Logger.hpp"
 
 #include<functional>
+
+#include "Logger.hpp"
+#include "ResultError.hpp"
 
 namespace twili {
 namespace twib {
@@ -152,7 +154,7 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		return;
 	}
 
-	uint64_t pid = current_thread.pid;
+	uint64_t pid = current_thread ? current_thread->process.pid : 0;
 	
 	char ch;
 	if(packet.ReadAvailable() && packet.Read()[0] == 'p') { // peek
@@ -176,9 +178,28 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		packet.MarkRead(2); // consume
 	}
 
-	current_thread.pid = pid;
-	current_thread.thread_id = thread_id;
-	LogMessage(Debug, "selected thread for '%c': pid 0x%lx tid 0x%lx", op, pid, thread_id);
+	auto i = attached_processes.find(pid);
+	if(i == attached_processes.end()) {
+		LogMessage(Debug, "no such process with pid 0x%x", pid);
+		connection.RespondError(1);
+		return;
+	}
+
+	if(thread_id == 0) {
+		// pick the first thread
+		current_thread = &i->second.threads.begin()->second;
+	} else {
+		auto j = i->second.threads.find(thread_id);
+		if(j == i->second.threads.end()) {
+			LogMessage(Debug, "no such thread with tid 0x%x", thread_id);
+			connection.RespondError(1);
+			return;
+		}
+		
+		current_thread = &j->second;
+	}
+	
+	LogMessage(Debug, "selected thread for '%c': pid 0x%lx tid 0x%lx", op, pid, current_thread->thread_id);
 	connection.RespondOk();
 }
 
@@ -191,14 +212,13 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	}
 	LogMessage(Debug, "decoded PID: 0x%lx", pid);
 
-	if(debuggers.find(pid) != debuggers.end()) {
+	if(attached_processes.find(pid) != attached_processes.end()) {
 		connection.RespondError(1);
 		return;
 	}
 
-	debuggers.emplace(pid, itdi.OpenActiveDebugger(pid));
-
-	current_thread.pid = pid;
+	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
+	ProcessEvents(r.first->second);
 	
 	stop_reason = "S05";
 	
@@ -236,15 +256,49 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 void GdbStub::QueryGetCurrentThread(util::Buffer &packet) {
 	util::Buffer response;
 	response.Write('p');
-	GdbConnection::Encode(current_thread.pid, 0, response);
+	GdbConnection::Encode(current_thread ? current_thread->process.pid : 0, 0, response);
 	response.Write('.');
-	GdbConnection::Encode(current_thread.thread_id, 0, response);
+	GdbConnection::Encode(current_thread ? current_thread->thread_id : 0, 0, response);
 	connection.Respond(response);
 }
 
 void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 	connection.StartNoAckMode();
 	connection.RespondOk();
+}
+
+void GdbStub::ProcessEvents(Process &process) {
+	try {
+		while(1) {
+			nx::DebugEvent event = process.debugger.GetDebugEvent();
+			LogMessage(Debug, "got event: %d", event.event_type);
+
+			switch(event.event_type) {
+			case nx::DebugEvent::EventType::AttachProcess:
+				break;
+			case nx::DebugEvent::EventType::AttachThread:
+				uint64_t thread_id = event.attach_thread.thread_id;
+				LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
+				auto r = process.threads.emplace(thread_id, Thread(process, thread_id));
+				current_thread = &r.first->second;
+				break;
+			}
+		}
+	} catch(ResultError &e) {
+		if(e.code == 0x8c01) {
+			LogMessage(Debug, "got all events");
+			return; // no events left
+		} else {
+			LogMessage(Debug, "error while processing events: 0x%x", e.code);
+			throw e; // propogate
+		}
+	}
+}
+
+GdbStub::Thread::Thread(Process &process, uint64_t thread_id) : process(process), thread_id(thread_id) {
+}
+
+GdbStub::Process::Process(uint64_t pid, ITwibDebugger debugger) : pid(pid), debugger(debugger) {
 }
 
 GdbStub::Logic::Logic(GdbStub &stub) : stub(stub) {

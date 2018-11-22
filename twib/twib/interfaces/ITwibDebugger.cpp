@@ -20,6 +20,7 @@
 
 #include "ITwibDebugger.hpp"
 
+#include<string.h>
 #include "Protocol.hpp"
 
 namespace twili {
@@ -29,8 +30,12 @@ ITwibDebugger::ITwibDebugger(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 	
 }
 
-void ITwibDebugger::GetDebugEvent() {
-	obj->SendSmartSyncRequest(CommandID::GET_DEBUG_EVENT);
+nx::DebugEvent ITwibDebugger::GetDebugEvent() {
+	nx::DebugEvent event;
+	obj->SendSmartSyncRequest(
+		CommandID::GET_DEBUG_EVENT,
+		out<nx::DebugEvent>(event));
+	return event;
 }
 
 } // namespace twib
