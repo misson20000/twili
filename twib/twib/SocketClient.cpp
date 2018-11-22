@@ -20,6 +20,8 @@
 
 #include "SocketClient.hpp"
 
+#include "err.hpp"
+
 namespace twili {
 namespace twib {
 namespace client {
@@ -55,11 +57,11 @@ void SocketClient::Logic::Prepare(twibc::SocketServer &server) {
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}
-	if(client.connection.error_flag) {
-		LogMessage(Fatal, "socket error");
-		exit(1);
+	if(!client.connection.error_flag) {
+		server.AddSocket(client.connection.socket);
+	} else {
+		client.FailAllRequests(TWILI_ERR_IO_ERROR);
 	}
-	server.AddSocket(client.connection.socket);
 }
 
 } // namespace client

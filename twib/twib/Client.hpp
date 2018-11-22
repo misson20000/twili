@@ -42,6 +42,7 @@ class Client {
  protected:
 	virtual void SendRequestImpl(const Request &rq) = 0;
 	void PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
+	void FailAllRequests(uint32_t code);
  private:
 	std::map<uint32_t, std::promise<Response>> response_map;
 	std::mutex response_map_mutex;

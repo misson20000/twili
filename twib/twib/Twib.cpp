@@ -255,8 +255,12 @@ int main(int argc, char *argv[]) {
 		client = twili::twib::connect_named_pipe(named_pipe_frontend_path);
 	} else {
 		LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
-		exit(1);
+		return 1;
 	}
+	if(!client) {
+		return 1;
+	}
+	
 	twili::twib::ITwibMetaInterface itmi(twili::twib::RemoteObject(*client, 0, 0));
 	
 	if(ld->parsed()) {
@@ -367,7 +371,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Debug, "  state %d change...", state);
 		}
 		LogMessage(Debug, "  process exited");
-		exit(0); // skip calling stdin_pump thread destructor, since it will std::terminate
+		return 0;
 	}
 
 	if(reboot->parsed()) {
@@ -465,13 +469,12 @@ namespace twib {
 std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 #if TWIB_TCP_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "TCP socket not supported");
-	exit(1);
 	return std::unique_ptr<client::Client>();
 #else
 	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(fd < 0) {
 		LogMessage(Fatal, "failed to create TCP socket: %s", NetErrStr());
-		exit(1);
+		return std::unique_ptr<client::Client>();
 	}
 
 	struct sockaddr_in6 addr;
@@ -483,7 +486,7 @@ std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
 		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		closesocket(fd);
-		exit(1);
+		return std::unique_ptr<client::Client>();
 	}
 	LogMessage(Info, "connected to twibd: %d", fd);
 	return std::make_unique<client::SocketClient>(fd);
@@ -493,13 +496,12 @@ std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 std::unique_ptr<client::Client> connect_unix(std::string path) {
 #if TWIB_UNIX_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "UNIX domain socket not supported");
-	exit(1);
 	return std::unique_ptr<client::Client>();
 #else
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(fd < 0) {
 		LogMessage(Fatal, "failed to create UNIX domain socket: %s", NetErrStr());
-		exit(1);
+		return std::unique_ptr<client::Client>();
 	}
 
 	struct sockaddr_un addr;
@@ -510,7 +512,7 @@ std::unique_ptr<client::Client> connect_unix(std::string path) {
 	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
 		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
 		close(fd);
-		exit(1);
+		return std::unique_ptr<client::Client>();
 	}
 	LogMessage(Info, "connected to twibd: %d", fd);
 	return std::make_unique<client::SocketClient>(fd);
@@ -520,7 +522,6 @@ std::unique_ptr<client::Client> connect_unix(std::string path) {
 std::unique_ptr<client::Client> connect_named_pipe(std::string path) {
 #if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 0
 	LogMessage(Fatal, "Named pipe not supported");
-	exit(1);
 	return std::unique_ptr<client::Client>();
 #else
 	twili::platform::windows::Pipe pipe; 
@@ -533,19 +534,19 @@ std::unique_ptr<client::Client> connect_named_pipe(std::string path) {
 
 		if(GetLastError() != ERROR_PIPE_BUSY) {
 			LogMessage(Fatal, "Could not open pipe. GLE=%d", GetLastError());
-			exit(1);
+			return std::unique_ptr<client::Client>();
 		}
 
 		LogMessage(Info, "got ERROR_PIPE_BUSY, waiting...");
 		if(!WaitNamedPipe(path.c_str(), 20000)) {
 			LogMessage(Fatal, "Could not open pipe: 20 second wait timed out");
-			exit(1);
+			return std::unique_ptr<client::Client>();
 		}
 	}
 	/*DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
 	if(!SetNamedPipeHandleState(pipe.handle, &mode, nullptr, nullptr)) {
 		LogMessage(Fatal, "Failed to set named pipe handle state. GLE=%d", GetLastError());
-		exit(1);
+		return std::unique_ptr<client::Client>();
 	}*/
 	return std::make_unique<client::NamedPipeClient>(std::move(pipe));
 #endif

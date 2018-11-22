@@ -22,6 +22,8 @@
 
 #include "Protocol.hpp"
 #include "Logger.hpp"
+#include "ResultError.hpp"
+#include "err.hpp"
 
 namespace twili {
 namespace twib {
@@ -32,8 +34,7 @@ ITwibProcessMonitor::ITwibProcessMonitor(std::shared_ptr<RemoteObject> obj) : ob
 uint64_t ITwibProcessMonitor::Launch() {
 	Response rs = obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::LAUNCH);
 	if(rs.payload.size() < sizeof(uint64_t)) {
-		LogMessage(Fatal, "response size invalid");
-		exit(1);
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
 	}
 	return *(uint64_t*) rs.payload.data();
 }
@@ -57,8 +58,7 @@ ITwibPipeReader ITwibProcessMonitor::OpenStderr() {
 uint32_t ITwibProcessMonitor::WaitStateChange() {
 	Response rs = obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::WAIT_STATE_CHANGE);
 	if(rs.payload.size() < sizeof(uint32_t)) {
-		LogMessage(Fatal, "response size invalid");
-		exit(1);
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
 	}
 	return *(uint32_t*) rs.payload.data();
 }
