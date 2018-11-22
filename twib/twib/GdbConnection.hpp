@@ -48,6 +48,7 @@ class GdbConnection {
 	static char EncodeHexNybble(uint8_t n);
 	static void Encode(uint64_t n, size_t size, util::Buffer &dest);
 	static void Encode(uint8_t *p, size_t size, util::Buffer &dest);
+	static void Encode(std::string &string, util::Buffer &dest);
 	
 	class Socket : public twibc::SocketServer::Socket {
 	 public:

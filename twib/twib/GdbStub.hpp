@@ -92,6 +92,14 @@ class GdbStub {
 	std::unordered_map<std::string, Query> gettable_queries;
 	std::unordered_map<std::string, Query> settable_queries;
 	std::unordered_map<std::string, void (GdbStub::*)(util::Buffer&)> multiletter_handlers;
+
+	struct {
+		std::map<uint64_t, Process>::iterator process_iterator;
+		std::map<uint64_t, Thread>::iterator thread_iterator;
+	} get_thread_info;
+
+	// utilities
+	void ReadThreadId(util::Buffer &buffer, uint64_t &pid, uint64_t &thread_id);
 	
 	// packets
 	void HandleGeneralGetQuery(util::Buffer &packet);
@@ -107,6 +115,9 @@ class GdbStub {
 	// get queries
 	void QueryGetSupported(util::Buffer &packet);
 	void QueryGetCurrentThread(util::Buffer &packet);
+	void QueryGetFThreadInfo(util::Buffer &packet);
+	void QueryGetSThreadInfo(util::Buffer &packet);
+	void QueryGetThreadExtraInfo(util::Buffer &packet);
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);

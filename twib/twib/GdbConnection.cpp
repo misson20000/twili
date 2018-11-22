@@ -229,6 +229,10 @@ void GdbConnection::Encode(uint8_t *p, size_t size, util::Buffer &out_buffer) {
 	}
 }
 
+void GdbConnection::Encode(std::string &string, util::Buffer &out_buffer) {
+	Encode((uint8_t*) string.data(), string.size(), out_buffer);
+}
+
 } // namespace gdb
 } // namespace twib
 } // namespace twili
