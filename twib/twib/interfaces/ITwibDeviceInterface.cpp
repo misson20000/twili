@@ -22,6 +22,8 @@
 
 #include "Protocol.hpp"
 #include "Logger.hpp"
+#include "ResultError.hpp"
+#include "err.hpp"
 
 namespace twili {
 namespace twib {
@@ -79,8 +81,7 @@ std::vector<std::string> ITwibDeviceInterface::ListNamedPipes() {
 ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::OPEN_NAMED_PIPE, std::vector<uint8_t>(name.begin(), name.end()));
 	if(rs.payload.size() < sizeof(uint32_t)) {
-		LogMessage(Fatal, "response size invalid");
-		exit(1);
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
 	}
 	return rs.objects[*(uint32_t*) rs.payload.data()];
 }
@@ -89,8 +90,7 @@ ITwibDebugger ITwibDeviceInterface::OpenActiveDebugger(uint64_t pid) {
 	uint8_t *pid_bytes = (uint8_t*) &pid;
 	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::OPEN_ACTIVE_DEBUGGER, std::vector<uint8_t>(pid_bytes, pid_bytes + sizeof(pid)));
 	if(rs.payload.size() < sizeof(uint32_t)) {
-		LogMessage(Fatal, "response size invalid");
-		exit(1);
+		throw ResultError(TWILI_ERR_BAD_RESPONSE);
 	}
 	return rs.objects[*(uint32_t*) rs.payload.data()];
 }

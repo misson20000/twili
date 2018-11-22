@@ -81,6 +81,17 @@ std::future<Response> Client::SendRequest(Request &&rq) {
 	return future;
 }
 
+void Client::FailAllRequests(uint32_t code) {
+	for(auto i = response_map.begin(); i != response_map.end();) {
+		i->second.set_value(
+			Response(
+				0, 0, code, 0,
+				std::vector<uint8_t>(),
+				std::vector<std::shared_ptr<RemoteObject>>()));
+		i = response_map.erase(i);
+	}
+}
+
 } // namespace client
 } // namespace twib
 } // namespace twili

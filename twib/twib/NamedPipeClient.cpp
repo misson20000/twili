@@ -20,6 +20,8 @@
 
 #include "NamedPipeClient.hpp"
 
+#include "err.hpp"
+
 namespace twili {
 namespace twib {
 namespace client {
@@ -55,12 +57,12 @@ void NamedPipeClient::Logic::Prepare(platform::windows::EventLoop &loop) {
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}
-	if(client.connection.error_flag) {
-		LogMessage(Fatal, "pipe error");
-		exit(1);
+	if(!client.connection.error_flag) {
+		loop.AddMember(client.connection.input_member);
+		loop.AddMember(client.connection.output_member);
+	} else {
+		FailAllRequests(TWILI_ERR_IO_ERROR);
 	}
-	loop.AddMember(client.connection.input_member);
-	loop.AddMember(client.connection.output_member);
 }
 
 } // namespace client
