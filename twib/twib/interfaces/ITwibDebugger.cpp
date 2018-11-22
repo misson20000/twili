@@ -38,5 +38,11 @@ nx::DebugEvent ITwibDebugger::GetDebugEvent() {
 	return event;
 }
 
+std::vector<uint64_t> ITwibDebugger::GetThreadContext(uint64_t thread_id) {
+	uint8_t *tid_bytes = (uint8_t*) &thread_id;
+	std::vector<uint8_t> payload = obj->SendSyncRequest(protocol::ITwibDebugger::Command::GET_THREAD_CONTEXT, std::vector<uint8_t>(tid_bytes, tid_bytes + sizeof(thread_id))).payload;
+	return std::vector<uint64_t>((uint64_t*) payload.data(), (uint64_t*) (payload.data() + payload.size()));
+}
+
 } // namespace twib
 } // namespace twili
