@@ -36,6 +36,9 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	server(logic) {
 	AddGettableQuery(Query(*this, "Supported", &GdbStub::QueryGetSupported, false));
 	AddGettableQuery(Query(*this, "C", &GdbStub::QueryGetCurrentThread, false));
+	AddGettableQuery(Query(*this, "fThreadInfo", &GdbStub::QueryGetFThreadInfo, false));
+	AddGettableQuery(Query(*this, "sThreadInfo", &GdbStub::QueryGetSThreadInfo, false));
+	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
 }
@@ -83,10 +86,40 @@ void GdbStub::AddMultiletterHandler(std::string name, void (GdbStub::*handler)(u
 	multiletter_handlers.emplace(name, handler);
 }
 
+void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, uint64_t &thread_id) {
+	pid = current_thread ? current_thread->process.pid : 0;
+	
+	char ch;
+	if(packet.ReadAvailable() && packet.Read()[0] == 'p') { // peek
+		packet.MarkRead(1); // consume
+		pid = 0;
+		while(packet.ReadAvailable() >= 2 && packet.Read()[0] != '.') {
+			pid<<= 8;
+			pid|= GdbConnection::DecodeHexByte((char*) packet.Read());
+			packet.MarkRead(2); // consume
+		}
+		if(packet.ReadAvailable()) {
+			packet.MarkRead(1); // consume separator
+		}
+	}
+
+	thread_id = 0;
+	
+	while(packet.ReadAvailable() >= 2) {
+		thread_id<<= 8;
+		thread_id|= GdbConnection::DecodeHexByte((char*) packet.Read());
+		packet.MarkRead(2); // consume
+	}
+}
+
 void GdbStub::HandleGeneralGetQuery(util::Buffer &packet) {
 	std::string field;
 	char ch;
 	while(packet.Read(ch) && ch != ':') {
+		if(field == "ThreadExtraInfo" && ch == ',') {
+			// special case... :/
+			break;
+		}
 		field.push_back(ch);
 	}
 	LogMessage(Debug, "got get query for '%s'", field.c_str());
@@ -171,29 +204,8 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		return;
 	}
 
-	uint64_t pid = current_thread ? current_thread->process.pid : 0;
-	
-	char ch;
-	if(packet.ReadAvailable() && packet.Read()[0] == 'p') { // peek
-		packet.MarkRead(1); // consume
-		pid = 0;
-		while(packet.ReadAvailable() >= 2 && packet.Read()[0] != '.') {
-			pid<<= 8;
-			pid|= GdbConnection::DecodeHexByte((char*) packet.Read());
-			packet.MarkRead(2); // consume
-		}
-		if(packet.ReadAvailable()) {
-			packet.MarkRead(1); // consume separator
-		}
-	}
-
-	uint64_t thread_id = 0;
-	
-	while(packet.ReadAvailable() >= 2) {
-		thread_id<<= 8;
-		thread_id|= GdbConnection::DecodeHexByte((char*) packet.Read());
-		packet.MarkRead(2); // consume
-	}
+	uint64_t pid, thread_id;
+	ReadThreadId(packet, pid, thread_id);
 
 	auto i = attached_processes.find(pid);
 	if(i == attached_processes.end()) {
@@ -276,6 +288,50 @@ void GdbStub::QueryGetCurrentThread(util::Buffer &packet) {
 	GdbConnection::Encode(current_thread ? current_thread->process.pid : 0, 0, response);
 	response.Write('.');
 	GdbConnection::Encode(current_thread ? current_thread->thread_id : 0, 0, response);
+	connection.Respond(response);
+}
+
+void GdbStub::QueryGetFThreadInfo(util::Buffer &packet) {
+	get_thread_info.process_iterator = attached_processes.begin();
+	get_thread_info.thread_iterator = get_thread_info.process_iterator->second.threads.begin();
+	QueryGetSThreadInfo(packet);
+}
+
+void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
+	util::Buffer response;
+	bool has_written = false;
+	for(;
+			get_thread_info.process_iterator != attached_processes.end();
+			get_thread_info.process_iterator++,
+				get_thread_info.thread_iterator = get_thread_info.process_iterator->second.threads.begin()) {
+		for(;
+				get_thread_info.thread_iterator != get_thread_info.process_iterator->second.threads.end();
+				get_thread_info.thread_iterator++) {
+			Thread &thread = get_thread_info.thread_iterator->second;
+			if(has_written) {
+				response.Write(',');
+			}
+			response.Write('m');
+			response.Write('p');
+			GdbConnection::Encode(thread.process.pid, 0, response);
+			response.Write('.');
+			GdbConnection::Encode(thread.thread_id, 0, response);
+			has_written = true;
+		}
+	}
+	if(!has_written) {
+		response.Write('l'); // end of list
+	}
+	connection.Respond(response);
+}
+
+void GdbStub::QueryGetThreadExtraInfo(util::Buffer &packet) {
+	uint64_t pid, thread_id;
+	ReadThreadId(packet, pid, thread_id);
+
+	std::string extra_info("extra info goes here");
+	util::Buffer response;
+	GdbConnection::Encode(extra_info, response);
 	connection.Respond(response);
 }
 
