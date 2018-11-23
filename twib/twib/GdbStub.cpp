@@ -314,8 +314,9 @@ void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 			Thread &thread = get_thread_info.thread_iterator->second;
 			if(has_written) {
 				response.Write(',');
+			} else {
+				response.Write('m');
 			}
-			response.Write('m');
 			response.Write('p');
 			GdbConnection::Encode(thread.process.pid, 0, response);
 			response.Write('.');
