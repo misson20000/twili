@@ -195,6 +195,27 @@ uint8_t GdbConnection::DecodeHexByte(char *h) {
 	return (DecodeHexNybble(h[0]) << 4) | DecodeHexNybble(h[1]);
 }
 
+void GdbConnection::DecodeWithSeparator(uint64_t &out, char sep, util::Buffer &packet) {
+	out = 0;
+	while(packet.ReadAvailable() >= 2 && packet.Read()[0] != sep) {
+		out<<= 8;
+		out|= DecodeHexByte((char*) packet.Read());
+		packet.MarkRead(2); // consume
+	}
+	if(packet.ReadAvailable()) {
+		packet.MarkRead(1); // consume separator
+	}
+}
+
+void GdbConnection::Decode(uint64_t &out, util::Buffer &packet) {
+	out = 0;
+	while(packet.ReadAvailable()) {
+		out<<= 4;
+		out|= DecodeHexNybble(packet.Read()[0]);
+		packet.MarkRead(1); // consume
+	}
+}
+
 char GdbConnection::EncodeHexNybble(uint8_t n) {
 	if(n < 0xa) {
 		return '0' + n;

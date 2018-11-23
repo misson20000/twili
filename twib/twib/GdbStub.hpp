@@ -108,6 +108,7 @@ class GdbStub {
 	void HandleGetStopReason();
 	void HandleReadGeneralRegisters();
 	void HandleSetCurrentThread(util::Buffer &packet);
+	void HandleReadMemory(util::Buffer &packet);
 	
 	// multiletter packets
 	void HandleVAttach(util::Buffer &packet);

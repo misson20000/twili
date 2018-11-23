@@ -92,24 +92,10 @@ void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, uint64_t &thread
 	char ch;
 	if(packet.ReadAvailable() && packet.Read()[0] == 'p') { // peek
 		packet.MarkRead(1); // consume
-		pid = 0;
-		while(packet.ReadAvailable() >= 2 && packet.Read()[0] != '.') {
-			pid<<= 8;
-			pid|= GdbConnection::DecodeHexByte((char*) packet.Read());
-			packet.MarkRead(2); // consume
-		}
-		if(packet.ReadAvailable()) {
-			packet.MarkRead(1); // consume separator
-		}
+		GdbConnection::DecodeWithSeparator(pid, '.', packet);
 	}
 
-	thread_id = 0;
-	
-	while(packet.ReadAvailable() >= 2) {
-		thread_id<<= 8;
-		thread_id|= GdbConnection::DecodeHexByte((char*) packet.Read());
-		packet.MarkRead(2); // consume
-	}
+	GdbConnection::Decode(thread_id, packet);
 }
 
 void GdbStub::HandleGeneralGetQuery(util::Buffer &packet) {
@@ -230,6 +216,24 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 	
 	LogMessage(Debug, "selected thread for '%c': pid 0x%lx tid 0x%lx", op, pid, current_thread->thread_id);
 	connection.RespondOk();
+}
+
+void GdbStub::HandleReadMemory(util::Buffer &packet) {
+	uint64_t address, size;
+	GdbConnection::DecodeWithSeparator(address, ',', packet);
+	GdbConnection::Decode(size, packet);
+
+	if(!current_thread) {
+		LogMessage(Warning, "attempted to read without selected thread");
+		connection.RespondError(1);
+	}
+
+	LogMessage(Debug, "reading 0x%lx bytes from 0x%lx", size, address);
+	
+	util::Buffer response;
+	std::vector<uint8_t> mem = current_thread->process.debugger.ReadMemory(address, size);
+	GdbConnection::Encode(mem.data(), mem.size(), response);
+	connection.Respond(response);
 }
 
 void GdbStub::HandleVAttach(util::Buffer &packet) {
@@ -405,6 +409,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		case 'H': // set current thread
 			stub.HandleSetCurrentThread(*buffer);
+			break;
+		case 'm': // read memory
+			stub.HandleReadMemory(*buffer);
 			break;
 		case 'q': // general get query
 			stub.HandleGeneralGetQuery(*buffer);
