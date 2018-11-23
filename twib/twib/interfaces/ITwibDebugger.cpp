@@ -30,6 +30,16 @@ ITwibDebugger::ITwibDebugger(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 	
 }
 
+std::vector<uint8_t> ITwibDebugger::ReadMemory(uint64_t addr, uint64_t size) {
+	std::vector<uint8_t> bytes;
+	obj->SendSmartSyncRequest(
+		CommandID::READ_MEMORY,
+		in<uint64_t>(addr),
+		in<uint64_t>(size),
+		out<std::vector<uint8_t>>(bytes));
+	return bytes;
+}
+
 nx::DebugEvent ITwibDebugger::GetDebugEvent() {
 	nx::DebugEvent event;
 	obj->SendSmartSyncRequest(
