@@ -94,6 +94,7 @@ class GdbStub {
 	std::unordered_map<std::string, void (GdbStub::*)(util::Buffer&)> multiletter_handlers;
 
 	struct {
+		bool valid = false;
 		std::map<uint64_t, Process>::iterator process_iterator;
 		std::map<uint64_t, Thread>::iterator thread_iterator;
 	} get_thread_info;
