@@ -298,11 +298,18 @@ void GdbStub::QueryGetCurrentThread(util::Buffer &packet) {
 void GdbStub::QueryGetFThreadInfo(util::Buffer &packet) {
 	get_thread_info.process_iterator = attached_processes.begin();
 	get_thread_info.thread_iterator = get_thread_info.process_iterator->second.threads.begin();
+	get_thread_info.valid = true;
 	QueryGetSThreadInfo(packet);
 }
 
 void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 	util::Buffer response;
+	if(!get_thread_info.valid) {
+		LogMessage(Warning, "get_thread_info iterators invalidated");
+		connection.RespondError(1);
+		return;
+	}
+	
 	bool has_written = false;
 	for(;
 			get_thread_info.process_iterator != attached_processes.end();
@@ -325,6 +332,7 @@ void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 		}
 	}
 	if(!has_written) {
+		get_thread_info.valid = false;
 		response.Write('l'); // end of list
 	}
 	connection.Respond(response);
