@@ -41,6 +41,8 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
+	AddMultiletterHandler("Cont?", &GdbStub::HandleVContQuery);
+	AddMultiletterHandler("Cont", &GdbStub::HandleVCont);
 }
 
 GdbStub::~GdbStub() {
@@ -86,7 +88,7 @@ void GdbStub::AddMultiletterHandler(std::string name, void (GdbStub::*handler)(u
 	multiletter_handlers.emplace(name, handler);
 }
 
-void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, uint64_t &thread_id) {
+void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, int64_t &thread_id) {
 	pid = current_thread ? current_thread->process.pid : 0;
 	
 	char ch;
@@ -95,7 +97,12 @@ void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, uint64_t &thread
 		GdbConnection::DecodeWithSeparator(pid, '.', packet);
 	}
 
-	GdbConnection::Decode(thread_id, packet);
+	if(packet.ReadAvailable() && packet.Read()[0] == '-') { // all threads
+		thread_id = -1;
+		packet.MarkRead(1); // consume
+	} else {
+		GdbConnection::Decode(thread_id, packet);
+	}
 }
 
 void GdbStub::HandleGeneralGetQuery(util::Buffer &packet) {
@@ -139,7 +146,7 @@ void GdbStub::HandleGeneralSetQuery(util::Buffer &packet) {
 void GdbStub::HandleMultiletterPacket(util::Buffer &packet) {
 	std::string title;
 	char ch;
-	while(packet.Read(ch) && ch != ';' &&  ch != '?') {
+	while(packet.Read(ch) && ch != ';') {
 		title.push_back(ch);
 	}
 	LogMessage(Debug, "got v'%s'", title.c_str());
@@ -284,6 +291,57 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	
 	// ok
 	HandleGetStopReason();
+}
+
+void GdbStub::HandleVContQuery(util::Buffer &packet) {
+	util::Buffer response;
+	response.write(std::string("vCont;c;C"));
+	connection.Respond(response);
+}
+
+void GdbStub::HandleVCont(util::Buffer &packet) {
+	char ch;
+	util::Buffer action_buffer;
+	util::Buffer thread_id_buffer;
+	bool reading_action = true;
+	bool read_success = true;
+	while(read_success) {
+		read_success = packet.Read(ch);
+		if(!read_success || ch == ';') {
+			if(!action_buffer.Read(ch)) {
+				LogMessage(Warning, "invalid vCont action: too small");
+				connection.RespondError(1);
+				return;
+			}
+			if(ch == 'C') {
+				LogMessage(Warning, "vCont 'C' action not well supported");
+			}
+			if(ch == 'C' || ch == 'c') {
+				int64_t pid = -1;
+				int64_t thread_id = -1;
+				if(thread_id_buffer.ReadAvailable()) {
+					ReadThreadId(thread_id_buffer, pid, thread_id);
+				}
+				
+			} else {
+				LogMessage(Warning, "unsupported vCont action: %c", ch);
+			}
+			
+			reading_action = true;
+			action_buffer.Clear();
+			thread_id_buffer.Clear();
+			continue;
+		}
+		if(ch == ':') {
+			reading_action = false;
+			continue;
+		}
+		if(reading_action) {
+			action_buffer.Write(ch);
+		} else {
+			thread_id_buffer.Write(ch);
+		}
+	}
 }
 
 void GdbStub::QueryGetSupported(util::Buffer &packet) {
