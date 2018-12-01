@@ -100,7 +100,7 @@ class GdbStub {
 	} get_thread_info;
 
 	// utilities
-	void ReadThreadId(util::Buffer &buffer, uint64_t &pid, uint64_t &thread_id);
+	void ReadThreadId(util::Buffer &buffer, uint64_t &pid, int64_t &thread_id);
 	
 	// packets
 	void HandleGeneralGetQuery(util::Buffer &packet);
@@ -114,6 +114,8 @@ class GdbStub {
 	
 	// multiletter packets
 	void HandleVAttach(util::Buffer &packet);
+	void HandleVContQuery(util::Buffer &packet);
+	void HandleVCont(util::Buffer &packet);
 	
 	// get queries
 	void QueryGetSupported(util::Buffer &packet);
