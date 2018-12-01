@@ -159,6 +159,33 @@ void GdbStub::HandleGetStopReason() {
 	connection.Respond(buf);
 }
 
+void GdbStub::HandleDetach(util::Buffer &packet) {
+	char ch;
+	if(packet.Read(ch)) {
+		if(ch != ';') {
+			LogMessage(Warning, "invalid detach packet");
+			connection.RespondError(1);
+			return;
+		}
+		
+		uint64_t pid;
+		GdbConnection::Decode(pid, packet);
+		LogMessage(Debug, "detaching from 0x%x", pid);
+		if(current_thread->process.pid == pid) {
+			current_thread = nullptr;
+		}
+		get_thread_info.valid = false;
+		attached_processes.erase(pid);
+	} else { // detach all
+		LogMessage(Debug, "detaching from all");
+		current_thread = nullptr;
+		get_thread_info.valid = false;
+		attached_processes.clear();
+	}
+	stop_reason = "W00";
+	connection.RespondOk();
+}
+
 void GdbStub::HandleReadGeneralRegisters() {
 	if(current_thread == nullptr) {
 		LogMessage(Warning, "attempt to read registers with no selected thread");
@@ -412,6 +439,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		case '?': // stop reason
 			stub.HandleGetStopReason();
+			break;
+		case 'D': // detach
+			stub.HandleDetach(*buffer);
 			break;
 		case 'g': // read general registers
 			stub.HandleReadGeneralRegisters();
