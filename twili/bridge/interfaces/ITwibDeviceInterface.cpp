@@ -88,6 +88,9 @@ void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_
 	case protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO:
 		GetMemoryInfo(payload, opener);
 		break;
+	case protocol::ITwibDeviceInterface::Command::PRINT_DEBUG_INFO:
+		PrintDebugInfo(payload, opener);
+		break;
 	default:
 		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
 		break;
@@ -336,6 +339,21 @@ void ITwibDeviceInterface::GetMemoryInfo(std::vector<uint8_t> payload, bridge::R
 	auto w = opener.BeginOk(ser.size());
 	w.Write(ser);
 	w.Finalize();
+}
+
+void ITwibDeviceInterface::PrintDebugInfo(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+	printf("Twili state dump:\n");
+	printf("  monitored process list\n");
+	for(auto proc : twili.monitored_processes) {
+		printf("    - %p\n", proc.get());
+		printf("      type: %s\n", typeid(*proc.get()).name());
+		printf("      pid: 0x%lx\n", proc->GetPid());
+		printf("      state: %d\n", proc->GetState());
+		printf("      result: 0x%x\n", proc->GetResult().code);
+		printf("      target entry: 0x%lx\n", proc->GetTargetEntry());
+	}
+	twili.applet_tracker.PrintDebugInfo();
+	opener.BeginOk().Finalize();
 }
 
 } // namespace bridge

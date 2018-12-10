@@ -64,6 +64,7 @@ class ITwibDeviceInterface {
 		OPEN_NAMED_PIPE = 18,
 		OPEN_ACTIVE_DEBUGGER = 19,
 		GET_MEMORY_INFO = 20,
+		PRINT_DEBUG_INFO = 21
 	};
 };
 

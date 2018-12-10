@@ -92,5 +92,9 @@ msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
 	return msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
 }
 
+void ITwibDeviceInterface::PrintDebugInfo() {
+	obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::PRINT_DEBUG_INFO);
+}
+
 } // namespace twib
 } // namespace twili
