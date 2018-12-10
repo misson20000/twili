@@ -49,11 +49,27 @@ ManagedProcess::ManagedProcess(Twili &twili) :
 	uint64_t shim_addr = ResultCode::AssertOk(builder.AppendNRO(hbabi_shim_reader));
 }
 
+ManagedProcess::~ManagedProcess() {
+	twili.services.sm_m.SendSyncRequest<1>(
+		trn::ipc::InRaw<uint64_t>(GetPid()));
+}
+
 void ManagedProcess::Launch(bridge::ResponseOpener response) {
 	std::shared_ptr<trn::KProcess> process = ResultCode::AssertOk(builder.Build("twili_child", caps));
 
 	ChangeState(State::Started);
 	Attach(process);
+
+	printf("registering sac...\n");
+	uint8_t sac[] = {0x00, '*', 0x80, '*'};
+	ResultCode::AssertOk(
+		twili.services.sm_m.SendSyncRequest<0>(
+			trn::ipc::InRaw<uint64_t>(GetPid()),
+			trn::ipc::Buffer<uint8_t, 0x5>(sac, sizeof(sac)),
+			trn::ipc::Buffer<uint8_t, 0x5>(sac, sizeof(sac))
+			));
+	has_registered_sac = true;
+	printf("  registered sac.\n");
 	
 	printf("created managed process: 0x%x, pid 0x%x\n", proc->handle, GetPid());
 	wait = twili.event_waiter.Add(*proc, [this]() {

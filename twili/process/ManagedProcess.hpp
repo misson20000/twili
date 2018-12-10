@@ -30,6 +30,7 @@ namespace process {
 class ManagedProcess : public MonitoredProcess {
  public:
 	ManagedProcess(Twili &twili);
+	virtual ~ManagedProcess() override;
 	virtual void Launch(bridge::ResponseOpener response) override;
 	virtual void AppendCode(std::vector<uint8_t> nro) override;
  private:
@@ -38,6 +39,8 @@ class ManagedProcess : public MonitoredProcess {
 	std::vector<process_creation::ProcessBuilder::VectorDataReader> readers;
 	
 	std::shared_ptr<trn::WaitHandle> wait;
+
+	bool has_registered_sac = false;
 };
 
 } // namespace process
