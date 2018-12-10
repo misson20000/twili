@@ -225,6 +225,13 @@ void USBBridge::RequestReader::ProcessCommand() {
 		} else {
 			throw e;
 		}
+	} catch(std::bad_alloc &e) {
+		if(!state->has_begun) {
+			printf("out of memory!\n");
+			opener.BeginError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY).Finalize();
+		} else {
+			throw e;
+		}
 	}
 }
 
