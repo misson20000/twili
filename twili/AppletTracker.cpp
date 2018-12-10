@@ -55,6 +55,12 @@ void AppletTracker::ReleaseControlProcess() {
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
 	has_control_process = false;
+
+	printf("lost control applet. invalidating created processes...\n");
+	for(std::shared_ptr<process::AppletProcess> process : created) {
+		process->ChangeState(process::MonitoredProcess::State::Exited);
+	}
+	created.clear();
 }
 
 const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
