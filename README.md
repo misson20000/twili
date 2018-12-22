@@ -14,6 +14,7 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
 - [Twili](#twili)
   * [Supported Firmware Versions](#supported-firmware-versions)
   * [Limitations](#limitations)
+  * [Application Development](#application-development)
 - [Installation](#installation)
   * [Linux](#linux)
     + [Arch Linux](#arch-linux)
@@ -60,6 +61,8 @@ Version | Support
 5.0.1 - 5.1.0 | Expected working
 6.0.0 | Expected working
 6.0.1 | Tested working
+6.1.0 | Expected Working
+6.2.0 | Tested working
 
 ## Limitations
 
@@ -68,6 +71,14 @@ These are temporary and are planned to be addressed.
 - Applets cannot be launched with an active control applet (hbmenu open).
 - Applets are library applets, not applications (this means they're limited to using memory in the APPLET pool).
 - ASET RomFS doesn't work [pending on a new HBABI key](https://switchbrew.org/wiki/Talk:Homebrew_ABI#RomFS_Override).
+
+## Application Development
+
+If you're developing with libtransistor, Twili integration is automatic. Standard I/O will automatically be attached to the twib console.
+
+If you're developing an application with libnx, try [libtwili](https://github.com/misson20000/twili-libnx) for twib stdio.
+Most libnx applications are applets. If you're developing an applet (interacts with the user), make sure you use `-a` with `twib run` to run it as an applet.
+If you're developing a sysmodule, you can use `twib run` without `-a` to run it as a sysmodule.
 
 # Installation
 
