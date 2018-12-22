@@ -228,6 +228,11 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *na
 			PROCESS_FLAG_ENABLE_DEBUG = 0b10000,
 			PROCESS_FLAG_ENABLE_ASLR = 0b100000,
 			PROCESS_FLAG_USE_SYSTEM_MEM_BLOCKS = 0b1000000,
+			
+			PROCESS_FLAG_POOL_PARTITION_APPLICATION = 0,
+			PROCESS_FLAG_POOL_PARTITION_APPLET = 0x80,
+			PROCESS_FLAG_POOL_PARTITION_SYSTEM = 0x100,
+			PROCESS_FLAG_POOL_PARTITION_SYSTEM_UNSAFE = 0x180,
 		};
 
 		uint32_t process_flags =
@@ -239,6 +244,11 @@ trn::Result<std::shared_ptr<trn::KProcess>> ProcessBuilder::Build(const char *na
 			process_flags|= PROCESS_FLAG_AS_39BIT;
 		} else {
 			process_flags|= PROCESS_FLAG_AS_36BIT;
+		}
+
+		if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+			// applet pool usually has plenty of spare memory
+			process_flags|= PROCESS_FLAG_POOL_PARTITION_APPLET;
 		}
 		
 		ProcessInfo process_info = {
