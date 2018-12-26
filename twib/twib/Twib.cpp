@@ -232,6 +232,8 @@ int main(int argc, char *argv[]) {
 	CLI::App *get_memory_info = app.add_subcommand("get-memory-info", "Gets memory usage information from the device");
 
 	CLI::App *gdb = app.add_subcommand("gdb", "Opens an enhanced GDB stub for the device");
+
+	CLI::App *print_debug_info = app.add_subcommand("debug", "Prints debug info");
 	
 	app.require_subcommand(1);
 	
@@ -473,7 +475,12 @@ int main(int argc, char *argv[]) {
 		stub.Run();
 		return 0;
 	}
-	
+
+	if(print_debug_info->parsed()) {
+		itdi.PrintDebugInfo();
+		return 0;
+	}
+
 	return 0;
 }
 

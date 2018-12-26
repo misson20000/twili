@@ -5,9 +5,9 @@ tar xzf libtransistor_$LIBTRANSISTOR_VERSION.tar.gz -C libtransistor
 pip3 install --user --upgrade pip setuptools wheel
 pip3 install lz4 pyelftools --user
 
-wget http://xenotoad.net/switch_tools_elf2kip_fix.tar.gz
-mkdir fr
-tar xf switch_tools_elf2kip_fix.tar.gz -C fr
-#wget -nv https://downloads.devkitpro.org/packages/linux/switch-tools-1.4.1-3-any.pkg.tar.xz
+#wget http://xenotoad.net/switch_tools_elf2kip_fix.tar.gz
 #mkdir fr
-#tar xf switch-tools-1.4.1-3-any.pkg.tar.xz -C fr
+#tar xf switch_tools_elf2kip_fix.tar.gz -C fr
+wget -nv https://downloads.devkitpro.org/packages/linux/switch-tools-1.5.0-1-any.pkg.tar.xz
+mkdir fr
+tar xf switch-tools-1.5.0-1-any.pkg.tar.xz -C fr

@@ -8,43 +8,40 @@ HBABI_SHIM_OBJECTS := hbabi_shim.o
 
 BUILD_PFS0 := build_pfs0
 
+ATMOSPHERE_DIR := build/atmosphere
 ATMOSPHERE_TWILI_TITLE_ID := 0100000000006480
-ATMOSPHERE_TWILI_TITLE_DIR := build/atmosphere/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
-ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs/main exefs/main.npdm exefs/rtld.stub boot2.flag)
+ATMOSPHERE_TWILI_TITLE_DIR := $(ATMOSPHERE_DIR)/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
+ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs.nsp flags/boot2.flag)
 
 all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS) build/atmosphere/hbl.nsp
 
-$(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main: build/twili.nso
+$(ATMOSPHERE_TWILI_TITLE_DIR)/exefs.nsp: build/twili/exefs/main build/twili/exefs/main.npdm
 	mkdir -p $(@D)
-	cp $< $@
+	$(BUILD_PFS0) build/twili/exefs/ $@
 
-$(ATMOSPHERE_TWILI_TITLE_DIR)/exefs/main.npdm: twili/twili.json
+$(ATMOSPHERE_TWILI_TITLE_DIR)/flags/boot2.flag:
+	mkdir -p $(@D)
+	touch $@
+
+$(ATMOSPHERE_DIR)/hbl.nsp: build/applet_control/exefs/main build/applet_control/exefs/main.npdm
+	mkdir -p $(@D)
+	$(BUILD_PFS0) build/applet_control/exefs/ $@
+
+build/twili/exefs/main.npdm: twili/twili.json
 	mkdir -p $(@D)
 	npdmtool $< $@
 
-build/atmosphere/hbl.nsp: build/applet_control_exefs/main build/applet_control_exefs/main.npdm
+build/applet_control/exefs/main.npdm: twili_applet_shim/applet_control.json
 	mkdir -p $(@D)
-	$(BUILD_PFS0) build/applet_control_exefs/ $@
+	npdmtool $< $@
 
-build/applet_control_exefs/main: build/applet_control.nso
-	mkdir -p $(@D)
-	cp $< $@
-
-build/applet_control_exefs/main.npdm: build/twili_applet_shim/applet_control.npdm
+build/%/exefs/main: build/%.nso
 	mkdir -p $(@D)
 	cp $< $@
 
 build/%.npdm: %.json
 	mkdir -p $(@D)
 	npdmtool $< $@
-
-%/exefs/rtld.stub:
-	mkdir -p $(@D)
-	touch $@
-
-%/boot2.flag:
-	mkdir -p $(@D)
-	touch $@
 
 clean:
 	rm -rf build

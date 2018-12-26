@@ -55,6 +55,12 @@ void AppletTracker::ReleaseControlProcess() {
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
 	has_control_process = false;
+
+	printf("lost control applet. invalidating created processes...\n");
+	for(std::shared_ptr<process::AppletProcess> process : created) {
+		process->ChangeState(process::MonitoredProcess::State::Exited);
+	}
+	created.clear();
 }
 
 const trn::KEvent &AppletTracker::GetProcessQueuedEvent() {
@@ -148,6 +154,40 @@ void AppletTracker::HBLLoad(std::string path, std::string argv) {
 	printf("prepared hbl next load process. queueing...\n");
 	QueueLaunch(next_proc);
 }
+
+void AppletTracker::PrintDebugInfo() {
+	printf("AppletTracker debug:\n");
+	printf("  has_control_process: %d\n", has_control_process);
+	printf("  hbmenu: %p\n", hbmenu.get());
+	if(hbmenu) {
+		printf("    pid: 0x%lx\n", hbmenu->GetPid());
+	}
+	printf("  monitor.process: %p\n", monitor.process.get());
+	if(monitor.process) {
+		printf("    pid: 0x%lx\n", monitor.process->GetPid());
+	}
+
+	printf("  queued:\n");
+	for(auto proc : queued) {
+		printf("    - %p\n", proc.get());
+		printf("      type: %s\n", typeid(*proc.get()).name());
+		printf("      pid: 0x%lx\n", proc->GetPid());
+		printf("      state: %d\n", proc->GetState());
+		printf("      result: 0x%x\n", proc->GetResult().code);
+		printf("      target entry: 0x%lx\n", proc->GetTargetEntry());
+	}
+	printf("  created:\n");
+	for(auto proc : created) {
+		printf("    - %p\n", proc.get());
+		printf("      type: %s\n", typeid(*proc.get()).name());
+		printf("      pid: 0x%lx\n", proc->GetPid());
+		printf("      state: %d\n", proc->GetState());
+		printf("      result: 0x%x\n", proc->GetResult().code);
+		printf("      target entry: 0x%lx\n", proc->GetTargetEntry());
+	}
+
+}
+
 
 AppletTracker::Monitor::Monitor(AppletTracker &tracker) : process::ProcessMonitor(std::shared_ptr<process::MonitoredProcess>()), tracker(tracker) {
 }

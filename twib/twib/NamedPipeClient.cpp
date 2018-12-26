@@ -61,7 +61,7 @@ void NamedPipeClient::Logic::Prepare(platform::windows::EventLoop &loop) {
 		loop.AddMember(client.connection.input_member);
 		loop.AddMember(client.connection.output_member);
 	} else {
-		FailAllRequests(TWILI_ERR_IO_ERROR);
+		client.FailAllRequests(TWILI_ERR_IO_ERROR);
 	}
 }
 

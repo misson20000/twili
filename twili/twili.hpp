@@ -59,6 +59,7 @@ class Twili {
 		service::ldr::IDebugMonitorInterface ldr_dmnt;
 		trn::ipc::client::Object ldr_shel;
 		service::nifm::IGeneralService nifm;
+		trn::ipc::client::Object sm_m;
 	} services;
 
 	struct Resources {
