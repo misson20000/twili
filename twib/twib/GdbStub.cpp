@@ -88,20 +88,29 @@ void GdbStub::AddMultiletterHandler(std::string name, void (GdbStub::*handler)(u
 	multiletter_handlers.emplace(name, handler);
 }
 
-void GdbStub::ReadThreadId(util::Buffer &packet, uint64_t &pid, int64_t &thread_id) {
+void GdbStub::ReadThreadId(util::Buffer &packet, int64_t &pid, int64_t &thread_id) {
 	pid = current_thread ? current_thread->process.pid : 0;
 	
 	char ch;
 	if(packet.ReadAvailable() && packet.Read()[0] == 'p') { // peek
 		packet.MarkRead(1); // consume
-		GdbConnection::DecodeWithSeparator(pid, '.', packet);
+		if(packet.ReadAvailable() && packet.Read()[0] == '-') { // all processes
+			pid = -1;
+			packet.MarkRead(1); // consume
+		} else {
+			uint64_t dec_pid;
+			GdbConnection::DecodeWithSeparator(dec_pid, '.', packet);
+			pid = dec_pid;
+		}
 	}
 
 	if(packet.ReadAvailable() && packet.Read()[0] == '-') { // all threads
 		thread_id = -1;
 		packet.MarkRead(1); // consume
 	} else {
-		GdbConnection::Decode(thread_id, packet);
+		uint64_t dec_thread_id;
+		GdbConnection::Decode(dec_thread_id, packet);
+		thread_id = dec_thread_id;
 	}
 }
 
@@ -224,7 +233,7 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		return;
 	}
 
-	uint64_t pid, thread_id;
+	int64_t pid, thread_id;
 	ReadThreadId(packet, pid, thread_id);
 
 	auto i = attached_processes.find(pid);
@@ -295,7 +304,7 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 
 void GdbStub::HandleVContQuery(util::Buffer &packet) {
 	util::Buffer response;
-	response.write(std::string("vCont;c;C"));
+	response.Write(std::string("vCont;c;C"));
 	connection.Respond(response);
 }
 
@@ -305,6 +314,16 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 	util::Buffer thread_id_buffer;
 	bool reading_action = true;
 	bool read_success = true;
+
+	struct Action {
+		enum class Type {
+			Invalid,
+			Continue
+		} type = Type::Invalid;
+	};
+
+	std::map<uint64_t, std::map<uint64_t, Action>> process_actions;
+	
 	while(read_success) {
 		read_success = packet.Read(ch);
 		if(!read_success || ch == ';') {
@@ -313,18 +332,48 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 				connection.RespondError(1);
 				return;
 			}
-			if(ch == 'C') {
+			
+			Action action;
+			switch(ch) {
+			case 'C':
 				LogMessage(Warning, "vCont 'C' action not well supported");
+				// fall-through
+			case 'c':
+				action.type = Action::Type::Continue;
+				break;
+			default:
+				LogMessage(Warning, "unsupported vCont action: %c", ch);
 			}
-			if(ch == 'C' || ch == 'c') {
+
+			if(action.type != Action::Type::Invalid) {
 				int64_t pid = -1;
 				int64_t thread_id = -1;
 				if(thread_id_buffer.ReadAvailable()) {
 					ReadThreadId(thread_id_buffer, pid, thread_id);
 				}
-				
-			} else {
-				LogMessage(Warning, "unsupported vCont action: %c", ch);
+				if(pid == -1) {
+					for(auto p : attached_processes) {
+						std::map<uint64_t, Action> &thread_actions = process_actions.insert({p.first, {}}).first->second;
+						for(auto t : p.second.threads) {
+							thread_actions.insert({t.first, action});
+						}
+					}
+				} else {
+					auto p = attached_processes.find(pid);
+					if(p != attached_processes.end()) {
+						std::map<uint64_t, Action> &thread_actions = process_actions.insert({p->first, {}}).first->second;
+						if(thread_id == -1) {
+							for(auto t : p->second.threads) {
+								thread_actions.insert({t.first, action});
+							}
+						} else {
+							auto t = p->second.threads.find(thread_id);
+							if(t != p->second.threads.end()) {
+								thread_actions.insert({t->first, action});
+							}
+						}
+					}
+				}
 			}
 			
 			reading_action = true;
@@ -341,6 +390,25 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 		} else {
 			thread_id_buffer.Write(ch);
 		}
+	}
+
+	for(auto p : process_actions) {
+		auto p_i = attached_processes.find(p.first);
+		if(p_i == attached_processes.end()) {
+			LogMessage(Warning, "no such process: 0x%lx", p.first);
+			continue;
+		}
+		Process &proc = p_i->second;
+		std::vector<uint64_t> thread_ids;
+		for(auto t : p.second) {
+			auto t_i = proc.threads.find(t.first);
+			if(t_i == proc.threads.end()) {
+				LogMessage(Warning, "no such thread: 0x%lx", t.first);
+				continue;
+			}
+			thread_ids.push_back(t.first);
+		}
+		proc.debugger.ContinueDebugEvent(5, thread_ids);
 	}
 }
 
@@ -424,7 +492,7 @@ void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 }
 
 void GdbStub::QueryGetThreadExtraInfo(util::Buffer &packet) {
-	uint64_t pid, thread_id;
+	int64_t pid, thread_id;
 	ReadThreadId(packet, pid, thread_id);
 
 	std::string extra_info("extra info goes here");

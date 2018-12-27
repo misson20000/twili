@@ -20,7 +20,7 @@
 
 #include "ITwibDebugger.hpp"
 
-#include<string.h>
+#include<cstring>
 #include "Protocol.hpp"
 
 namespace twili {
@@ -57,6 +57,13 @@ std::vector<uint64_t> ITwibDebugger::GetThreadContext(uint64_t thread_id) {
 		in<uint64_t>(thread_id),
 		out<ThreadContext>(tc));
 	return std::vector<uint64_t>(&tc.regs[0], &tc.regs[100]);
+}
+
+void ITwibDebugger::ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids) {
+	obj->SendSmartSyncRequest(
+		CommandID::CONTINUE_DEBUG_EVENT,
+		in<uint32_t>(flags),
+		in<std::vector<uint64_t>>(thread_ids));
 }
 
 } // namespace twib

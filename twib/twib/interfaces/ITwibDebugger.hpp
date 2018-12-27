@@ -37,6 +37,7 @@ class ITwibDebugger {
 	std::vector<uint8_t> ReadMemory(uint64_t addr, uint64_t size);
 	nx::DebugEvent GetDebugEvent();
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
+	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

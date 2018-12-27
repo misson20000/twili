@@ -98,6 +98,7 @@ void ITwibDebugger::BreakProcess(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::ContinueDebugEvent(bridge::ResponseOpener opener, uint32_t flags, std::vector<uint64_t> thread_ids) {
+	// TODO: flags for pre-3.0.0
 	ResultCode::AssertOk(
 		trn::svc::ContinueDebugEvent(debug, flags, thread_ids.data(), thread_ids.size()));
 
