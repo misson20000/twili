@@ -296,8 +296,6 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
 	r.first->second.IngestEvents(*this);
 
-	stop_reason = "S05";
-	
 	// ok
 	HandleGetStopReason();
 }
@@ -508,9 +506,19 @@ void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 
 void GdbStub::Process::IngestEvents(GdbStub &stub) {
 	std::optional<nx::DebugEvent> event;
+
+	int signal = 0;
+	
 	while(event = debugger.GetDebugEvent()) {
 		LogMessage(Debug, "got event: %d", event->event_type);
 
+		if(event->thread_id) {
+			auto t_i = threads.find(event->thread_id);
+			if(t_i != threads.end()) {
+				stub.current_thread = &(*t_i);
+			}
+		}
+		
 		switch(event->event_type) {
 		case nx::DebugEvent::EventType::AttachProcess:
 			break;
@@ -520,8 +528,53 @@ void GdbStub::Process::IngestEvents(GdbStub &stub) {
 			auto r = threads.emplace(thread_id, Thread(*this, thread_id));
 			stub.current_thread = &r.first->second;
 			break;
+		case nx::DebugEvent::EventType::ExitProcess:
+			LogMessage(Warning, "process exited");
+			break;
+		case nx::DebugEvent::EventType::ExitThread:
+			LogMessage(Warning, "thread exited");
+			break;
+		case nx::DebugEvent::EventType::Exception:
+			switch(event->exception.exception_type) {
+			case nx::DebugEvent::ExceptionType::Trap:
+				signal = 5; // SIGTRAP
+				break;
+			case nx::DebugEvent::ExceptionType::InstructionAbort:
+				signal = 145; // EXC_BAD_ACCESS
+				break;
+			case nx::DebugEvent::ExceptionType::DataAbortMisc:
+				signal = 11; // SIGSEGV
+				break;
+			case nx::DebugEvent::ExceptionType::PcSpAlignmentFault:
+				signal = 145; // EXC_BAD_ACCESS
+				break;
+			case nx::DebugEvent::ExceptionType::DebuggerAttached:
+				signal = 0; // no signal
+				break;
+			case nx::DebugEvent::ExceptionType::BreakPoint:
+				signal = 5; // SIGTRAP
+				break;
+			case nx::DebugEvent::ExceptionType::UserBreak:
+				signal = 149; // EXC_SOFTWARE
+				break;
+			case nx::DebugEvent::ExceptionType::DebuggerBreak:
+				signal = 2; // SIGINT
+				break;
+			case nx::DebugEvent::ExceptionType::BadSvcId:
+				signal = 12; // SIGSYS
+				break;
+			case nx::DebugEvent::ExceptionType::SError:
+				signal = 10; // SIGBUS
+				break;
+			}
+			break;
 		}
 	}
+
+	util::Buffer stop_reason;
+	stop_reason.Write('T');
+	GdbConnection::Encode(signal, 1, stop_reason);
+	stub.stop_reason = stop_reason.GetString();
 }
 
 GdbStub::Thread::Thread(Process &process, uint64_t thread_id) : process(process), thread_id(thread_id) {

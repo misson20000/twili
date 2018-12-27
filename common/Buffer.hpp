@@ -99,6 +99,8 @@ public:
 	std::vector<uint8_t> GetData();
 
 	void Compact(); // guarantees that data pending read won't be moved around
+
+	std::string GetString();
 private:
 	std::vector<uint8_t> data;
 	size_t read_head = 0;
