@@ -37,6 +37,7 @@ class ITwibDebugger {
 	nx::DebugEvent GetDebugEvent();
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
+	void BreakProcess();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };
