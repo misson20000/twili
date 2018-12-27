@@ -174,6 +174,7 @@ void ITwibDebugger::ContinueDebugEvent(std::vector<uint8_t> payload, bridge::Res
 	}
 	
 	RQFmt *rq = (RQFmt*) payload.data();
+	// TODO: flags for pre-3.0.0
 	ResultCode::AssertOk(
 		trn::svc::ContinueDebugEvent(debug, rq->flags, rq->thread_ids, (payload.size() - sizeof(uint32_t)) / sizeof(trn::svc::ThreadId)));
 
