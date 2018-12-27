@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include<future>
+#include<functional>
 #include<mutex>
 #include<map>
 
@@ -35,7 +35,7 @@ namespace client {
 class Client {
  public:
 	virtual ~Client() = default;
-	std::future<Response> SendRequest(Request &&rq);
+	void SendRequest(Request &&rq, std::function<void(Response)> &&function);
 	
 	bool deletion_flag = false;
 	
@@ -44,7 +44,7 @@ class Client {
 	void PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
 	void FailAllRequests(uint32_t code);
  private:
-	std::map<uint32_t, std::promise<Response>> response_map;
+	std::map<uint32_t, std::function<void(Response r)>> response_map;
 	std::mutex response_map_mutex;
 };
 

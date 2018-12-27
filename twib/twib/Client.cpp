@@ -40,8 +40,8 @@ void Client::PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, ut
 		}
 		objects[i] = std::make_shared<RemoteObject>(*this, mh.device_id, id);
 	}
-	
-	std::promise<Response> promise;
+
+	std::function<void(Response)> func;
 	{
 		std::lock_guard<std::mutex> lock(response_map_mutex);
 		auto it = response_map.find(mh.tag);
@@ -49,11 +49,12 @@ void Client::PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, ut
 			LogMessage(Warning, "dropping response for unknown tag 0x%x", mh.tag);
 			return;
 		}
-		promise.swap(it->second);
+		func = std::move(it->second);
 		response_map.erase(it);
 	}
-	
-	promise.set_value(
+		
+	std::invoke(
+		func,
 		Response(
 			mh.device_id,
 			mh.object_id,
@@ -63,8 +64,7 @@ void Client::PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, ut
 			objects));
 }
 
-std::future<Response> Client::SendRequest(Request &&rq) {
-	std::future<Response> future;
+void Client::SendRequest(Request &&rq, std::function<void(Response)> &&function) {
 	{
 		std::lock_guard<std::mutex> lock(response_map_mutex);
 		static std::random_device rng;
@@ -72,18 +72,16 @@ std::future<Response> Client::SendRequest(Request &&rq) {
 		uint32_t tag = rng();
 		rq.tag = tag;
 		
-		std::promise<Response> promise;
-		future = promise.get_future();
-		response_map[tag] = std::move(promise);
+		response_map[tag] = std::move(function);
 	}
 	
 	SendRequestImpl(rq);
-	return future;
 }
 
 void Client::FailAllRequests(uint32_t code) {
 	for(auto i = response_map.begin(); i != response_map.end();) {
-		i->second.set_value(
+		std::invoke(
+			i->second,
 			Response(
 				0, 0, code, 0,
 				std::vector<uint8_t>(),
