@@ -66,5 +66,9 @@ void ITwibDebugger::ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thr
 		in<std::vector<uint64_t>>(thread_ids));
 }
 
+void ITwibDebugger::BreakProcess() {
+	obj->SendSmartSyncRequest(CommandID::BREAK_PROCESS);
+}
+
 } // namespace twib
 } // namespace twili
