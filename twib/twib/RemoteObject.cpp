@@ -20,6 +20,9 @@
 
 #include "RemoteObject.hpp"
 
+#include<mutex>
+#include<condition_variable>
+
 #include "Logger.hpp"
 #include "ResultError.hpp"
 
@@ -34,16 +37,35 @@ RemoteObject::RemoteObject(client::Client &client, uint32_t device_id, uint32_t 
 RemoteObject::~RemoteObject() {
 	// send close request if we're not object 0
 	if(object_id != 0) {
-		client.SendRequest(Request(device_id, object_id, 0xffffffff, 0, std::vector<uint8_t>()));
+		SendSyncRequestWithoutAssert(0xffffffff);
 	}
 }
 
-std::future<Response> RemoteObject::SendRequest(uint32_t command_id, std::vector<uint8_t> payload) {
-	return client.SendRequest(Request(device_id, object_id, command_id, 0, payload));
+void RemoteObject::SendRequest(uint32_t command_id, std::vector<uint8_t> payload, std::function<void(Response)> &&func) {
+	return client.SendRequest(Request(device_id, object_id, command_id, 0, payload), std::move(func));
+}
+
+Response RemoteObject::SendSyncRequestWithoutAssert(uint32_t command_id, std::vector<uint8_t> payload) {
+	std::mutex mutex;
+	std::unique_lock<std::mutex> lock(mutex);
+	std::condition_variable condvar;
+	std::optional<Response> rs;
+
+	SendRequest(
+		command_id, payload,
+		[&](Response rs_actual) {
+			rs = rs_actual;
+			condvar.notify_all();
+		});
+	
+	while(!rs) {
+		condvar.wait(lock);
+	}
+	return *rs;
 }
 
 Response RemoteObject::SendSyncRequest(uint32_t command_id, std::vector<uint8_t> payload) {
-	Response rs = SendRequest(command_id, payload).get();
+	Response rs = SendSyncRequestWithoutAssert(command_id, payload);
 	if(rs.result_code != 0) {
 		throw ResultError(rs.result_code);
 	}

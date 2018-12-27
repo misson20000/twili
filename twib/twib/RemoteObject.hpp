@@ -20,8 +20,9 @@
 
 #pragma once
 
-#include "err.hpp"
+#include<functional>
 
+#include "err.hpp"
 #include "ResultError.hpp"
 #include "Client.hpp"
 #include "Packing.hpp"
@@ -34,7 +35,8 @@ class RemoteObject {
 	RemoteObject(client::Client &client, uint32_t device_id, uint32_t object_id);
 	~RemoteObject();
 
-	std::future<Response> SendRequest(uint32_t command_id, std::vector<uint8_t> payload);
+	void SendRequest(uint32_t command_id, std::vector<uint8_t> payload, std::function<void(Response)> &&func);
+	Response SendSyncRequestWithoutAssert(uint32_t command_id, std::vector<uint8_t> payload = std::vector<uint8_t>());
 	Response SendSyncRequest(uint32_t command_id, std::vector<uint8_t> payload = std::vector<uint8_t>());
 
 	template<typename T, typename... Args>
@@ -47,6 +49,27 @@ class RemoteObject {
 			throw ResultError(TWILI_ERR_PROTOCOL_BAD_RESPONSE);
 		}
 	}
+
+	template<typename T, typename... Args>
+	void SendSmartRequest(T command_id, Args&&... args, std::function<void(uint32_t)> &&func) {
+		util::Buffer input_buffer;
+		(detail::WrappingHelper<Args>::Pack(std::move(args), input_buffer), ...);
+		Response r = SendRequest(
+			(uint32_t) command_id,
+			input_buffer.GetData(),
+			[&](Response r) {
+				if(r.result_code) {
+					func(r.result_code);
+				}
+				util::Buffer output_buffer(r.payload);
+				if(!(detail::WrappingHelper<Args>::Unpack(std::move(args), output_buffer, r.objects) && ... && true)) {
+					func(TWILI_ERR_PROTOCOL_BAD_RESPONSE);
+				} else {
+					func(0);
+				}
+			});
+	}
+	
  private:
 	client::Client &client;
 	const uint32_t device_id;
