@@ -22,6 +22,7 @@
 
 #include<cstring>
 #include "Protocol.hpp"
+#include "ResultError.hpp"
 
 namespace twili {
 namespace twib {
@@ -39,10 +40,17 @@ std::vector<uint8_t> ITwibDebugger::ReadMemory(uint64_t addr, uint64_t size) {
 	return obj->SendSyncRequest(protocol::ITwibDebugger::Command::READ_MEMORY, std::vector<uint8_t>(bytes, bytes + sizeof(rq))).payload;
 }
 
-nx::DebugEvent ITwibDebugger::GetDebugEvent() {
+std::optional<nx::DebugEvent> ITwibDebugger::GetDebugEvent() {
 	nx::DebugEvent event;
 	memset(&event, 0, sizeof(event));
-	std::vector<uint8_t> payload = obj->SendSyncRequest(protocol::ITwibDebugger::Command::GET_DEBUG_EVENT).payload;
+	Response rs = obj->SendSyncRequestWithoutAssert((uint32_t) protocol::ITwibDebugger::Command::GET_DEBUG_EVENT);
+	if(rs.result_code == 0x8c01) {
+		return std::nullopt;
+	}
+	if(rs.result_code != 0) {
+		throw ResultError(rs.result_code);
+	}
+	std::vector<uint8_t> payload = rs.payload;
 	memcpy(&event, payload.data(), payload.size());
 	return event;
 }

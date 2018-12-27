@@ -294,8 +294,8 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	}
 
 	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
-	ProcessEvents(r.first->second);
-	
+	r.first->second.IngestEvents(*this);
+
 	stop_reason = "S05";
 	
 	// ok
@@ -506,30 +506,20 @@ void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 	connection.RespondOk();
 }
 
-void GdbStub::ProcessEvents(Process &process) {
-	try {
-		while(1) {
-			nx::DebugEvent event = process.debugger.GetDebugEvent();
-			LogMessage(Debug, "got event: %d", event.event_type);
+void GdbStub::Process::IngestEvents(GdbStub &stub) {
+	std::optional<nx::DebugEvent> event;
+	while(event = debugger.GetDebugEvent()) {
+		LogMessage(Debug, "got event: %d", event->event_type);
 
-			switch(event.event_type) {
-			case nx::DebugEvent::EventType::AttachProcess:
-				break;
-			case nx::DebugEvent::EventType::AttachThread:
-				uint64_t thread_id = event.attach_thread.thread_id;
-				LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
-				auto r = process.threads.emplace(thread_id, Thread(process, thread_id));
-				current_thread = &r.first->second;
-				break;
-			}
-		}
-	} catch(ResultError &e) {
-		if(e.code == 0x8c01) {
-			LogMessage(Debug, "got all events");
-			return; // no events left
-		} else {
-			LogMessage(Debug, "error while processing events: 0x%x", e.code);
-			throw e; // propogate
+		switch(event->event_type) {
+		case nx::DebugEvent::EventType::AttachProcess:
+			break;
+		case nx::DebugEvent::EventType::AttachThread:
+			uint64_t thread_id = event->attach_thread.thread_id;
+			LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
+			auto r = threads.emplace(thread_id, Thread(*this, thread_id));
+			stub.current_thread = &r.first->second;
+			break;
 		}
 	}
 }
