@@ -61,6 +61,7 @@ class GdbStub {
 	class Process {
 	 public:
 		Process(uint64_t pid, ITwibDebugger debugger);
+		void IngestEvents(GdbStub &stub);
 		uint64_t pid;
 		ITwibDebugger debugger;
 		std::map<uint64_t, Thread> threads;
@@ -126,8 +127,6 @@ class GdbStub {
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);
-
-	void ProcessEvents(Process &process);
 };
 
 } // namespace gdb

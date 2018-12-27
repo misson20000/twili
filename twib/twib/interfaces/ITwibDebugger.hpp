@@ -21,6 +21,7 @@
 #pragma once
 
 #include<vector>
+#include<optional>
 
 #include "../RemoteObject.hpp"
 #include "../DebugTypes.hpp"
@@ -35,7 +36,7 @@ class ITwibDebugger {
 	using CommandID = protocol::ITwibDebugger::Command;
 	
 	std::vector<uint8_t> ReadMemory(uint64_t addr, uint64_t size);
-	nx::DebugEvent GetDebugEvent();
+	std::optional<nx::DebugEvent> GetDebugEvent();
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
 	void BreakProcess();

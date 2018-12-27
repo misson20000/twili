@@ -22,6 +22,7 @@
 
 #include<cstring>
 #include "Protocol.hpp"
+#include "ResultError.hpp"
 
 namespace twili {
 namespace twib {
@@ -40,11 +41,17 @@ std::vector<uint8_t> ITwibDebugger::ReadMemory(uint64_t addr, uint64_t size) {
 	return bytes;
 }
 
-nx::DebugEvent ITwibDebugger::GetDebugEvent() {
+std::optional<nx::DebugEvent> ITwibDebugger::GetDebugEvent() {
 	nx::DebugEvent event;
-	obj->SendSmartSyncRequest(
+	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(
 		CommandID::GET_DEBUG_EVENT,
 		out<nx::DebugEvent>(event));
+	if(r == 0x8c01) {
+		return std::nullopt;
+	}
+	if(r != 0) {
+		throw ResultError(r);
+	}
 	return event;
 }
 
