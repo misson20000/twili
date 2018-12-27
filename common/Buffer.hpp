@@ -97,6 +97,7 @@ public:
 	size_t WriteAvailableHint();
 
 	std::vector<uint8_t> GetData();
+	std::string GetString();
 	
 private:
 	std::vector<uint8_t> data;

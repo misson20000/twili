@@ -109,5 +109,9 @@ std::vector<uint8_t> Buffer::GetData() {
 	return std::vector<uint8_t>(data.begin() + read_head, data.begin() + write_head);
 }
 
+std::string Buffer::GetString() {
+	return std::string(data.begin() + read_head, data.begin() + write_head);
+}
+
 } // namespace util
 } // namespace twili
