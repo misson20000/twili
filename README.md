@@ -68,7 +68,7 @@ Version | Support
 
 These are temporary and are planned to be addressed.
 
-- Applets cannot be launched with an active control applet (hbmenu open).
+- Applets cannot be launched without an active control applet (hbmenu open).
 - Applets are library applets, not applications (this means they're limited to using memory in the APPLET pool).
 - ASET RomFS doesn't work [pending on a new HBABI key](https://switchbrew.org/wiki/Talk:Homebrew_ABI#RomFS_Override).
 
