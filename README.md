@@ -102,7 +102,7 @@ OSX users can download `twib_osx64` and `twibd_osx64` from the [latest release](
 
 ## Windows
 
-Windows support is experimental and is being improved. Windows users may download `twib_win64.exe` and `twibd_win64.exe` from the [latest release](https://github.com/misson20000/twili/releases/latest). Boot your switch with Twili installed, then run Zadig and set both of the `TransistorUSB` interfaces to `libusbK`. Run `twibd_win64.exe`, and leave it running in the background. `twib_win64.exe` should be run from the command prompt.
+Windows support is experimental and is being improved. Windows users may download `twib_win64.exe` and `twibd_win64.exe` from the [latest release](https://github.com/misson20000/twili/releases/latest). Boot your switch with Twili installed, then install the libusbK-based [driver package](https://github.com/misson20000/twili/tree/master/contrib/windows/driver). Run `twibd_win64.exe`, and leave it running in the background. `twib_win64.exe` should be run from the command prompt.
 
 # Building From Source
 
