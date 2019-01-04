@@ -35,6 +35,7 @@ class IFileSystem : public trn::ipc::server::Object {
 
 	virtual trn::ResultCode Dispatch(trn::ipc::Message msg, uint32_t request_id) override;
 	virtual trn::ResultCode OpenFile(trn::ipc::InRaw<uint32_t> mode, trn::ipc::Buffer<char, 0x19, 0> path, trn::ipc::OutObject<IFile> &out) = 0;
+	virtual trn::ResultCode GetFileTimeStampRaw(trn::ipc::Buffer<char, 0x19, 0> path, trn::ipc::OutRaw<char[0x20]> timestamp);
 };
 
 } // namespace fs

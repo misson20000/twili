@@ -31,8 +31,14 @@ trn::ResultCode IFileSystem::Dispatch(trn::ipc::Message msg, uint32_t request_id
 	switch(request_id) {
 	case 8:
 		return trn::ipc::server::RequestHandler<&IFileSystem::OpenFile>::Handle(this, msg);
+	case 14:
+		return trn::ipc::server::RequestHandler<&IFileSystem::GetFileTimeStampRaw>::Handle(this, msg);
 	}
 	return 1;
+}
+
+trn::ResultCode IFileSystem::GetFileTimeStampRaw(trn::ipc::Buffer<char, 0x19, 0> path, trn::ipc::OutRaw<char[0x20]> timestamp) {
+	return 0;
 }
 
 } // namespace fs
