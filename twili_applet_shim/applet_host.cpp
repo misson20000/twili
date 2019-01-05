@@ -35,7 +35,7 @@ void *_trn_runconf_heap_base = _heap;
 size_t _trn_runconf_heap_size = sizeof(_heap);
 
 uint64_t reg_backups[13];
-uint64_t target_thunk(result_t (*entry)(loader_config_entry_t*, thread_h), loader_config_entry_t *config, thread_h thrd);
+uint64_t target_thunk(result_t (*entry)(loader_config_entry_t*, int64_t), loader_config_entry_t *config, int64_t thrd);
 }
 
 using namespace trn;
@@ -154,7 +154,7 @@ void HostMode(ipc::client::Object &iappletshim) {
 		shimservice.SendSyncRequest<5>(
 			ipc::OutRaw<uint64_t>(target_entry_addr)));
 	
-	result_t (*target_entry)(loader_config_entry_t*, thread_h) = (result_t (*)(loader_config_entry_t*, thread_h)) target_entry_addr;
+	result_t (*target_entry)(loader_config_entry_t*, int64_t) = (result_t (*)(loader_config_entry_t*, int64_t)) target_entry_addr;
 
 	printf("ready to jump to application\n");
 	
@@ -167,7 +167,7 @@ void HostMode(ipc::client::Object &iappletshim) {
 	// Run the application
 	uint8_t tls_backup[0x200];
 	memcpy(tls_backup, get_tls(), 0x200);
-	result_t ret = target_thunk(target_entry, entries.data(), 0xFFFFFFFF);
+	result_t ret = target_thunk(target_entry, entries.data(), -1);
 	memcpy(get_tls(), tls_backup, 0x200);
 
 	printf("application has returned\n");
