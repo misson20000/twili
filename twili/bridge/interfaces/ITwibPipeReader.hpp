@@ -32,11 +32,19 @@ namespace bridge {
 class ITwibPipeReader : public bridge::Object {
  public:
 	ITwibPipeReader(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
-	virtual void HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+
+	using CommandID = protocol::ITwibPipeReader::Command;
+	
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	std::weak_ptr<TwibPipe> pipe;
 
-	void Read(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+	void Read(bridge::ResponseOpener opener);
+
+	SmartRequestDispatcher<
+		ITwibPipeReader,
+		SmartCommand<CommandID::READ, &ITwibPipeReader::Read>
+		> dispatcher;
 };
 
 } // namespace bridge

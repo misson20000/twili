@@ -32,12 +32,21 @@ namespace bridge {
 class ITwibPipeWriter : public bridge::Object {
  public:
 	ITwibPipeWriter(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
-	virtual void HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+
+	using CommandID = protocol::ITwibPipeWriter::Command;
+	
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	std::weak_ptr<TwibPipe> pipe;
 
-	void Write(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void Close(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+	void Write(bridge::ResponseOpener opener, InputStream &stream);
+	void Close(bridge::ResponseOpener opener);
+
+	SmartRequestDispatcher<
+		ITwibPipeWriter,
+		SmartCommand<CommandID::WRITE, &ITwibPipeWriter::Write>,
+		SmartCommand<CommandID::CLOSE, &ITwibPipeWriter::Close>
+		> dispatcher;
 };
 
 } // namespace bridge

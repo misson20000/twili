@@ -73,7 +73,7 @@ struct PackingHelper<std::string> {
 
 // specialization for arbitrary vectors
 template<typename T>
-struct PackingHelper<std::vector<T>> {
+struct PackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::value>::type> {
 	static size_t GetSize(std::vector<T> &&vec) {
 		size_t size = sizeof(uint64_t);
 		for(auto i = vec.begin(); i != vec.end(); i++) {

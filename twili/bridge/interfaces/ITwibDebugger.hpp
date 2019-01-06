@@ -35,24 +35,41 @@ namespace bridge {
 class ITwibDebugger : public bridge::Object {
  public:
 	ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug);
-	virtual void HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+
+	using CommandID = protocol::ITwibDebugger::Command;
 	
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	Twili &twili;
 	trn::KDebug debug;
 	std::shared_ptr<trn::WaitHandle> wait_handle;
 	
-	void QueryMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void ReadMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void WriteMemory(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void ListThreads(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void GetDebugEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void GetThreadContext(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void BreakProcess(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void ContinueDebugEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void SetThreadContext(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void GetNsoInfos(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
-	void WaitEvent(std::vector<uint8_t> payload, bridge::ResponseOpener opener);
+	void QueryMemory(bridge::ResponseOpener opener, uint64_t address);
+	void ReadMemory(bridge::ResponseOpener opener, uint64_t address, uint64_t size);
+	void WriteMemory(bridge::ResponseOpener opener, uint64_t address, InputStream &data);
+	void ListThreads(bridge::ResponseOpener opener);
+	void GetDebugEvent(bridge::ResponseOpener opener);
+	void GetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id);
+	void BreakProcess(bridge::ResponseOpener opener);
+	void ContinueDebugEvent(bridge::ResponseOpener opener, uint32_t flags, std::vector<uint64_t> thread_ids);
+	void SetThreadContext(bridge::ResponseOpener opener);
+	void GetNsoInfos(bridge::ResponseOpener opener);
+	void WaitEvent(bridge::ResponseOpener opener);
+
+	SmartRequestDispatcher<
+		ITwibDebugger,
+		SmartCommand<CommandID::QUERY_MEMORY, &ITwibDebugger::QueryMemory>,
+		SmartCommand<CommandID::READ_MEMORY, &ITwibDebugger::ReadMemory>,
+		SmartCommand<CommandID::WRITE_MEMORY, &ITwibDebugger::WriteMemory>,
+		SmartCommand<CommandID::LIST_THREADS, &ITwibDebugger::ListThreads>,
+		SmartCommand<CommandID::GET_DEBUG_EVENT, &ITwibDebugger::GetDebugEvent>,
+		SmartCommand<CommandID::GET_THREAD_CONTEXT, &ITwibDebugger::GetThreadContext>,
+		SmartCommand<CommandID::BREAK_PROCESS, &ITwibDebugger::BreakProcess>,
+		SmartCommand<CommandID::CONTINUE_DEBUG_EVENT, &ITwibDebugger::ContinueDebugEvent>,
+		SmartCommand<CommandID::SET_THREAD_CONTEXT, &ITwibDebugger::SetThreadContext>,
+		SmartCommand<CommandID::GET_NSO_INFOS, &ITwibDebugger::GetNsoInfos>,
+		SmartCommand<CommandID::WAIT_EVENT, &ITwibDebugger::WaitEvent>
+		> dispatcher;
 };
 
 } // namespace bridge

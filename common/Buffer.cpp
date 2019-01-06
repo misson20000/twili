@@ -90,6 +90,10 @@ size_t Buffer::ReadAvailable() {
 	return write_head - read_head;
 }
 
+size_t Buffer::WriteAvailableHint() {
+	return data.size() - write_head;
+}
+
 void Buffer::EnsureSpace(size_t size) {
 	if(write_head + size > data.size()) {
 		Compact();

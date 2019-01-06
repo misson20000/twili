@@ -97,14 +97,14 @@ public:
 	size_t WriteAvailableHint();
 
 	std::vector<uint8_t> GetData();
-	
+
+	void Compact(); // guarantees that data pending read won't be moved around
 private:
 	std::vector<uint8_t> data;
 	size_t read_head = 0;
 	size_t write_head = 0;
 
 	void EnsureSpace(size_t size);
-	void Compact();
 };
 
 } // namespace util

@@ -28,39 +28,26 @@ using trn::ResultError;
 namespace twili {
 namespace bridge {
 
-ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe) {
+ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe), dispatcher(*this) {
 }
 
-void ITwibPipeReader::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	switch((protocol::ITwibPipeReader::Command) command_id) {
-	case protocol::ITwibPipeReader::Command::READ:
-		Read(payload, opener);
-		break;
-	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
-		break;
-	}
+RequestHandler *ITwibPipeReader::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
-void ITwibPipeReader::Read(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-
+void ITwibPipeReader::Read(bridge::ResponseOpener opener) {
 	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
 		observe->Read(
 			[opener](uint8_t *data, size_t actual_size) mutable {
 				if(actual_size == 0) {
-					opener.BeginError(TWILI_ERR_EOF).Finalize();
+					opener.RespondError(TWILI_ERR_EOF);
 				} else {
-					auto r = opener.BeginOk(actual_size);
-					r.Write(data, actual_size);
-					r.Finalize();
+					opener.RespondOk(std::vector<uint8_t>(data, data + actual_size));
 				}
 				return actual_size;
 			});
 	} else {
-		opener.BeginError(TWILI_ERR_EOF).Finalize();
+		opener.RespondError(TWILI_ERR_EOF);
 	}
 }
 

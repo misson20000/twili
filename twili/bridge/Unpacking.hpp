@@ -29,6 +29,8 @@
 
 #include "Streaming.hpp"
 
+#include "ResponseOpener.hpp"
+
 namespace twili {
 namespace bridge {
 namespace detail {
@@ -82,7 +84,7 @@ struct UnpackingHelper<std::string> {
 
 // specialization for arbitrary vectors
 template<typename T>
-struct UnpackingHelper<std::vector<T>> {
+struct UnpackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::value>::type> {
 	bool Unpack(util::Buffer &buffer, std::vector<T> &out) {
 		if(!has_size) {
 			if(!buffer.Read(size)) {
@@ -127,7 +129,7 @@ struct UnpackingHelper<InputStream> {
 
 // specialization for POD types
 template<typename T>
-struct UnpackingHelper<T, typename std::enable_if<std::is_pod<T>::value>::type> {
+struct UnpackingHelper<T, typename std::enable_if<std::is_pod<T>::value && !std::is_same<T, bridge::ResponseOpener>::value>::type> {
 	bool Unpack(util::Buffer &buffer, T &out) {
 		return buffer.Read(out);
 	}
@@ -141,6 +143,32 @@ struct ArgPack;
 
 template<typename T>
 struct UnpackingHolder;
+
+// special case for streams, since they're passed by reference
+template<typename... Args>
+struct UnpackingHolder<ArgPack<InputStream&, Args...>> {
+ public:
+	bool Unpack(util::Buffer &buffer) {
+		if(!has_value) {
+			if(!helper.Unpack(buffer, stream)) {
+				return false;
+			}
+			has_value = true;
+		}
+		return next.Unpack(buffer);
+	}
+	std::tuple<InputStream&, Args...> GetValues() {
+		return std::tuple_cat<std::tuple<InputStream&>, std::tuple<Args...>>(std::forward_as_tuple<InputStream&>(stream), next.GetValues());
+	}
+	InputStream *GetStream() {
+		return &stream;
+	}
+ private:
+	bool has_value = false;
+	InputStream stream;
+	UnpackingHelper<InputStream> helper;
+	UnpackingHolder<ArgPack<Args...>> next;
+};
 
 template<typename T, typename... Args>
 struct UnpackingHolder<ArgPack<T, Args...>> {

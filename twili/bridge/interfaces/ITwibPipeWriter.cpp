@@ -28,49 +28,96 @@ using trn::ResultError;
 namespace twili {
 namespace bridge {
 
-ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe) {
+ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe), dispatcher(*this) {
 }
 
-void ITwibPipeWriter::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	switch((protocol::ITwibPipeWriter::Command) command_id) {
-	case protocol::ITwibPipeWriter::Command::WRITE:
-		Write(payload, opener);
-		break;
-	case protocol::ITwibPipeWriter::Command::CLOSE:
-		Close(payload, opener);
-		break;
-	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
-		break;
-	}
+RequestHandler *ITwibPipeWriter::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
-void ITwibPipeWriter::Write(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) {
 	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
-		// we need this so that payload will stay alive until our callback gets called
-		std::shared_ptr<std::vector<uint8_t>> payload_copy = std::make_shared<std::vector<uint8_t>>(payload);
-		observe->Write(payload_copy->data(), payload_copy->size(),
-			[opener, payload_copy](bool eof) mutable {
-				if(eof) {
-					opener.BeginError(TWILI_ERR_EOF).Finalize();
-				} else {
-					opener.BeginOk().Finalize();
+		struct State : std::enable_shared_from_this<State> {
+			State(bridge::ResponseOpener opener, std::shared_ptr<TwibPipe> pipe) :
+				opener(opener), pipe(pipe) {
+			}
+			
+			bridge::ResponseOpener opener;
+			std::shared_ptr<TwibPipe> pipe;
+			util::Buffer buffer;
+			bool is_writing = false;
+			bool is_done = false;
+
+			void Write() {
+				if(!buffer.ReadAvailable()) {
+					return;
 				}
-				payload_copy.reset();
-			});
+				
+				is_writing = true;
+				
+				// move data to start of buffer so it doesn't get moved later
+				buffer.Compact();
+
+				size_t size = buffer.ReadAvailable();
+				
+				std::shared_ptr<State> extension = shared_from_this(); // extend our lifetime
+				pipe->Write(
+					buffer.Read(), size,
+					[extension, size](bool eof) mutable {
+						extension->buffer.MarkRead(size);
+						extension->is_writing = false;
+						if(eof) {
+							if(!extension->is_done) {
+								extension->is_done = true;
+								extension->opener.RespondError(TWILI_ERR_EOF);
+							}
+						} else {
+							if(extension->is_done) {
+								extension->opener.RespondOk();
+							} else {
+								extension->Write();
+							}
+						}
+					});
+			}
+		};
+
+		std::shared_ptr<State> state = std::make_shared<State>(opener, observe);
+		
+		stream.receive =
+			[state](util::Buffer &input) {
+				size_t size = input.ReadAvailable();
+				if(state->is_writing) {
+					// if this flag is set, we have a reference to data in the buffer
+					// and we don't want it to be moved
+					size = std::min(size, state->buffer.WriteAvailableHint());
+				}
+				input.Read(state->buffer, std::min(input.ReadAvailable(), size));
+				if(!state->is_writing) {
+					state->Write();
+				}
+			};
+
+		stream.finish =
+			[state](util::Buffer &input) {
+				if(!state->is_done) {
+					state->is_done = true;
+					if(!state->is_writing) {
+						state->Write();
+					}
+				}
+			};
 	} else {
-		opener.BeginError(TWILI_ERR_EOF).Finalize();
+		opener.RespondError(TWILI_ERR_EOF);
 	}
 }
 
-void ITwibPipeWriter::Close(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
+void ITwibPipeWriter::Close(bridge::ResponseOpener opener) {
 	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
 		observe->Close();
 		pipe.reset();
 	}
+	opener.RespondOk();
 }
 
 } // namespace bridge

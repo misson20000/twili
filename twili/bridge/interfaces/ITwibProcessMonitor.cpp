@@ -35,40 +35,15 @@ using namespace trn;
 namespace twili {
 namespace bridge {
 
-ITwibProcessMonitor::ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process) : Object(object_id), process::ProcessMonitor(process) {
+ITwibProcessMonitor::ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process) : Object(object_id), process::ProcessMonitor(process), dispatcher(*this) {
 }
 
 ITwibProcessMonitor::~ITwibProcessMonitor() {
 	process->Kill(); // attempt to exit cleanly
 }
 
-void ITwibProcessMonitor::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	switch((protocol::ITwibProcessMonitor::Command) command_id) {
-	case protocol::ITwibProcessMonitor::Command::LAUNCH:
-		Launch(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::TERMINATE:
-		Terminate(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::APPEND_CODE:
-		AppendCode(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::OPEN_STDIN:
-		OpenStdin(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::OPEN_STDOUT:
-		OpenStdout(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::OPEN_STDERR:
-		OpenStderr(payload, opener);
-		break;
-	case protocol::ITwibProcessMonitor::Command::WAIT_STATE_CHANGE:
-		WaitStateChange(payload, opener);
-		break;
-	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
-		break;
-	}
+RequestHandler *ITwibProcessMonitor::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
 void ITwibProcessMonitor::StateChanged(process::MonitoredProcess::State new_state) {
@@ -82,62 +57,42 @@ void ITwibProcessMonitor::StateChanged(process::MonitoredProcess::State new_stat
 	}
 }
 
-void ITwibProcessMonitor::Launch(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-
+void ITwibProcessMonitor::Launch(bridge::ResponseOpener opener) {
 	process->twili.monitored_processes.push_back(process);
 	printf("  began monitoring 0x%x\n", process->GetPid());
 
 	process->Launch(opener);
 }
 
-void ITwibProcessMonitor::Terminate(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-
+void ITwibProcessMonitor::Terminate(bridge::ResponseOpener opener) {
 	process->Terminate();
 	opener.BeginOk().Finalize();
 }
 
-void ITwibProcessMonitor::AppendCode(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	process->AppendCode(payload);
+void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, std::vector<uint8_t> code) {
+	process->AppendCode(code);
 	opener.BeginOk().Finalize();
 }
 
-void ITwibProcessMonitor::OpenStdin(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) { throw ResultError(TWILI_ERR_BAD_REQUEST); }
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write<uint32_t>(w.Object(opener.MakeObject<ITwibPipeWriter>(process->tp_stdin)));
-	w.Finalize();
+void ITwibProcessMonitor::OpenStdin(bridge::ResponseOpener opener) {
+	opener.RespondOk(opener.MakeObject<ITwibPipeWriter>(process->tp_stdin));
 }
 
-void ITwibProcessMonitor::OpenStdout(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) { throw ResultError(TWILI_ERR_BAD_REQUEST); }
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write<uint32_t>(w.Object(opener.MakeObject<ITwibPipeReader>(process->tp_stdout)));
-	w.Finalize();
+void ITwibProcessMonitor::OpenStdout(bridge::ResponseOpener opener) {
+	opener.RespondOk(opener.MakeObject<ITwibPipeReader>(process->tp_stdout));
 }
 
-void ITwibProcessMonitor::OpenStderr(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) { throw ResultError(TWILI_ERR_BAD_REQUEST); }
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write<uint32_t>(w.Object(opener.MakeObject<ITwibPipeReader>(process->tp_stderr)));
-	w.Finalize();
+void ITwibProcessMonitor::OpenStderr(bridge::ResponseOpener opener) {
+	opener.RespondOk(opener.MakeObject<ITwibPipeReader>(process->tp_stderr));
 }
 
-void ITwibProcessMonitor::WaitStateChange(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) { throw ResultError(TWILI_ERR_BAD_REQUEST); }
+void ITwibProcessMonitor::WaitStateChange(bridge::ResponseOpener opener) {
 	if(state_changes.size() > 0) {
-		auto w = opener.BeginOk(sizeof(uint32_t));
-		w.Write<uint32_t>((uint32_t) state_changes.front());
-		w.Finalize();
+		opener.RespondOk((uint32_t) state_changes.front());
 		state_changes.pop_front();
 	} else {
 		if(state_observer) {
-			state_observer->BeginError(TWILI_ERR_INTERRUPTED).Finalize();
+			state_observer->RespondError(TWILI_ERR_INTERRUPTED);
 		}
 		state_observer = opener;
 	}
