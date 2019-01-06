@@ -56,14 +56,18 @@ size_t ActualFile::Read(size_t offset, size_t size, uint8_t *out) {
 }
 
 size_t ActualFile::GetSize() {
-	if(fseek(file, 0, SEEK_END) != 0) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
+	if(!has_size) {
+		if(fseek(file, 0, SEEK_END) != 0) {
+			throw trn::ResultError(TWILI_ERR_IO_ERROR);
+		}
+		off_t out = ftello(file);
+		if(out == -1) {
+			throw trn::ResultError(TWILI_ERR_IO_ERROR);
+		}
+		size = out;
+		has_size = true;
 	}
-	off_t out = ftello(file);
-	if(out == -1) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
-	}
-	return out;
+	return size;
 }
 
 } // namespace fs

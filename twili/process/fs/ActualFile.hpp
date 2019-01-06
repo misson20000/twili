@@ -39,6 +39,8 @@ class ActualFile : public ProcessFile {
 	virtual size_t GetSize() override;
  private:
 	FILE *file;
+	bool has_size = false;
+	size_t size;
 };
 
 } // namespace fs
