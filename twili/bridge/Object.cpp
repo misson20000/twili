@@ -28,7 +28,7 @@ namespace bridge {
 Object::Object(uint32_t object_id) : object_id(object_id) {
 }
 
-RequestHandler &Object::OpenRequest(uint32_t id, size_t payload_size, ResponseOpener opener) {
+RequestHandler *Object::OpenRequest(uint32_t id, size_t payload_size, ResponseOpener opener) {
 	opener.RespondError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
 	return DiscardingRequestHandler::GetInstance();
 }

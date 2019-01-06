@@ -184,7 +184,7 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 		payload_buffer.Write(bridge->request_data_buffer.data, entry->transferred_size);
 
 		// pass to request handler
-		current_handler.FlushReceiveBuffer(payload_buffer);
+		current_handler->FlushReceiveBuffer(payload_buffer);
 	} catch(trn::ResultError &e) {
 		if(!current_state->has_begun) {
 			ResponseOpener opener(current_state);
@@ -262,7 +262,7 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 
 void USBBridge::RequestReader::FinalizeCommand() {
 	try {
-		current_handler.Finalize(payload_buffer);
+		current_handler->Finalize(payload_buffer);
 		ResetHandler();
 	} catch(ResultError &e) {
 		if(!current_state->has_begun) {

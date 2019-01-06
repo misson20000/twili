@@ -50,7 +50,7 @@ class DiscardingRequestHandler : public RequestHandler {
  public:
 	DiscardingRequestHandler();
 
-	static DiscardingRequestHandler &GetInstance();
+	static DiscardingRequestHandler *GetInstance();
 
 	virtual void FlushReceiveBuffer(util::Buffer &input_buffer) override;
 	virtual void Finalize(util::Buffer &input_buffer) override;
@@ -125,9 +125,9 @@ struct SmartCommand<cmd_id, Func> {
 	static constexpr typename T::CommandID cmd_id_value = cmd_id;
 	static constexpr void (T::*func_value)(Args...) = Func;
 
-	RequestHandler &Dispatch(T &object, size_t payload_size, bridge::ResponseOpener opener) {
+	RequestHandler *Dispatch(T &object, size_t payload_size, bridge::ResponseOpener opener) {
 		handler.emplace(object, payload_size, opener);
-		return *handler;
+		return &handler.value();
 	}
 
 	std::optional<SmartRequestHandler<Func>> handler;
@@ -138,14 +138,14 @@ struct SmartRequestDispatcher {
 	SmartRequestDispatcher(T &object) : object(object) {
 	}
 	
-	RequestHandler &SmartDispatch(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	RequestHandler *SmartDispatch(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
 		return SmartDispatchImpl((typename T::CommandID) command_id, payload_size, opener, std::index_sequence_for<Commands...>());
 	}
  private:
 	template<std::size_t... I>
-	RequestHandler &SmartDispatchImpl(typename T::CommandID command_id, size_t payload_size, bridge::ResponseOpener opener, std::index_sequence<I...>) {
+	RequestHandler *SmartDispatchImpl(typename T::CommandID command_id, size_t payload_size, bridge::ResponseOpener opener, std::index_sequence<I...>) {
 		bool has_matched = false;
-		RequestHandler &handler = DiscardingRequestHandler::GetInstance();
+		RequestHandler *handler = DiscardingRequestHandler::GetInstance();
 		std::initializer_list<int>({(command_id == Commands::cmd_id_value ? (
 						handler = std::get<I>(commands).Dispatch(object, payload_size, opener),
 						has_matched = true,

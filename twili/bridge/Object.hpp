@@ -33,7 +33,7 @@ class Object {
 
 	// RequestHandler should have lifetime equal to or longer than that of its owning Object,
 	// or until OpenRequest is called again.
-	virtual RequestHandler &OpenRequest(uint32_t command_id, size_t payload_size, ResponseOpener opener);
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, ResponseOpener opener);
 	
 	const uint32_t object_id;
 };

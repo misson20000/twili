@@ -35,7 +35,7 @@ class ITwibDeviceInterface : public bridge::Object {
 
 	using CommandID = protocol::ITwibDeviceInterface::Command;
 	
-	virtual RequestHandler &OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	Twili &twili;
 	

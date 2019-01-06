@@ -35,9 +35,9 @@ void DiscardingRequestHandler::FlushReceiveBuffer(util::Buffer &input_buffer) {
 void DiscardingRequestHandler::Finalize(util::Buffer &input_buffer) {
 }
 
-DiscardingRequestHandler &DiscardingRequestHandler::GetInstance() {
+DiscardingRequestHandler *DiscardingRequestHandler::GetInstance() {
 	static DiscardingRequestHandler instance;
-	return instance;
+	return &instance;
 }
 
 } // namespace bridge

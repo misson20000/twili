@@ -87,7 +87,7 @@ class USBBridge {
 		std::vector<uint32_t> object_ids;
 
 		std::shared_ptr<detail::ResponseState> current_state;
-		RequestHandler &current_handler = DiscardingRequestHandler::GetInstance();
+		RequestHandler *current_handler = DiscardingRequestHandler::GetInstance();
 	};
 
 	class ResponseState;

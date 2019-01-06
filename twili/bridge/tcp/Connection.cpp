@@ -107,7 +107,7 @@ void TCPBridge::Connection::Synchronized() {
 		break;
 	case Task::FlushReceiveBuffer:
 		try {
-			current_handler.FlushReceiveBuffer(payload_buffer);
+			current_handler->FlushReceiveBuffer(payload_buffer);
 		} catch(trn::ResultError &e) {
 			if(!current_state->has_begun) {
 				ResponseOpener opener(current_state);
@@ -120,7 +120,7 @@ void TCPBridge::Connection::Synchronized() {
 		break;
 	case Task::FinalizeCommand:
 		try {
-			current_handler.Finalize(payload_buffer);
+			current_handler->Finalize(payload_buffer);
 			ResetHandler();
 		} catch(trn::ResultError &e) {
 			if(!current_state->has_begun) {
