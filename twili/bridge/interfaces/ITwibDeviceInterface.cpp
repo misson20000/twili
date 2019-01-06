@@ -104,7 +104,7 @@ void ITwibDeviceInterface::ListProcesses(bridge::ResponseOpener opener) {
 
 	uint64_t my_pid = ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001));
 	
-	auto writer = opener.BeginOk(sizeof(ProcessReport) * num_pids);
+	auto writer = opener.BeginOk(sizeof(ProcessReport) * num_pids + sizeof(uint64_t));
 	writer.Write<uint64_t>(num_pids); // maintain std::vector packing format
 	for(uint32_t i = 0; i < num_pids; i++) {
 		struct ProcessReport preport;
