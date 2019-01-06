@@ -195,11 +195,11 @@ void AppletTracker::Monitor::StateChanged(process::MonitoredProcess::State new_s
 	if(new_state == process::MonitoredProcess::State::Exited) {
 		if(process == tracker.hbmenu) {
 			printf("AppletTracker: hbmenu exited\n");
-			if(!tracker.hbmenu->next_load_path.empty()) {
-				printf("AppletTracker: hbmenu requested next load: %s[%s]\n", tracker.hbmenu->next_load_path.c_str(), tracker.hbmenu->next_load_argv.c_str());
-				tracker.HBLLoad(tracker.hbmenu->next_load_path, tracker.hbmenu->next_load_argv);
-			}
 			tracker.hbmenu.reset();
+		}
+		if(!process->next_load_path.empty()) {
+			printf("AppletTracker: application requested next load: %s[%s]\n", process->next_load_path.c_str(), process->next_load_argv.c_str());
+			tracker.HBLLoad(process->next_load_path, process->next_load_argv);
 		}
 		// we are no longer interested in monitoring the applet after it exits,
 		// and we need to clear this reference pretty fast anyway since libnx
