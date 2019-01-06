@@ -274,6 +274,11 @@ void TCPBackend::ServerLogic::Prepare(twibc::SocketServer &server) {
 			}
 			i = backend.devices.erase(i);
 			continue;
+		} else {
+			if((*i)->ready_flag && !(*i)->added_flag) {
+				backend.twibd.AddDevice((*i));
+				(*i)->added_flag = true;
+			}
 		}
 
 		server.AddSocket((*i)->connection.socket);
