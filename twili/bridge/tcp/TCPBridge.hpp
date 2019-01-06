@@ -31,6 +31,8 @@
 #include "../../../common/Protocol.hpp"
 #include "../../../common/Buffer.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
+
 #include "../../ipcbind/nifm/IRequest.hpp"
 #include "../../Socket.hpp"
 
@@ -90,22 +92,49 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 
 	void PumpInput();
 	void Process();
-	void SynchronizeCommand();
-	void ProcessCommand();
-	bool deletion_flag = false;
-	volatile bool processing_message = false;
 
+	// called when command processing has ended and further input should be discarded
+	void ResetHandler();
+	
+	bool deletion_flag = false;
+
+	enum class Task {
+		Idle, BeginProcessingCommand, FlushReceiveBuffer, FinalizeCommand
+	};
+	
+	volatile Task pending_task = Task::Idle;
+
+	void Synchronized(); // called on main thread
+	
 	util::Socket socket;
  private:
 	TCPBridge &bridge;
 
+	/*
+	 * Requests that the main thread process something,
+	 * and then blocks until the main thread finishes. I know that this
+	 * isn't very parallel, but I'm only using threads here to work around
+	 * bad socket synchronization primitives so I don't really care.
+	 * The faster we can block this (the I/O) thread and keep it from breaking
+	 * things, the better.
+	 */
+	// TODO: use a mutex here and run things on this thread to simplify
+	//       control flow.
+	void Synchronize(Task task);
+	
+	void BeginProcessingCommandImpl(); // should run on main thread
+	
 	util::Buffer in_buffer;
 
 	bool has_current_mh = false;
 	bool has_current_payload = false;
 	protocol::MessageHeader current_mh;
-	util::Buffer current_payload;
+	size_t payload_size;
+	util::Buffer payload_buffer;
 	util::Buffer current_object_ids;
+
+	std::shared_ptr<detail::ResponseState> current_state;
+	RequestHandler &current_handler = DiscardingRequestHandler::GetInstance();
 	
 	uint32_t next_object_id = 1;
 	std::map<uint32_t, std::shared_ptr<bridge::Object>> objects;

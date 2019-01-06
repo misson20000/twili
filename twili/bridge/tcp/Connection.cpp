@@ -55,59 +55,93 @@ void TCPBridge::Connection::Process() {
 		if(!has_current_mh) {
 			if(in_buffer.Read(current_mh)) {
 				has_current_mh = true;
-				current_payload.Clear();
+				payload_size = 0;
+				payload_buffer.Clear();
 				has_current_payload = false;
+				
+				// pick command handler
+				Synchronize(Task::BeginProcessingCommand);
 			} else {
 				in_buffer.Reserve(sizeof(protocol::MessageHeader));
 			}
 		}
 
 		if(!has_current_payload) {
-			if(in_buffer.Read(current_payload, current_mh.payload_size)) {
-				has_current_payload = true;
-				current_object_ids.Clear();
+			size_t payload_avail = in_buffer.ReadAvailable();
+			if(payload_avail > current_mh.payload_size - payload_size) {
+				payload_avail = current_mh.payload_size - payload_size;
+			}
+			in_buffer.Read(payload_buffer, payload_avail);
+			payload_size+= payload_avail;
+
+			Synchronize(Task::FlushReceiveBuffer);
+			
+			if(payload_size == current_mh.payload_size) {
+				Synchronize(Task::FinalizeCommand);
+				has_current_mh = false;
+				has_current_payload = false;
 			} else {
-				in_buffer.Reserve(current_mh.payload_size);
 				return;
 			}
-		}
-
-		if(in_buffer.Read(current_object_ids, current_mh.object_count * sizeof(uint32_t))) {
-			// we've read all the components of the message
-			SynchronizeCommand();
-			has_current_mh = false;
-			has_current_payload = false;
-		} else {
-			in_buffer.Reserve(current_mh.object_count * sizeof(uint32_t));
-			return;
 		}
 	}
 }
 
-/*
- * Request that the main thread process the message we've just read,
- * and then block until the main thread finishes. I know that this
- * isn't very parallel, but I'm only using threads here to work around
- * bad socket synchronization primitives so I don't really care.
- * The faster we can block this (the I/O) thread and keep it from breaking
- * things, the better.
- */
-void TCPBridge::Connection::SynchronizeCommand() {
+void TCPBridge::Connection::Synchronize(Task task) {
 	util::MutexShim shim(bridge.request_processing_mutex);
 	std::unique_lock<util::MutexShim> lock(shim);
 	
-	processing_message = true;
+	this->pending_task = task;
 	// request that the main thread service us
 	bridge.request_processing_connection = shared_from_this();
 	bridge.request_processing_signal_wh->Signal();
-	while(processing_message) {
+	while(this->pending_task != Task::Idle) {
 		trn_condvar_wait(&bridge.request_processing_condvar, &bridge.request_processing_mutex, -1);
 	}
 }
 
-void TCPBridge::Connection::ProcessCommand() {
-	std::shared_ptr<ResponseState> state = std::make_shared<Connection::ResponseState>(shared_from_this(), current_mh.client_id, current_mh.tag);
-	ResponseOpener opener(state);
+void TCPBridge::Connection::Synchronized() {
+	switch(pending_task) {
+	case Task::BeginProcessingCommand:
+		BeginProcessingCommandImpl();
+		break;
+	case Task::FlushReceiveBuffer:
+		try {
+			current_handler.FlushReceiveBuffer(payload_buffer);
+		} catch(trn::ResultError &e) {
+			if(!current_state->has_begun) {
+				ResponseOpener opener(current_state);
+				opener.RespondError(e.code);
+			} else {
+				printf("TCPConnection: dropped error during FlushReceiveBuffer: 0x%x\n", e.code.code);
+				ResetHandler();
+			}
+		}
+		break;
+	case Task::FinalizeCommand:
+		try {
+			current_handler.Finalize(payload_buffer);
+			ResetHandler();
+		} catch(trn::ResultError &e) {
+			if(!current_state->has_begun) {
+				ResponseOpener opener(current_state);
+				opener.RespondError(e.code);
+			} else {
+				printf("TCPConnection: dropped error during Finalize: 0x%x\n", e.code.code);
+				ResetHandler();
+			}
+		}
+		break;
+	case Task::Idle:
+		printf("TCPConnection: synchronized on idle task?\n");
+		break;
+	}
+	pending_task = Task::Idle;
+}
+
+void TCPBridge::Connection::BeginProcessingCommandImpl() {
+	current_state = std::make_shared<Connection::ResponseState>(shared_from_this(), current_mh.client_id, current_mh.tag);
+	ResponseOpener opener(current_state);
 	auto i = objects.find(current_mh.object_id);
 	if(i == objects.end()) {
 		opener.BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT).Finalize();
@@ -123,19 +157,23 @@ void TCPBridge::Connection::ProcessCommand() {
 		} else {
 			objects.erase(current_mh.object_id);
 		}
-		opener.BeginOk().Finalize();
+		opener.RespondOk();
 		return;
 	}
 
 	try {
-		i->second->HandleRequest(current_mh.command_id, current_payload.GetData(), opener);
+		current_handler = i->second->OpenRequest(current_mh.command_id, current_mh.payload_size, opener);
 	} catch(trn::ResultError &e) {
-		if(!state->has_begun) {
-			opener.BeginError(e.code).Finalize();
+		if(!current_state->has_begun) {
+			opener.RespondError(e.code);
 		} else {
 			throw e;
 		}
 	}
+}
+
+void TCPBridge::Connection::ResetHandler() {
+	current_handler = DiscardingRequestHandler::GetInstance();
 }
 
 } // namespace tcp

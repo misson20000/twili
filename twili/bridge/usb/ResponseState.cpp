@@ -41,6 +41,8 @@ size_t USBBridge::ResponseState::GetMaxTransferSize() {
 }
 
 void USBBridge::ResponseState::SendHeader(protocol::MessageHeader &hdr) {
+	bridge.request_reader.ResetHandler();
+	
 	memcpy(
 		bridge.response_meta_buffer.data,
 		&hdr,

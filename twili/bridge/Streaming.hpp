@@ -20,22 +20,15 @@
 
 #pragma once
 
-#include "ResponseOpener.hpp"
-#include "RequestHandler.hpp"
-
 namespace twili {
 namespace bridge {
 
-class Object {
- public:
-	Object(uint32_t object_id);
-	virtual ~Object() = default;
+struct InputStream {
+	size_t expected_size = 0;
 
-	// RequestHandler should have lifetime equal to or longer than that of its owning Object,
-	// or until OpenRequest is called again.
-	virtual RequestHandler &OpenRequest(uint32_t command_id, size_t payload_size, ResponseOpener opener);
-	
-	const uint32_t object_id;
+	// These have a similar contract to RequestHandler's FlushReceiveBuffer and Finalize
+	std::function<void(util::Buffer &buf)> receive;
+	std::function<void(util::Buffer &buf)> finish;
 };
 
 } // namespace bridge

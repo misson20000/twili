@@ -30,6 +30,7 @@
 
 #include "../../../common/Protocol.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 
 namespace twili {
 
@@ -62,7 +63,10 @@ class USBBridge {
 		void PostMetaBuffer();
 		void PostDataBuffer();
 		void PostObjectBuffer();
-		void ProcessCommand();
+
+		// called when command processing has ended (normally or fatally)
+		// and any further input for this request should be discarded.
+		void ResetHandler();
 		
 	 private:
 		USBBridge *bridge;
@@ -73,10 +77,17 @@ class USBBridge {
 		uint32_t meta_urb_id;
 		uint32_t data_urb_id;
 		uint32_t object_urb_id;
+
+		void BeginProcessingCommand();
+		void FinalizeCommand();
 		
 		protocol::MessageHeader current_header;
-		std::vector<uint8_t> current_payload;
+		size_t payload_size;
+		util::Buffer payload_buffer;
 		std::vector<uint32_t> object_ids;
+
+		std::shared_ptr<detail::ResponseState> current_state;
+		RequestHandler &current_handler = DiscardingRequestHandler::GetInstance();
 	};
 
 	class ResponseState;

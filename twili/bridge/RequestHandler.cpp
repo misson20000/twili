@@ -18,25 +18,27 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
-
-#include "ResponseOpener.hpp"
 #include "RequestHandler.hpp"
 
 namespace twili {
 namespace bridge {
 
-class Object {
- public:
-	Object(uint32_t object_id);
-	virtual ~Object() = default;
+RequestHandler::~RequestHandler() {
+}
 
-	// RequestHandler should have lifetime equal to or longer than that of its owning Object,
-	// or until OpenRequest is called again.
-	virtual RequestHandler &OpenRequest(uint32_t command_id, size_t payload_size, ResponseOpener opener);
-	
-	const uint32_t object_id;
-};
+DiscardingRequestHandler::DiscardingRequestHandler() {
+}
+
+void DiscardingRequestHandler::FlushReceiveBuffer(util::Buffer &input_buffer) {
+}
+
+void DiscardingRequestHandler::Finalize(util::Buffer &input_buffer) {
+}
+
+DiscardingRequestHandler &DiscardingRequestHandler::GetInstance() {
+	static DiscardingRequestHandler instance;
+	return instance;
+}
 
 } // namespace bridge
 } // namespace twili

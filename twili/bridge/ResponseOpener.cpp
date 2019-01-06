@@ -59,5 +59,9 @@ ResponseWriter ResponseOpener::BeginOk(size_t payload_size, uint32_t object_coun
 	return BeginError(ResultCode(0), payload_size, object_count);
 }
 
+void ResponseOpener::RespondError(ResultCode code) const {
+	BeginError(code).Finalize();
+}
+
 } // namespace bridge
 } // namespace twili

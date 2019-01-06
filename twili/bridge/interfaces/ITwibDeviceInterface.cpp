@@ -50,100 +50,46 @@ using namespace trn;
 namespace twili {
 namespace bridge {
 
-ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : Object(device_id), twili(twili) {
+ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : Object(device_id), twili(twili), dispatcher(*this) {
 }
 
-void ITwibDeviceInterface::HandleRequest(uint32_t command_id, std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	switch((protocol::ITwibDeviceInterface::Command) command_id) {
-	case protocol::ITwibDeviceInterface::Command::CREATE_MONITORED_PROCESS:
-		CreateMonitoredProcess(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::REBOOT:
-		Reboot(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::COREDUMP:
-		CoreDump(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::TERMINATE:
-		Terminate(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::LIST_PROCESSES:
-		ListProcesses(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::UPGRADE_TWILI:
-		UpgradeTwili(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::IDENTIFY:
-		Identify(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::LIST_NAMED_PIPES:
-		ListNamedPipes(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::OPEN_NAMED_PIPE:
-		OpenNamedPipe(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::OPEN_ACTIVE_DEBUGGER:
-		OpenActiveDebugger(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO:
-		GetMemoryInfo(payload, opener);
-		break;
-	case protocol::ITwibDeviceInterface::Command::PRINT_DEBUG_INFO:
-		PrintDebugInfo(payload, opener);
-		break;
-	default:
-		opener.BeginError(ResultCode(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION)).Finalize();
-		break;
-	}
+RequestHandler &ITwibDeviceInterface::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
-void ITwibDeviceInterface::Reboot(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	ResultCode::AssertOk(bpc_init());
-	ResultCode::AssertOk(bpc_reboot_system());
-}
-
-void ITwibDeviceInterface::CreateMonitoredProcess(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	std::string type(payload.begin(), payload.end());
-	
+void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener, std::string type) {
 	std::shared_ptr<process::MonitoredProcess> proc;
 	if(type == "managed") {
 		proc = std::make_shared<process::ManagedProcess>(twili);
 	} else if(type == "applet") {
 		proc = std::make_shared<process::AppletProcess>(twili);
 	} else {
-		opener.BeginError(ResultCode(TWILI_ERR_UNRECOGNIZED_MONITORED_PROCESS_TYPE)).Finalize();
+		opener.RespondError(TWILI_ERR_UNRECOGNIZED_MONITORED_PROCESS_TYPE);
 		return;
 	}
 
-	auto monitor = opener.MakeObject<ITwibProcessMonitor>(proc);
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write(w.Object(monitor));
-	w.Finalize();
+	opener.RespondOk(opener.MakeObject<ITwibProcessMonitor>(proc));
 }
 
-void ITwibDeviceInterface::CoreDump(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != sizeof(uint64_t)) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-	uint64_t pid = *((uint64_t*) payload.data());
+void ITwibDeviceInterface::Reboot(bridge::ResponseOpener opener) {
+	ResultCode::AssertOk(bpc_init());
+	ResultCode::AssertOk(bpc_reboot_system());
+}
+
+void ITwibDeviceInterface::CoreDump(bridge::ResponseOpener opener, uint64_t pid) {
 	std::shared_ptr<process::Process> proc = twili.FindProcess(pid);
 	ELFCrashReport report;
 	report.Generate(*proc, opener);
 }
 
-void ITwibDeviceInterface::Terminate(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != sizeof(uint64_t)) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-	uint64_t pid = *((uint64_t*) payload.data());
-
+void ITwibDeviceInterface::Terminate(bridge::ResponseOpener opener, uint64_t pid) {
 	twili.FindProcess(pid)->Terminate();
 
 	opener.BeginOk().Finalize();
 	return;
 }
 
-void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+void ITwibDeviceInterface::ListProcesses(bridge::ResponseOpener opener) {
 	uint64_t pids[256];
 	uint32_t num_pids;
 	ResultCode::AssertOk(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
@@ -159,6 +105,7 @@ void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, bridge::R
 	uint64_t my_pid = ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001));
 	
 	auto writer = opener.BeginOk(sizeof(ProcessReport) * num_pids);
+	writer.Write<uint64_t>(num_pids); // maintain std::vector packing format
 	for(uint32_t i = 0; i < num_pids; i++) {
 		struct ProcessReport preport;
 		preport.process_id = pids[i];
@@ -198,7 +145,11 @@ void ITwibDeviceInterface::ListProcesses(std::vector<uint8_t> payload, bridge::R
 	writer.Finalize();
 }
 
-void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+void ITwibDeviceInterface::UpgradeTwili(bridge::ResponseOpener opener) {
+	opener.RespondError(LIBTRANSISTOR_ERR_UNSPECIFIED);
+}
+
+void ITwibDeviceInterface::Identify(bridge::ResponseOpener opener) {
 	printf("identifying...\n");
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 	trn::ipc::client::Object set_sys = ResultCode::AssertOk(
@@ -246,71 +197,35 @@ void ITwibDeviceInterface::Identify(std::vector<uint8_t> payload, bridge::Respon
 		{"device_nickname", std::string((char*) device_nickname.data())},
 		{"mii_author_id", mii_author_id}
 	};
-	std::string ser = ident.dump();
-	auto w = opener.BeginOk(ser.size());
-	w.Write(ser);
-	w.Finalize();
+
+	opener.RespondOk(std::move(ident));
 }
 
-void ITwibDeviceInterface::UpgradeTwili(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	throw ResultError(LIBTRANSISTOR_ERR_UNSPECIFIED);
-}
-
-void ITwibDeviceInterface::ListNamedPipes(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-
-	size_t size = 0;
-	size+= sizeof(uint32_t);
+void ITwibDeviceInterface::ListNamedPipes(bridge::ResponseOpener opener) {
+	std::vector<std::string> names;
 	for(auto i : twili.named_pipes) {
-		size+= sizeof(uint32_t);
-		size+= i.first.size();
+		names.push_back(i.first);
 	}
-
-	auto w = opener.BeginOk(size);
-	w.Write<uint32_t>(twili.named_pipes.size());
-	for(auto i : twili.named_pipes) {
-		w.Write<uint32_t>(i.first.size());
-		w.Write((uint8_t*) i.first.data(), i.first.size());
-	}
-	w.Finalize();
+	opener.RespondOk(std::move(names));
 }
 
-void ITwibDeviceInterface::OpenNamedPipe(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	std::string name(payload.begin(), payload.end());
-
+void ITwibDeviceInterface::OpenNamedPipe(bridge::ResponseOpener opener, std::string name) {
 	auto i = twili.named_pipes.find(name);
 	if(i == twili.named_pipes.end()) {
 		throw ResultError(TWILI_ERR_NO_SUCH_PIPE);
 	}
 	
-	auto reader = opener.MakeObject<ITwibPipeReader>(i->second);
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write(w.Object(reader));
-	w.Finalize();
+	opener.RespondOk(opener.MakeObject<ITwibPipeReader>(i->second));
 }
 
-void ITwibDeviceInterface::OpenActiveDebugger(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() != sizeof(uint64_t)) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-	uint64_t pid = *((uint64_t*) payload.data());
-
+void ITwibDeviceInterface::OpenActiveDebugger(bridge::ResponseOpener opener, uint64_t pid) {
 	trn::KDebug debug = ResultCode::AssertOk(
 		trn::svc::DebugActiveProcess(pid));
 
-	auto debugger = opener.MakeObject<ITwibDebugger>(twili, std::move(debug));
-	auto w = opener.BeginOk(sizeof(uint32_t), 1);
-	w.Write(w.Object(debugger));
-	w.Finalize();
+	opener.RespondOk(opener.MakeObject<ITwibDebugger>(twili, std::move(debug)));
 }
 
-void ITwibDeviceInterface::GetMemoryInfo(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
-	if(payload.size() > 0) {
-		throw ResultError(TWILI_ERR_BAD_REQUEST);
-	}
-
+void ITwibDeviceInterface::GetMemoryInfo(bridge::ResponseOpener opener) {
 	size_t total_mem_available, total_mem_usage;
 
 	ResultCode::AssertOk(svcGetInfo(&total_mem_available, 6, 0xffff8001, 0));
@@ -334,14 +249,10 @@ void ITwibDeviceInterface::GetMemoryInfo(std::vector<uint8_t> payload, bridge::R
 		{"limits", resource_limit_infos},
 	};
 
-	std::string ser = meminfo.dump();
-	
-	auto w = opener.BeginOk(ser.size());
-	w.Write(ser);
-	w.Finalize();
+	opener.RespondOk(std::move(meminfo));
 }
 
-void ITwibDeviceInterface::PrintDebugInfo(std::vector<uint8_t> payload, bridge::ResponseOpener opener) {
+void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 	printf("Twili state dump:\n");
 	printf("  monitored process list\n");
 	for(auto proc : twili.monitored_processes) {
@@ -353,7 +264,8 @@ void ITwibDeviceInterface::PrintDebugInfo(std::vector<uint8_t> payload, bridge::
 		printf("      target entry: 0x%lx\n", proc->GetTargetEntry());
 	}
 	twili.applet_tracker.PrintDebugInfo();
-	opener.BeginOk().Finalize();
+
+	opener.RespondOk();
 }
 
 } // namespace bridge

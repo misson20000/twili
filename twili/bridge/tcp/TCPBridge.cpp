@@ -78,12 +78,11 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 
 			request_processing_signal_wh->ResetSignal();
 			try {
-				request_processing_connection->ProcessCommand();
+				request_processing_connection->Synchronized();
 			} catch(ResultError &e) {
 				printf("caught 0x%x while processing request\n", e.code.code);
 				request_processing_connection->deletion_flag = true;
 			}
-			request_processing_connection->processing_message = false;
 			request_processing_connection.reset();
 			
 			trn_condvar_signal(&request_processing_condvar, -1); // resume I/O thread after we unlock
