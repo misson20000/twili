@@ -91,7 +91,6 @@ class USBBridge {
 	};
 
 	class ResponseState;
-	using RequestHandler = std::function<trn::Result<std::nullopt_t>(std::vector<uint8_t>, ResponseOpener)>;
 	
 	USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero);
 	~USBBridge();
