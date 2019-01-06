@@ -42,13 +42,6 @@ AppletProcess::AppletProcess(Twili &twili) :
 }
 
 void AppletProcess::Launch(bridge::ResponseOpener opener) {
-	if(files.size() > 1) {
-		throw ResultError(TWILI_ERR_TOO_MANY_MODULES);
-	} else if(files.empty()) {
-		throw ResultError(TWILI_ERR_NO_MODULES);
-	}
-	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
-	
 	run_opener = opener;
 	ChangeState(State::Started);
 	
@@ -130,6 +123,13 @@ void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries)
 }
 
 void AppletProcess::PrepareForLaunch() {
+	if(files.size() > 1) {
+		throw ResultError(TWILI_ERR_TOO_MANY_MODULES);
+	} else if(files.empty()) {
+		throw ResultError(TWILI_ERR_NO_MODULES);
+	}
+	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
+
 	printf("installing ExternalContentSource\n");
 	KObject session;
 	ResultCode::AssertOk(
