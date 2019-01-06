@@ -129,13 +129,13 @@ std::shared_ptr<process::AppletProcess> AppletTracker::CreateHbmenu() {
 
 void AppletTracker::HBLLoad(std::string path, std::string argv) {
 	// transmute sdmc:/switch/application.nro path to /sd/switch/application.nro
-	const std::string prefix("sdmc:/");
-	if(path.compare(0, prefix.size(), prefix)) {
-		printf("  invalid path\n");
-		return;
+	const std::string *prefix = nullptr;
+	const std::string sdmc_prefix("sdmc:/");
+	if(!path.compare(0, sdmc_prefix.size(), sdmc_prefix)) {
+		prefix = &sdmc_prefix;
 	}
 	char transmute_path[0x301];
-	snprintf(transmute_path, sizeof(transmute_path), "/sd/%s", path.c_str() + prefix.size());
+	snprintf(transmute_path, sizeof(transmute_path), "/sd/%s", path.c_str() + (prefix == nullptr ? 0 : prefix->size()));
 
 	FILE *file = fopen(transmute_path, "rb");
 	if(!file) {
