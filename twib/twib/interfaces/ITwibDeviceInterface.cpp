@@ -97,7 +97,8 @@ ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
 	msgpack11::MsgPack pack;
 	obj->SendSmartSyncRequest(
-		CommandID::GET_MEMORY_INFO);
+		CommandID::GET_MEMORY_INFO,
+		out(pack));
 	return pack;
 }
 
