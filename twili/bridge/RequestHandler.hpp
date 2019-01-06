@@ -81,23 +81,27 @@ class SmartRequestHandler<Func> : public RequestHandler {
 				InputStream *stream = parameter_holder.GetStream();
 				if(stream) {
 					stream->expected_size = payload_size - consumed_size;
-					streaming = true;
 				} else {
 					if(consumed_size < payload_size) {
 						// too much data
 						throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
 					}
 				}
+				streaming = true; // sink any further data if we get any
 				InvocationHelper(object, parameter_holder.GetValues(), std::index_sequence_for<Args...>());
 			}
 		} else {
-			parameter_holder.GetStream()->receive(input_buffer);
+			if(parameter_holder.GetStream()) {
+				parameter_holder.GetStream()->receive(input_buffer);
+			} else if(input_buffer.ReadAvailable()) {
+				throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST); // too much data
+			}
 		}
 	}
 
 	virtual void Finalize(util::Buffer &input_buffer) {
 		FlushReceiveBuffer(input_buffer);
-		if(streaming) {
+		if(streaming && parameter_holder.GetStream()) {
 			parameter_holder.GetStream()->finish(input_buffer);
 		}
 	}
