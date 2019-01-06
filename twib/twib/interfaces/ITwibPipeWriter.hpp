@@ -31,6 +31,8 @@ class ITwibPipeWriter {
  public:
 	ITwibPipeWriter(std::shared_ptr<RemoteObject> obj);
 
+	using CommandID = protocol::ITwibPipeWriter::Command;
+	
 	void WriteSync(std::vector<uint8_t> data);
 	void Close();
  private:

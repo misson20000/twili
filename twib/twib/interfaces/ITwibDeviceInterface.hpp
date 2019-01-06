@@ -44,6 +44,8 @@ class ITwibDeviceInterface {
  public:
 	ITwibDeviceInterface(std::shared_ptr<RemoteObject> obj);
 
+	using CommandID = protocol::ITwibDeviceInterface::Command;
+	
 	ITwibProcessMonitor CreateMonitoredProcess(std::string type);
 	void Reboot();
 	std::vector<uint8_t> CoreDump(uint64_t process_id);

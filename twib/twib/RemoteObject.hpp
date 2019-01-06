@@ -20,7 +20,11 @@
 
 #pragma once
 
+#include "err.hpp"
+
+#include "ResultError.hpp"
 #include "Client.hpp"
+#include "Packing.hpp"
 
 namespace twili {
 namespace twib {
@@ -33,9 +37,15 @@ class RemoteObject {
 	std::future<Response> SendRequest(uint32_t command_id, std::vector<uint8_t> payload);
 	Response SendSyncRequest(uint32_t command_id, std::vector<uint8_t> payload = std::vector<uint8_t>());
 
-	template<typename T>
-	Response SendSyncRequest(T command_id, std::vector<uint8_t> payload = std::vector<uint8_t>()) {
-		return SendSyncRequest((uint32_t) command_id, payload);
+	template<typename T, typename... Args>
+	void SendSmartSyncRequest(T command_id, Args&&... args) {
+		util::Buffer input_buffer;
+		(detail::WrappingHelper<Args>::Pack(std::move(args), input_buffer), ...);
+		Response r = SendSyncRequest((uint32_t) command_id, input_buffer.GetData());
+		util::Buffer output_buffer(r.payload);
+		if(!(detail::WrappingHelper<Args>::Unpack(std::move(args), output_buffer, r.objects) && ... && true)) {
+			throw ResultError(TWILI_ERR_PROTOCOL_BAD_RESPONSE);
+		}
 	}
  private:
 	client::Client &client;

@@ -31,6 +31,8 @@ class ITwibPipeReader {
  public:
 	ITwibPipeReader(std::shared_ptr<RemoteObject> obj);
 
+	using CommandID = protocol::ITwibPipeReader::Command;
+	
 	std::vector<uint8_t> ReadSync();
  private:
 	std::shared_ptr<RemoteObject> obj;

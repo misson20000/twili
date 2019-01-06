@@ -223,9 +223,15 @@ Response Twibd::HandleRequest(Request &rq) {
 						{"identification", device->identification}
 					});
 			}
+
+			util::Buffer response_payload;
+			
 			msgpack11::MsgPack array_pack(device_packs);
 			std::string ser = array_pack.dump();
-			r.payload = std::vector<uint8_t>(ser.begin(), ser.end());
+			response_payload.Write<uint64_t>(ser.size());
+			response_payload.Write(ser);
+			
+			r.payload = response_payload.GetData();
 			
 			return r; }
 		case protocol::ITwibMetaInterface::Command::CONNECT_TCP: {
@@ -234,17 +240,20 @@ Response Twibd::HandleRequest(Request &rq) {
 			util::Buffer buffer(rq.payload);
 			size_t hostname_len, port_len;
 			std::string hostname, port;
-			if(!buffer.Read(hostname_len) ||
-				 !buffer.Read(port_len) ||
+			if(!buffer.Read<uint64_t>(hostname_len) ||
 				 !buffer.Read(hostname, hostname_len) ||
+				 !buffer.Read<uint64_t>(port_len) ||
 				 !buffer.Read(port, port_len)) {
 				return rq.RespondError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
 			}
 			LogMessage(Info, "requested to connect to %s:%s", hostname.c_str(), port.c_str());
 
 			Response r = rq.RespondOk();
+			util::Buffer response_payload;
 			std::string msg = tcp.Connect(hostname, port);
-			r.payload = std::vector<uint8_t>(msg.begin(), msg.end());
+			response_payload.Write<uint64_t>(msg.size());
+			response_payload.Write(msg);
+			r.payload = response_payload.GetData();
 			return r; }
 		default:
 			return rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION);

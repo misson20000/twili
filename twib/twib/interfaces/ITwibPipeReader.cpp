@@ -30,7 +30,11 @@ ITwibPipeReader::ITwibPipeReader(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 }
 
 std::vector<uint8_t> ITwibPipeReader::ReadSync() {
-	return obj->SendSyncRequest(protocol::ITwibPipeReader::Command::READ).payload;
+	std::vector<uint8_t> data;
+	obj->SendSmartSyncRequest(
+		CommandID::READ,
+		out(data));
+	return data;
 }
 
 } // namespace twib

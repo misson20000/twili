@@ -33,6 +33,8 @@ class ITwibMetaInterface {
  public:
 	ITwibMetaInterface(RemoteObject obj);
 
+	using CommandID = protocol::ITwibMetaInterface::Command;
+	
 	std::vector<msgpack11::MsgPack> ListDevices();
 	std::string ConnectTcp(std::string hostname, std::string port);
  private:

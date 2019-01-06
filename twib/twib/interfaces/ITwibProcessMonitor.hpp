@@ -33,6 +33,8 @@ class ITwibProcessMonitor {
  public:
 	ITwibProcessMonitor(std::shared_ptr<RemoteObject> obj);
 
+	using CommandID = protocol::ITwibProcessMonitor::Command;
+	
 	uint64_t Launch();
 	void AppendCode(std::vector<uint8_t> code);
 	ITwibPipeWriter OpenStdin();

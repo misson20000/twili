@@ -32,35 +32,49 @@ ITwibProcessMonitor::ITwibProcessMonitor(std::shared_ptr<RemoteObject> obj) : ob
 }
 
 uint64_t ITwibProcessMonitor::Launch() {
-	Response rs = obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::LAUNCH);
-	if(rs.payload.size() < sizeof(uint64_t)) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
-	}
-	return *(uint64_t*) rs.payload.data();
+	uint64_t pid;
+	obj->SendSmartSyncRequest(
+		CommandID::LAUNCH,
+		out(pid));
+	return pid;
 }
 
 void ITwibProcessMonitor::AppendCode(std::vector<uint8_t> code) {
-	obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::APPEND_CODE, code);
+	obj->SendSmartSyncRequest(
+		CommandID::APPEND_CODE,
+		in(code));
 }
 
 ITwibPipeWriter ITwibProcessMonitor::OpenStdin() {
-	return ITwibPipeWriter(obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::OPEN_STDIN).objects[0]);
+	std::optional<ITwibPipeWriter> writer;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_STDIN,
+		out_object(writer));
+	return *writer;
 }
 
 ITwibPipeReader ITwibProcessMonitor::OpenStdout() {
-	return ITwibPipeReader(obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::OPEN_STDOUT).objects[0]);
+	std::optional<ITwibPipeReader> reader;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_STDOUT,
+		out_object(reader));
+	return *reader;
 }
 
 ITwibPipeReader ITwibProcessMonitor::OpenStderr() {
-	return ITwibPipeReader(obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::OPEN_STDERR).objects[0]);
+	std::optional<ITwibPipeReader> reader;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_STDERR,
+		out_object(reader));
+	return *reader;
 }
 
 uint32_t ITwibProcessMonitor::WaitStateChange() {
-	Response rs = obj->SendSyncRequest(protocol::ITwibProcessMonitor::Command::WAIT_STATE_CHANGE);
-	if(rs.payload.size() < sizeof(uint32_t)) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
-	}
-	return *(uint32_t*) rs.payload.data();
+	uint32_t state;
+	obj->SendSmartSyncRequest(
+		CommandID::WAIT_STATE_CHANGE,
+		out(state));
+	return state;
 }
 
 } // namespace twib
