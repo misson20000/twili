@@ -36,7 +36,6 @@ AppletTracker::AppletTracker(Twili &twili) :
 	printf("building AppletTracker\n");
 	hbmenu_transmute = process::fs::NRONSOTransmutationFile::Create(
 		std::make_shared<process::fs::ActualFile>("/sd/hbmenu.nro"));
-	process_queued_wevent.Signal(); // for hbmenu launch
 }
 
 bool AppletTracker::HasControlProcess() {
@@ -47,6 +46,7 @@ void AppletTracker::AttachControlProcess() {
 	if(has_control_process) {
 		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
+	process_queued_wevent.Signal(); // for hbmenu launch
 	has_control_process = true;
 }
 
