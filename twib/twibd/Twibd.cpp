@@ -238,7 +238,7 @@ Response Twibd::HandleRequest(Request &rq) {
 			LogMessage(Debug, "command 1 issued to twibd meta object: CONNECT_TCP");
 
 			util::Buffer buffer(rq.payload);
-			size_t hostname_len, port_len;
+			uint64_t hostname_len, port_len;
 			std::string hostname, port;
 			if(!buffer.Read<uint64_t>(hostname_len) ||
 				 !buffer.Read(hostname, hostname_len) ||

@@ -71,7 +71,7 @@ struct PackingHelper<std::vector<T>, typename std::enable_if<std::is_pod<T>::val
 	}
 	static bool Unpack(std::vector<T> &&value, util::Buffer &output_buffer) {
 		value.clear();
-		size_t size;
+		uint64_t size;
 		return output_buffer.Read<uint64_t>(size) && (value.resize(size), output_buffer.Read(value));
 	}
 };
@@ -86,7 +86,7 @@ struct PackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::va
 	}
 	static bool Unpack(std::vector<T> &&value, util::Buffer &output_buffer) {
 		value.clear();
-		size_t size;
+		uint64_t size;
 		if(!output_buffer.Read<uint64_t>(size)) {
 			return false;
 		}
@@ -107,7 +107,7 @@ struct PackingHelper<std::string> {
 		input_buffer.Write(value);
 	}
 	static bool Unpack(std::string &&value, util::Buffer &output_buffer) {
-		size_t size;
+		uint64_t size;
 		return output_buffer.Read<uint64_t>(size) && output_buffer.Read(value, size);
 	}
 };
@@ -120,7 +120,7 @@ struct PackingHelper<msgpack11::MsgPack> {
 		input_buffer.Write(ser);
 	}
 	static bool Unpack(msgpack11::MsgPack &&value, util::Buffer &output_buffer) {
-		size_t size;
+		uint64_t size;
 		if(!output_buffer.Read<uint64_t>(size)) {
 			return false;
 		}
