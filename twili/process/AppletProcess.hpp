@@ -50,7 +50,7 @@ class AppletProcess : public MonitoredProcess {
 
 	// used to communicate with host shim
 	trn::KEvent &GetCommandEvent();
-	uint32_t PopCommand();
+	std::optional<uint32_t> PopCommand();
 
 	fs::ProcessFileSystem virtual_exefs;
  private:

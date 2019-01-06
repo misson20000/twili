@@ -60,8 +60,13 @@ trn::ResultCode IAppletController::GetEvent(trn::ipc::OutHandle<handle_t, trn::i
 }
 
 trn::ResultCode IAppletController::GetCommand(trn::ipc::OutRaw<uint32_t> command) {
-	command = process->PopCommand();
-	return RESULT_OK;
+	std::optional<uint32_t> maybe_command = process->PopCommand();
+	if(maybe_command) {
+		command = *maybe_command;
+		return RESULT_OK;
+	} else {
+		return TWILI_ERR_APPLET_SHIM_NO_COMMANDS_LEFT;
+	}
 }
 
 } // namespace service

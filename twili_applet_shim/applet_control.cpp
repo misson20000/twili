@@ -48,7 +48,7 @@ class ControlledApplet {
 		
 		applet_wh = waiter.Add(
 			applet_event,
-			[&]() -> bool {
+			[this]() -> bool {
 				printf("controlled applet state change event signalled\n");
 				applet_event.ResetSignal();
 				SetResult();
@@ -57,7 +57,7 @@ class ControlledApplet {
 
 		controller_wh = waiter.Add(
 			controller_event,
-			[&]() -> bool {
+			[this]() -> bool {
 				printf("controlled applet got controller event signal\n");
 				controller_event.ResetSignal();
 				uint32_t command;

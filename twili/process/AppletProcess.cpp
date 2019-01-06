@@ -145,13 +145,14 @@ trn::KEvent &AppletProcess::GetCommandEvent() {
 	return command_event;
 }
 
-uint32_t AppletProcess::PopCommand() {
+std::optional<uint32_t> AppletProcess::PopCommand() {
 	if(commands.size() == 0) {
-		throw trn::ResultError(TWILI_ERR_APPLET_SHIM_NO_COMMANDS_LEFT);
+		return std::nullopt;
+	} else {
+		uint32_t cmd = commands.front();
+		commands.pop_front();
+		return cmd;
 	}
-	uint32_t cmd = commands.front();
-	commands.pop_front();
-	return cmd;
 }
 
 void AppletProcess::PushCommand(uint32_t command) {
