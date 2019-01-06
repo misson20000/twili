@@ -28,7 +28,7 @@
 #include "err.hpp"
 
 namespace twili {
-namespace process_creation {
+namespace process {
 
 struct SegmentHeader {
 	uint32_t file_offset;
@@ -58,59 +58,8 @@ struct ProcessInfo {
 	uint32_t system_resource_num_pages;
 };
 
-ProcessBuilder::Segment::Segment(DataReader &data, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
-	data(data), data_offset(data_offset), data_length(data_length), virt_length(virt_length), permissions(permissions) {
-}
-
-ProcessBuilder::FileDataReader::FileDataReader(FILE *f) : f(f) {
-}
-
-void ProcessBuilder::FileDataReader::Seek(size_t pos) {
-	fseek(f, pos, SEEK_SET);
-}
-
-void ProcessBuilder::FileDataReader::Read(uint8_t *target, size_t size) {
-	ssize_t r;
-	while((r = fread(target, 1, size, f)) < size) {
-		if(r > 0) {
-			target+= r;
-			size-= r;
-		} else {
-			abort();
-		}
-	}
-}
-
-size_t ProcessBuilder::FileDataReader::Tell() {
-	return ftell(f);
-}
-
-size_t ProcessBuilder::FileDataReader::TotalSize() {
-	size_t pos = ftell(f);
-	fseek(f, 0, SEEK_END);
-	size_t size = ftell(f);
-	fseek(f, pos, SEEK_SET);
-	return size;
-}
-
-ProcessBuilder::VectorDataReader::VectorDataReader(std::vector<uint8_t> vec) : vec(vec) {
-}
-
-void ProcessBuilder::VectorDataReader::Seek(size_t pos) {
-	this->pos = pos;
-}
-
-void ProcessBuilder::VectorDataReader::Read(uint8_t *target, size_t size) {
-	memcpy(target, vec.data() + pos, size);
-	pos+= size;
-}
-
-size_t ProcessBuilder::VectorDataReader::Tell() {
-	return pos;
-}
-
-size_t ProcessBuilder::VectorDataReader::TotalSize() {
-	return vec.size();
+ProcessBuilder::Segment::Segment(std::shared_ptr<fs::ProcessFile> file, size_t data_offset, size_t data_length, size_t virt_length, uint32_t permissions) :
+	file(file), data_offset(data_offset), data_length(data_length), virt_length(virt_length), permissions(permissions) {
 }
 
 ProcessBuilder::ProcessBuilder() {
@@ -125,7 +74,7 @@ trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	if((seg.virt_length & 0xFFF) != 0) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
 	}
-	if(seg.data.TotalSize() < seg.data_offset + seg.data_length) {
+	if(seg.file->GetSize() < seg.data_offset + seg.data_length) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_SEGMENT);
 	}
 	seg.load_addr = load_base + total_size;
@@ -134,16 +83,16 @@ trn::Result<uint64_t> ProcessBuilder::AppendSegment(Segment &&seg) {
 	return seg.load_addr;
 }
 
-trn::Result<uint64_t> ProcessBuilder::AppendNRO(DataReader &nro) {
-	if(nro.TotalSize() < sizeof(NroHeader)) {
+trn::Result<uint64_t> ProcessBuilder::AppendNRO(std::shared_ptr<fs::ProcessFile> nro) {
+	if(nro->GetSize() < sizeof(NroHeader)) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
 	NroHeader nro_header;
-	nro.Read((uint8_t*) &nro_header, sizeof(nro_header));
+	nro->Read(0, sizeof(nro_header), (uint8_t*) &nro_header);
 	if(nro_header.magic != 0x304f524e) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
-	if(nro.TotalSize() < nro_header.size) {
+	if(nro->GetSize() < nro_header.size) {
 		return tl::make_unexpected(TWILI_ERR_INVALID_NRO);
 	}
 	uint64_t base;
@@ -168,8 +117,7 @@ trn::Result<std::nullopt_t> ProcessBuilder::Load(std::shared_ptr<trn::KProcess> 
 		printf("Mapped at %p\n", map->Base());
 		for(auto i = segments.begin(); i != segments.end(); i++) {
 			uint8_t *target = map->Base() + (i->load_addr - this->load_base);
-			i->data.Seek(i->data_offset);
-			i->data.Read(target, i->data_length);
+			i->file->Read(i->data_offset, i->data_length, target);
 		}
 		printf("Copied segments\n");
 	} // let map go out of scope
@@ -280,5 +228,5 @@ size_t ProcessBuilder::GetTotalSize() {
 	return total_size;
 }
 
-} // namespace process_creation
+} // namespace process
 } // namespace twili

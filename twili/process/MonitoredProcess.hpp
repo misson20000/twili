@@ -31,6 +31,8 @@
 #include "../TwibPipe.hpp"
 #include "../bridge/ResponseOpener.hpp"
 
+#include "fs/ProcessFile.hpp"
+
 namespace twili {
 
 class Twili;
@@ -54,7 +56,6 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	};
 	
 	virtual void Launch(bridge::ResponseOpener response) = 0;
-	virtual void AppendCode(std::vector<uint8_t> code) = 0;
 	
 	virtual uint64_t GetPid() override;
 	virtual void AddNotes(ELFCrashReport &report) override;
@@ -65,6 +66,7 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	trn::ResultCode GetResult();
 	
 	// these shouldn't really be public
+	void AppendCode(std::shared_ptr<fs::ProcessFile> file);
 	void Attach(std::shared_ptr<trn::KProcess> process);
 	void SetResult(trn::ResultCode r);
 	virtual void ChangeState(State state);
@@ -75,7 +77,8 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
 	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
-
+	std::list<std::shared_ptr<fs::ProcessFile>> files;
+	
 	std::string argv;
 	std::string next_load_path;
 	std::string next_load_argv;

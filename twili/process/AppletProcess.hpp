@@ -41,7 +41,6 @@ class AppletProcess : public MonitoredProcess {
 	AppletProcess(Twili &twili);
 	
 	virtual void Launch(bridge::ResponseOpener) override;
-	virtual void AppendCode(std::vector<uint8_t>) override;
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
 	virtual void ChangeState(State state) override;
 	virtual void Kill() override;
@@ -55,7 +54,6 @@ class AppletProcess : public MonitoredProcess {
 
 	fs::ProcessFileSystem virtual_exefs;
  private:
-	bool has_code = false;
 	std::optional<bridge::ResponseOpener> run_opener;
 
 	std::shared_ptr<trn::WaitHandle> kill_timeout;

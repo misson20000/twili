@@ -24,6 +24,8 @@
 
 #include "../process_creation.hpp"
 
+#include "fs/ActualFile.hpp"
+
 using namespace trn;
 
 namespace twili {
@@ -44,9 +46,11 @@ static std::vector<uint32_t> caps = {
 };
 
 ManagedProcess::ManagedProcess(Twili &twili) :
-	MonitoredProcess(twili),
-	hbabi_shim_reader(twili.resources.hbabi_shim_nro) {
-	uint64_t shim_addr = ResultCode::AssertOk(builder.AppendNRO(hbabi_shim_reader));
+	MonitoredProcess(twili) {
+	uint64_t shim_addr = ResultCode::AssertOk(
+		builder.AppendNRO(
+			std::make_shared<fs::ActualFile>(
+				fopen("/squash/hbabi_shim.nro", "rb"))));
 }
 
 ManagedProcess::~ManagedProcess() {
@@ -55,6 +59,13 @@ ManagedProcess::~ManagedProcess() {
 }
 
 void ManagedProcess::Launch(bridge::ResponseOpener response) {
+	for(std::shared_ptr<fs::ProcessFile> &file : files) {
+		uint64_t base = ResultCode::AssertOk(builder.AppendNRO(file));
+		if(target_entry == 0) {
+			target_entry = base;
+		}
+	}
+	
 	std::shared_ptr<trn::KProcess> process = ResultCode::AssertOk(builder.Build("twili_child", caps));
 
 	ChangeState(State::Started);
@@ -101,15 +112,6 @@ void ManagedProcess::Launch(bridge::ResponseOpener response) {
 		auto w = response.BeginOk(sizeof(uint64_t));
 		w.Write<uint64_t>(GetPid());
 		w.Finalize();
-	}
-}
-
-void ManagedProcess::AppendCode(std::vector<uint8_t> nro) {
-	process_creation::ProcessBuilder::VectorDataReader &r =
-		readers.emplace_back(nro);
-	uint64_t base = ResultCode::AssertOk(builder.AppendNRO(r));
-	if(target_entry == 0) {
-		target_entry = base;
 	}
 }
 

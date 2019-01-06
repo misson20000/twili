@@ -62,13 +62,6 @@ class Twili {
 		trn::ipc::client::Object sm_m;
 	} services;
 
-	struct Resources {
-	 public:
-		Resources();
-		
-		std::vector<uint8_t> hbabi_shim_nro;
-	} resources;
-
 	AppletTracker applet_tracker;
 	
 	bridge::usb::USBBridge usb_bridge;

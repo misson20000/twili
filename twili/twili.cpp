@@ -164,13 +164,4 @@ Twili::Services::Services() {
 	printf("acquired services\n");
 }
 
-Twili::Resources::Resources() {
-	auto hbabi_shim_nro = util::ReadFile("/squash/hbabi_shim.nro");
-	if(!hbabi_shim_nro) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
-	}
-	this->hbabi_shim_nro = *hbabi_shim_nro;
-	printf("prepared resources\n");
-}
-
 } // namespace twili

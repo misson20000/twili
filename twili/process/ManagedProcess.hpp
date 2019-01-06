@@ -32,11 +32,8 @@ class ManagedProcess : public MonitoredProcess {
 	ManagedProcess(Twili &twili);
 	virtual ~ManagedProcess() override;
 	virtual void Launch(bridge::ResponseOpener response) override;
-	virtual void AppendCode(std::vector<uint8_t> nro) override;
  private:
-	process_creation::ProcessBuilder builder;
-	process_creation::ProcessBuilder::VectorDataReader hbabi_shim_reader;
-	std::vector<process_creation::ProcessBuilder::VectorDataReader> readers;
+	ProcessBuilder builder;
 	
 	std::shared_ptr<trn::WaitHandle> wait;
 

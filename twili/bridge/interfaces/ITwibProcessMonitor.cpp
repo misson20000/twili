@@ -70,7 +70,8 @@ void ITwibProcessMonitor::Terminate(bridge::ResponseOpener opener) {
 }
 
 void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, std::vector<uint8_t> code) {
-	process->AppendCode(code);
+	//TODO: this
+	//process->AppendCode(code);
 	opener.BeginOk().Finalize();
 }
 

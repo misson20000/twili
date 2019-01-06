@@ -41,16 +41,14 @@ AppletProcess::AppletProcess(Twili &twili) :
 	virtual_exefs.SetNpdm(std::make_shared<fs::ActualFile>(fopen("/squash/applet_host.npdm", "rb")));
 }
 
-void AppletProcess::AppendCode(std::vector<uint8_t> nro) {
-	if(has_code) {
-		throw ResultError(TWILI_ERR_ALREADY_HAS_CODE);
-	} else {
-		virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(std::make_shared<fs::VectorFile>(nro)));
-		has_code = true;
-	}
-}
-
 void AppletProcess::Launch(bridge::ResponseOpener opener) {
+	if(files.size() > 1) {
+		throw ResultError(TWILI_ERR_TOO_MANY_MODULES);
+	} else if(files.empty()) {
+		throw ResultError(TWILI_ERR_NO_MODULES);
+	}
+	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
+	
 	run_opener = opener;
 	ChangeState(State::Started);
 	
