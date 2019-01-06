@@ -30,9 +30,11 @@ DiscardingRequestHandler::DiscardingRequestHandler() {
 }
 
 void DiscardingRequestHandler::FlushReceiveBuffer(util::Buffer &input_buffer) {
+	input_buffer.MarkRead(input_buffer.ReadAvailable());
 }
 
 void DiscardingRequestHandler::Finalize(util::Buffer &input_buffer) {
+	input_buffer.MarkRead(input_buffer.ReadAvailable());
 }
 
 DiscardingRequestHandler *DiscardingRequestHandler::GetInstance() {
