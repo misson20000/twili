@@ -80,7 +80,9 @@ class SmartRequestHandler<Func> : public RequestHandler {
 			if(done) {
 				InputStream *stream = parameter_holder.GetStream();
 				if(stream) {
-					stream->expected_size = payload_size - consumed_size;
+					if(stream->expected_size != payload_size - consumed_size) {
+						throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
+					}
 				} else {
 					if(consumed_size < payload_size) {
 						// too much data

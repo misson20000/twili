@@ -112,19 +112,27 @@ struct UnpackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::
 	}
  private:
 	UnpackingHelper<T> current_helper;
-	bool has_size;
-	size_t size;
+	bool has_size = false;
+	size_t size = 0;
 };
 
 // specialization for streams
 template<>
 struct UnpackingHelper<InputStream> {
 	bool Unpack(util::Buffer &buffer, InputStream &out) {
+		if(!has_size && !buffer.Read(size)) {
+			return false;
+		}
+		has_size = true;
 		return true;
 	}
+	
 	static bool IsStream() {
 		return true;
 	}
+ private:
+	bool has_size = false;
+	size_t size = 0;
 };
 
 // specialization for POD types
@@ -147,7 +155,8 @@ struct UnpackingHolder;
 // special case for streams, since they're passed by reference
 template<typename... Args>
 struct UnpackingHolder<ArgPack<InputStream&, Args...>> {
- public:
+	static_assert(sizeof...(Args) == 0, "InputStream must be last argument");
+	
 	bool Unpack(util::Buffer &buffer) {
 		if(!has_value) {
 			if(!helper.Unpack(buffer, stream)) {
