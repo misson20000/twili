@@ -347,7 +347,7 @@ void USBBackend::Device::Identified(Response &r) {
 		return;
 	}
 	std::string err;
-	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin(), r.payload.end()), err);
+	msgpack11::MsgPack obj = msgpack11::MsgPack::parse(std::string(r.payload.begin() + 8, r.payload.end()), err);
 	identification = obj;
 	device_nickname = obj["device_nickname"].string_value();
 	serial_number = obj["serial_number"].string_value();

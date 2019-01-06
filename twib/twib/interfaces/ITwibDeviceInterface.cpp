@@ -52,8 +52,9 @@ void ITwibDeviceInterface::Terminate(uint64_t process_id) {
 
 std::vector<ProcessListEntry> ITwibDeviceInterface::ListProcesses() {
 	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::LIST_PROCESSES);
-	ProcessListEntry *first = (ProcessListEntry*) rs.payload.data();
-	return std::vector<ProcessListEntry>(first, first + (rs.payload.size() / sizeof(ProcessListEntry)));
+	uint64_t count = *(uint64_t*) rs.payload.data();
+	ProcessListEntry *first = (ProcessListEntry*) (rs.payload.data() + 8);
+	return std::vector<ProcessListEntry>(first, first + count);
 }
 
 msgpack11::MsgPack ITwibDeviceInterface::Identify() {
@@ -89,7 +90,7 @@ ITwibPipeReader ITwibDeviceInterface::OpenNamedPipe(std::string name) {
 msgpack11::MsgPack ITwibDeviceInterface::GetMemoryInfo() {
 	Response rs = obj->SendSyncRequest(protocol::ITwibDeviceInterface::Command::GET_MEMORY_INFO);
 	std::string err;
-	return msgpack11::MsgPack::parse(std::string(rs.payload.begin(), rs.payload.end()), err);
+	return msgpack11::MsgPack::parse(std::string(rs.payload.begin() + 8, rs.payload.end()), err);
 }
 
 void ITwibDeviceInterface::PrintDebugInfo() {
