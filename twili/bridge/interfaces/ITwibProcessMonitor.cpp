@@ -24,6 +24,7 @@
 
 #include "../../twili.hpp"
 #include "../../process/MonitoredProcess.hpp"
+#include "../../process/fs/ActualFile.hpp"
 
 #include "ITwibPipeReader.hpp"
 #include "ITwibPipeWriter.hpp"
@@ -69,10 +70,31 @@ void ITwibProcessMonitor::Terminate(bridge::ResponseOpener opener) {
 	opener.BeginOk().Finalize();
 }
 
-void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, std::vector<uint8_t> code) {
-	//TODO: this
-	//process->AppendCode(code);
-	opener.BeginOk().Finalize();
+void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, InputStream &code) {
+	std::string path;
+	FILE *file = process->twili.file_manager.CreateFile(".nro", path, process->argv);
+	printf("streaming into %s...\n", process->argv.c_str());
+	
+	code.receive =
+		[file, opener](util::Buffer &buffer) {
+			printf("nro stream writes 0x%lx bytes to file on sd card\n", buffer.ReadAvailable());
+			size_t ret = fwrite(buffer.Read(), 1, buffer.ReadAvailable(), file);
+			if(ret != buffer.ReadAvailable()) {
+				opener.RespondError(TWILI_ERR_IO_ERROR);
+			} else {
+				printf("  success! flushing...\n");
+				fflush(file);
+				buffer.MarkRead(ret);
+			}
+		};
+
+	code.finish =
+		[this, file, path, opener](util::Buffer &buffer) {
+			printf("nro stream finished\n");
+			fclose(file);
+			process->AppendCode(std::make_shared<process::fs::ActualFile>(path.c_str()));
+			opener.RespondOk();
+		};
 }
 
 void ITwibProcessMonitor::OpenStdin(bridge::ResponseOpener opener) {

@@ -47,7 +47,7 @@ class ITwibProcessMonitor : public bridge::Object, public process::ProcessMonito
  private:
 	void Launch(bridge::ResponseOpener opener);
 	void Terminate(bridge::ResponseOpener opener);
-	void AppendCode(bridge::ResponseOpener opener, std::vector<uint8_t> code);
+	void AppendCode(bridge::ResponseOpener opener, InputStream &code);
 	
 	void OpenStdin(bridge::ResponseOpener opener);
 	void OpenStdout(bridge::ResponseOpener opener);

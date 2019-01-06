@@ -35,6 +35,8 @@
 #include "ipcbind/ldr/IDebugMonitorInterface.hpp"
 #include "ipcbind/nifm/IGeneralService.hpp"
 
+#include "FileManager.hpp"
+
 namespace twili {
 
 class Twili {
@@ -62,6 +64,7 @@ class Twili {
 		trn::ipc::client::Object sm_m;
 	} services;
 
+	FileManager file_manager;
 	AppletTracker applet_tracker;
 	
 	bridge::usb::USBBridge usb_bridge;
