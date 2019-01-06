@@ -120,7 +120,7 @@ struct UnpackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::
 template<>
 struct UnpackingHelper<InputStream> {
 	bool Unpack(util::Buffer &buffer, InputStream &out) {
-		if(!has_size && !buffer.Read(size)) {
+		if(!has_size && !buffer.Read(out.expected_size)) {
 			return false;
 		}
 		has_size = true;
@@ -132,7 +132,6 @@ struct UnpackingHelper<InputStream> {
 	}
  private:
 	bool has_size = false;
-	size_t size = 0;
 };
 
 // specialization for POD types
