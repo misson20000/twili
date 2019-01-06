@@ -217,7 +217,7 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 	ResponseOpener opener(current_state);
 	auto i = bridge->objects.find(current_header.object_id);
 	if(i == bridge->objects.end()) {
-		opener.BeginError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT).Finalize();
+		opener.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT);
 		return;
 	}
 	
@@ -238,7 +238,7 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 			// delete it
 			bridge->objects.erase(current_header.object_id);
 		}
-		opener.BeginOk().Finalize();
+		opener.RespondOk();
 		return;
 	}
 	
