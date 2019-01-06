@@ -34,8 +34,7 @@ AppletTracker::AppletTracker(Twili &twili) :
 	process_queued_wevent(process_queued_event),
 	monitor(*this) {
 	printf("building AppletTracker\n");
-	hbmenu_transmute = process::fs::NRONSOTransmutationFile::Create(
-		std::make_shared<process::fs::ActualFile>("/sd/hbmenu.nro"));
+	hbmenu_nro = std::make_shared<process::fs::ActualFile>("/sd/hbmenu.nro");
 }
 
 bool AppletTracker::HasControlProcess() {
@@ -123,8 +122,8 @@ void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process)
 std::shared_ptr<process::AppletProcess> AppletTracker::CreateHbmenu() {
 	std::shared_ptr<process::AppletProcess> proc = std::make_shared<process::AppletProcess>(twili);
 	// note: we skip over the Started state through this non-standard launch procedure
-
-	proc->virtual_exefs.SetMain(hbmenu_transmute);
+	proc->AppendCode(hbmenu_nro);
+	proc->argv = "sdmc:/hbmenu.nro";
 	return proc;
 }
 
@@ -143,12 +142,9 @@ void AppletTracker::HBLLoad(std::string path, std::string argv) {
 		printf("  failed to open\n");
 		return;
 	}
-
-	std::shared_ptr<process::fs::ProcessFile> transmute = process::fs::NRONSOTransmutationFile::Create(
-		std::make_shared<process::fs::ActualFile>(file));
 	
 	std::shared_ptr<process::AppletProcess> next_proc = std::make_shared<process::AppletProcess>(twili);
-	next_proc->virtual_exefs.SetMain(transmute);
+	next_proc->AppendCode(std::make_shared<process::fs::ActualFile>(file));
 	next_proc->argv = argv;
 	
 	printf("prepared hbl next load process. queueing...\n");

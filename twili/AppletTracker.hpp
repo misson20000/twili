@@ -69,7 +69,7 @@ class AppletTracker {
 	trn::KWEvent process_queued_wevent;
 
 	std::shared_ptr<process::AppletProcess> CreateHbmenu();
-	std::shared_ptr<process::fs::NSOTransmutationFile> hbmenu_transmute;
+	std::shared_ptr<process::fs::ProcessFile> hbmenu_nro;
 	std::shared_ptr<process::AppletProcess> hbmenu;
 
 	class Monitor : public process::ProcessMonitor {

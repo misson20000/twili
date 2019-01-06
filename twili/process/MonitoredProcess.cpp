@@ -89,6 +89,10 @@ trn::ResultCode MonitoredProcess::GetResult() {
 	return result;
 }
 
+void MonitoredProcess::AppendCode(std::shared_ptr<fs::ProcessFile> file) {
+	files.push_back(file);
+}
+
 void MonitoredProcess::Attach(std::shared_ptr<trn::KProcess> process) {
 	if(proc) {
 		throw trn::ResultError(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
