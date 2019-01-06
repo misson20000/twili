@@ -243,7 +243,8 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 	}
 	
 	try {
-		current_handler = i->second->OpenRequest(current_header.command_id, current_header.payload_size, opener);
+		current_object = i->second;
+		current_handler = current_object->OpenRequest(current_header.command_id, current_header.payload_size, opener);
 	} catch(trn::ResultError &e) {
 		if(!current_state->has_begun) {
 			opener.RespondError(e.code);
@@ -262,7 +263,7 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 
 void USBBridge::RequestReader::FinalizeCommand() {
 	try {
-		current_handler->Finalize(payload_buffer);
+		current_object->FinalizeCommand(payload_buffer);
 		ResetHandler();
 	} catch(ResultError &e) {
 		if(!current_state->has_begun) {
@@ -276,6 +277,7 @@ void USBBridge::RequestReader::FinalizeCommand() {
 }
 
 void USBBridge::RequestReader::ResetHandler() {
+	current_object.reset();
 	current_handler = DiscardingRequestHandler::GetInstance();
 }
 

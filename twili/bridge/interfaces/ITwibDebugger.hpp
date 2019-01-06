@@ -25,6 +25,7 @@
 
 #include "../Object.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 
 namespace twili {
 
@@ -32,13 +33,12 @@ class Twili;
 
 namespace bridge {
 
-class ITwibDebugger : public bridge::Object {
+class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
  public:
 	ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug);
 
 	using CommandID = protocol::ITwibDebugger::Command;
 	
-	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	Twili &twili;
 	trn::KDebug debug;
@@ -56,6 +56,7 @@ class ITwibDebugger : public bridge::Object {
 	void GetNsoInfos(bridge::ResponseOpener opener);
 	void WaitEvent(bridge::ResponseOpener opener);
 
+ public:
 	SmartRequestDispatcher<
 		ITwibDebugger,
 		SmartCommand<CommandID::QUERY_MEMORY, &ITwibDebugger::QueryMemory>,

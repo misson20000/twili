@@ -120,7 +120,7 @@ void TCPBridge::Connection::Synchronized() {
 		break;
 	case Task::FinalizeCommand:
 		try {
-			current_handler->Finalize(payload_buffer);
+			current_object->FinalizeCommand(payload_buffer);
 			ResetHandler();
 		} catch(trn::ResultError &e) {
 			if(!current_state->has_begun) {
@@ -162,7 +162,8 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 	}
 
 	try {
-		current_handler = i->second->OpenRequest(current_mh.command_id, current_mh.payload_size, opener);
+		current_object = i->second;
+		current_handler = current_object->OpenRequest(current_mh.command_id, current_mh.payload_size, opener);
 	} catch(trn::ResultError &e) {
 		if(!current_state->has_begun) {
 			opener.RespondError(e.code);
@@ -173,6 +174,7 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 }
 
 void TCPBridge::Connection::ResetHandler() {
+	current_object.reset();
 	current_handler = DiscardingRequestHandler::GetInstance();
 }
 

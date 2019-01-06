@@ -50,11 +50,7 @@ using namespace trn;
 namespace twili {
 namespace bridge {
 
-ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : Object(device_id), twili(twili), dispatcher(*this) {
-}
-
-RequestHandler *ITwibDeviceInterface::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
-	return dispatcher.SmartDispatch(command_id, payload_size, opener);
+ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : ObjectDispatcherProxy(*this, device_id), twili(twili), dispatcher(*this) {
 }
 
 void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener, std::string type) {

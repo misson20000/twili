@@ -24,23 +24,24 @@
 
 #include "../Object.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 #include "../../TwibPipe.hpp"
 
 namespace twili {
 namespace bridge {
 
-class ITwibPipeReader : public bridge::Object {
+class ITwibPipeReader : public ObjectDispatcherProxy<ITwibPipeReader> {
  public:
 	ITwibPipeReader(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
 
 	using CommandID = protocol::ITwibPipeReader::Command;
 	
-	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	std::weak_ptr<TwibPipe> pipe;
 
 	void Read(bridge::ResponseOpener opener);
 
+ public:
 	SmartRequestDispatcher<
 		ITwibPipeReader,
 		SmartCommand<CommandID::READ, &ITwibPipeReader::Read>

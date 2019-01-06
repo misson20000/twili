@@ -36,15 +36,11 @@ using namespace trn;
 namespace twili {
 namespace bridge {
 
-ITwibProcessMonitor::ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process) : Object(object_id), process::ProcessMonitor(process), dispatcher(*this) {
+ITwibProcessMonitor::ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process) : ObjectDispatcherProxy(*this, object_id), process::ProcessMonitor(process), dispatcher(*this) {
 }
 
 ITwibProcessMonitor::~ITwibProcessMonitor() {
 	process->Kill(); // attempt to exit cleanly
-}
-
-RequestHandler *ITwibProcessMonitor::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
-	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
 void ITwibProcessMonitor::StateChanged(process::MonitoredProcess::State new_state) {

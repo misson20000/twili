@@ -24,24 +24,25 @@
 
 #include "../Object.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 #include "../../TwibPipe.hpp"
 
 namespace twili {
 namespace bridge {
 
-class ITwibPipeWriter : public bridge::Object {
+class ITwibPipeWriter : public ObjectDispatcherProxy<ITwibPipeWriter> {
  public:
 	ITwibPipeWriter(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
 
 	using CommandID = protocol::ITwibPipeWriter::Command;
 	
-	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	std::weak_ptr<TwibPipe> pipe;
 
 	void Write(bridge::ResponseOpener opener, InputStream &stream);
 	void Close(bridge::ResponseOpener opener);
 
+ public:
 	SmartRequestDispatcher<
 		ITwibPipeWriter,
 		SmartCommand<CommandID::WRITE, &ITwibPipeWriter::Write>,

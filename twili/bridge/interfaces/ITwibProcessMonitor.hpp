@@ -25,6 +25,7 @@
 
 #include "../Object.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 #include "../../process/ProcessMonitor.hpp"
 #include "../../process/MonitoredProcess.hpp"
 
@@ -34,14 +35,12 @@ class Twili;
 
 namespace bridge {
 
-class ITwibProcessMonitor : public bridge::Object, public process::ProcessMonitor {
+class ITwibProcessMonitor : public ObjectDispatcherProxy<ITwibProcessMonitor>, public process::ProcessMonitor {
  public:
 	ITwibProcessMonitor(uint32_t object_id, std::shared_ptr<process::MonitoredProcess> process);
 	virtual ~ITwibProcessMonitor() override;
 
 	using CommandID = protocol::ITwibProcessMonitor::Command;
-	
-	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
 
 	virtual void StateChanged(process::MonitoredProcess::State new_state) override;
  private:
@@ -54,20 +53,21 @@ class ITwibProcessMonitor : public bridge::Object, public process::ProcessMonito
 	void OpenStderr(bridge::ResponseOpener opener);
 
 	void WaitStateChange(bridge::ResponseOpener opener);
-
-	SmartRequestDispatcher<
-		ITwibProcessMonitor,
-		SmartCommand<CommandID::LAUNCH, &ITwibProcessMonitor::Launch>,
-		SmartCommand<CommandID::TERMINATE, &ITwibProcessMonitor::Terminate>,
-		SmartCommand<CommandID::APPEND_CODE, &ITwibProcessMonitor::AppendCode>,
-		SmartCommand<CommandID::OPEN_STDIN, &ITwibProcessMonitor::OpenStdin>,
-		SmartCommand<CommandID::OPEN_STDOUT, &ITwibProcessMonitor::OpenStdout>,
-		SmartCommand<CommandID::OPEN_STDERR, &ITwibProcessMonitor::OpenStderr>,
-		SmartCommand<CommandID::WAIT_STATE_CHANGE, &ITwibProcessMonitor::WaitStateChange>
-		> dispatcher;
 	
 	std::deque<process::MonitoredProcess::State> state_changes;
 	std::optional<bridge::ResponseOpener> state_observer;
+
+ public:
+	SmartRequestDispatcher<
+	 ITwibProcessMonitor,
+	 SmartCommand<CommandID::LAUNCH, &ITwibProcessMonitor::Launch>,
+	 SmartCommand<CommandID::TERMINATE, &ITwibProcessMonitor::Terminate>,
+	 SmartCommand<CommandID::APPEND_CODE, &ITwibProcessMonitor::AppendCode>,
+	 SmartCommand<CommandID::OPEN_STDIN, &ITwibProcessMonitor::OpenStdin>,
+	 SmartCommand<CommandID::OPEN_STDOUT, &ITwibProcessMonitor::OpenStdout>,
+	 SmartCommand<CommandID::OPEN_STDERR, &ITwibProcessMonitor::OpenStderr>,
+	 SmartCommand<CommandID::WAIT_STATE_CHANGE, &ITwibProcessMonitor::WaitStateChange>
+	 > dispatcher;
 };
 
 } // namespace bridge

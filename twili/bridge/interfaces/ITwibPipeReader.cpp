@@ -28,11 +28,7 @@ using trn::ResultError;
 namespace twili {
 namespace bridge {
 
-ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : Object(device_id), pipe(pipe), dispatcher(*this) {
-}
-
-RequestHandler *ITwibPipeReader::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
-	return dispatcher.SmartDispatch(command_id, payload_size, opener);
+ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : ObjectDispatcherProxy(*this, device_id), pipe(pipe), dispatcher(*this) {
 }
 
 void ITwibPipeReader::Read(bridge::ResponseOpener opener) {

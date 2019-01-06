@@ -30,12 +30,8 @@ using namespace trn;
 namespace twili {
 namespace bridge {
 
-ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug) : bridge::Object(object_id), twili(twili), debug(std::move(debug)), dispatcher(*this) {
+ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug) : ObjectDispatcherProxy(*this, object_id), twili(twili), debug(std::move(debug)), dispatcher(*this) {
 	
-}
-
-RequestHandler *ITwibDebugger::OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
-	return dispatcher.SmartDispatch(command_id, payload_size, opener);
 }
 
 void ITwibDebugger::QueryMemory(bridge::ResponseOpener opener, uint64_t addr) {

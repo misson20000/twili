@@ -29,6 +29,7 @@
 #include "Packing.hpp"
 
 #include "ResponseOpener.hpp"
+#include "Object.hpp"
 
 namespace twili {
 namespace bridge {
@@ -131,29 +132,40 @@ struct SmartCommand<cmd_id, Func> {
 	static constexpr typename T::CommandID cmd_id_value = cmd_id;
 	static constexpr void (T::*func_value)(Args...) = Func;
 
-	RequestHandler *Dispatch(T &object, size_t payload_size, bridge::ResponseOpener opener) {
-		handler.emplace(object, payload_size, opener);
-		return &handler.value();
+	SmartCommand(T &object, size_t payload_size, ResponseOpener opener) : handler(object, payload_size, opener) {
+	}
+	
+	RequestHandler *Dispatch() {
+		return &handler;
 	}
 
-	std::optional<SmartRequestHandler<Func>> handler;
+	SmartRequestHandler<Func> handler;
 };
 
-template<typename T, typename... Commands>
+template<typename T, typename... Commands> 
 struct SmartRequestDispatcher {
 	SmartRequestDispatcher(T &object) : object(object) {
 	}
 	
-	RequestHandler *SmartDispatch(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
+	RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) {
 		return SmartDispatchImpl((typename T::CommandID) command_id, payload_size, opener, std::index_sequence_for<Commands...>());
 	}
+
+	void FinalizeCommand(util::Buffer &buffer) {
+		if(handler) {
+			handler->Finalize(buffer);
+			handler = nullptr;
+		}
+		commands.template emplace<0>(); // clear handler
+	}
+
  private:
 	template<std::size_t... I>
 	RequestHandler *SmartDispatchImpl(typename T::CommandID command_id, size_t payload_size, bridge::ResponseOpener opener, std::index_sequence<I...>) {
 		bool has_matched = false;
-		RequestHandler *handler = DiscardingRequestHandler::GetInstance();
+		handler = DiscardingRequestHandler::GetInstance();
 		std::initializer_list<int>({(command_id == Commands::cmd_id_value ? (
-						handler = std::get<I>(commands).Dispatch(object, payload_size, opener),
+						handler = commands.template emplace<I+1>(object, payload_size, opener).Dispatch(),
 						has_matched = true,
 						0) : 0)...});
 		if(!has_matched) {
@@ -162,7 +174,26 @@ struct SmartRequestDispatcher {
 		return handler;
 	}
 	T &object;
-	std::tuple<Commands...> commands;
+	std::variant<std::monostate, Commands...> commands;
+	RequestHandler *handler;
+};
+
+// used to avoid having to put the giant SmartRequestDispatcher type
+// in the inheritance at the top of the class.
+template<typename T>
+class ObjectDispatcherProxy : public Object {
+ public:
+	ObjectDispatcherProxy(T &self, uint32_t object_id) : Object(object_id), self(self) {
+	}
+	
+	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override {
+		return self.dispatcher.OpenRequest(command_id, payload_size, opener);
+	}
+	virtual void FinalizeCommand(util::Buffer &buffer) override {
+		self.dispatcher.FinalizeCommand(buffer);
+	}
+ private:
+	T &self;
 };
 
 } // namespace bridge

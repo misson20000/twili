@@ -28,5 +28,8 @@ namespace bridge {
 Object::Object(uint32_t object_id) : object_id(object_id) {
 }
 
+Object::~Object() {
+}
+
 } // namespace bridge
 } // namespace twili

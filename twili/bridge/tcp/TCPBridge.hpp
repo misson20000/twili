@@ -134,6 +134,7 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 	util::Buffer current_object_ids;
 
 	std::shared_ptr<detail::ResponseState> current_state;
+	std::shared_ptr<Object> current_object;
 	RequestHandler *current_handler = DiscardingRequestHandler::GetInstance();
 	
 	uint32_t next_object_id = 1;

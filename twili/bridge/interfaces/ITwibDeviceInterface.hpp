@@ -22,6 +22,7 @@
 
 #include "../Object.hpp"
 #include "../ResponseOpener.hpp"
+#include "../RequestHandler.hpp"
 
 namespace twili {
 
@@ -29,13 +30,12 @@ class Twili;
 
 namespace bridge {
 
-class ITwibDeviceInterface : public bridge::Object {
+class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> {
  public:
 	ITwibDeviceInterface(uint32_t object_id, Twili &twili);
 
 	using CommandID = protocol::ITwibDeviceInterface::Command;
 	
-	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override;
  private:
 	Twili &twili;
 	
@@ -52,6 +52,7 @@ class ITwibDeviceInterface : public bridge::Object {
 	void GetMemoryInfo(bridge::ResponseOpener opener);
 	void PrintDebugInfo(bridge::ResponseOpener opener);
 
+ public:
 	SmartRequestDispatcher<
 		ITwibDeviceInterface,
 		SmartCommand<CommandID::CREATE_MONITORED_PROCESS, &ITwibDeviceInterface::CreateMonitoredProcess>,
