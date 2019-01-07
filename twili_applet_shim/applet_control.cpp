@@ -97,7 +97,6 @@ class ControlledApplet {
 	
 	void Start() {
 		ResultCode::AssertOk(ilaa.SendSyncRequest<10>()); // Start
-		ResultCode::AssertOk(ilaa.SendSyncRequest<150>()); // RequestForAppletToGetForeground
 	}
 
 	void SetResult() {
