@@ -62,6 +62,7 @@ class AppletProcess : public MonitoredProcess {
 	trn::KEvent command_event;
 	trn::KWEvent command_wevent;
 	std::deque<uint32_t> commands;
+	bool ecs_pending = false;
 };
 
 } // namespace process

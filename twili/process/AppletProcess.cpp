@@ -76,11 +76,16 @@ void AppletProcess::ChangeState(State state) {
 			printf("CODE REGION COUNT MISMATCH (expected 2, counted %d)\n", coderegions_found);
 		}
 	}
-	if(state == State::Exited && run_opener) {
-		run_opener->BeginError(GetResult()).Finalize();
-		run_opener.reset();
-	}
 	if(state == State::Exited) {
+		if(run_opener) {
+			run_opener->BeginError(GetResult()).Finalize();
+			run_opener.reset();
+		}
+		if(ecs_pending) {
+			ResultCode::AssertOk(
+				twili.services.ldr_shel.SendSyncRequest<65001>( // ClearExternalContentSource
+					trn::ipc::InRaw<uint64_t>(applet_shim::TitleId)));
+		}
 		kill_timeout.reset();
 	}
 }
@@ -137,6 +142,8 @@ void AppletProcess::PrepareForLaunch() {
 			trn::ipc::InRaw<uint64_t>(applet_shim::TitleId),
 			trn::ipc::OutHandle<KObject, trn::ipc::move>(session)));
 	printf("installed ExternalContentSource\n");
+	ecs_pending = true;
+	
 	ResultCode::AssertOk(
 		twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
 }
