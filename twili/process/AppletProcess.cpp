@@ -52,6 +52,8 @@ void AppletProcess::Launch(bridge::ResponseOpener opener) {
 void AppletProcess::ChangeState(State state) {
 	MonitoredProcess::ChangeState(state);
 	if(state == State::Attached) {
+		ecs_pending = false;
+		
 		if(run_opener) {
 			auto w = run_opener->BeginOk(sizeof(uint64_t));
 			w.Write<uint64_t>(GetPid());
