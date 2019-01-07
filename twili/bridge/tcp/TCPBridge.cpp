@@ -110,8 +110,11 @@ void TCPBridge::SocketThread() {
 				
 				// wait for network to come back up
 				printf("waiting for network to come up\n");
-				while(network_state != service::nifm::IRequest::State::Connected) {
+				while(network_state != service::nifm::IRequest::State::Connected && !thread_destroy) {
 					trn_condvar_wait(&network_state_condvar, &network_state_mutex, -1);
+				}
+				if(thread_destroy) {
+					break;
 				}
 				printf("network is up\n");
 
@@ -253,6 +256,7 @@ TCPBridge::~TCPBridge() {
 	printf("destroying TCPBridge\n");
 	thread_destroy = true;
 	server_socket.Close();
+	trn_condvar_signal(&network_state_condvar, -1);
 	printf("waiting for socket thread to die\n");
 	trn_thread_join(&thread, -1);
 	printf("socket thread joined\n");

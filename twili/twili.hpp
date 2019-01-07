@@ -44,12 +44,16 @@ class Twili {
 	Twili();
 
 	bool destroy_flag = false;
+	bool relaunch_flag = false;
 	trn::Waiter event_waiter;
 	trn::ipc::server::IPCServer server;
 
 	struct ServiceRegistration {
 	 public:
 		ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory);
+		~ServiceRegistration();
+	 private:
+		std::string name;
 	} twili_registration;
 	
 	struct Services {

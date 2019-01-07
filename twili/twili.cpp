@@ -132,8 +132,14 @@ std::shared_ptr<process::Process> Twili::FindProcess(uint64_t pid) {
 	return proc;
 }
 
-Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory) {
+Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory) : name(name) {
 	ResultCode::AssertOk(server.CreateService(name.c_str(), factory));
+}
+
+Twili::ServiceRegistration::~ServiceRegistration() {
+	ResultCode::AssertOk(sm_init());
+	ResultCode::AssertOk(sm_unregister_service(name.c_str()));
+	sm_finalize();
 }
 
 Twili::Services::Services() {
