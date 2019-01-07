@@ -68,6 +68,10 @@ class ControlledApplet {
 						printf("requesting exit\n");
 						ResultCode::AssertOk(ilaa.SendSyncRequest<20>()); // RequestExit
 						break;
+					case 1: // REQUEST_FOREGROUND
+						printf("requesting foreground\n");
+						ResultCode::AssertOk(ilaa.SendSyncRequest<150>()); // RequestForAppletToGetForeground
+						break;
 					default:
 						// TODO: fatal
 						break;
