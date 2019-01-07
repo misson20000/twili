@@ -59,6 +59,8 @@ void AppletTracker::ReleaseControlProcess() {
 	for(std::shared_ptr<process::AppletProcess> process : created) {
 		process->ChangeState(process::MonitoredProcess::State::Exited);
 	}
+	hbmenu->Terminate();
+	hbmenu->ChangeState(process::MonitoredProcess::State::Exited);
 	created.clear();
 }
 
