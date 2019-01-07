@@ -35,7 +35,9 @@ class Object {
 	// RequestHandler should have lifetime equal to or longer than that of its owning Object,
 	// or until OpenRequest is called again.
 	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, ResponseOpener opener) = 0;
-	virtual void FinalizeCommand(util::Buffer &buffer) = 0;
+
+	// Called when command processing is over for any reason and state should be cleaned up.
+	virtual void FinalizeCommand() = 0;
 	
 	const uint32_t object_id;
 };

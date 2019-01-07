@@ -80,6 +80,7 @@ class USBBridge {
 
 		void BeginProcessingCommand();
 		void FinalizeCommand();
+		void CleanupCommand();
 		
 		protocol::MessageHeader current_header;
 		size_t payload_size;

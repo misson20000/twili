@@ -123,6 +123,7 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 	void Synchronize(Task task);
 	
 	void BeginProcessingCommandImpl(); // should run on main thread
+	void CleanupCommand(); // should run on main thread
 	
 	util::Buffer in_buffer;
 

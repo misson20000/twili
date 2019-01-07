@@ -109,26 +109,26 @@ void TCPBridge::Connection::Synchronized() {
 		try {
 			current_handler->FlushReceiveBuffer(payload_buffer);
 		} catch(trn::ResultError &e) {
-			if(!current_state->has_begun) {
+			if(current_state && !current_state->has_begun) {
 				ResponseOpener opener(current_state);
 				opener.RespondError(e.code);
 			} else {
 				printf("TCPConnection: dropped error during FlushReceiveBuffer: 0x%x\n", e.code.code);
-				ResetHandler();
+				CleanupCommand();
 			}
 		}
 		break;
 	case Task::FinalizeCommand:
 		try {
-			current_object->FinalizeCommand(payload_buffer);
-			ResetHandler();
+			current_handler->Finalize(payload_buffer);
+			CleanupCommand();
 		} catch(trn::ResultError &e) {
-			if(!current_state->has_begun) {
+			if(current_state && !current_state->has_begun) {
 				ResponseOpener opener(current_state);
 				opener.RespondError(e.code);
 			} else {
 				printf("TCPConnection: dropped error during Finalize: 0x%x\n", e.code.code);
-				ResetHandler();
+				CleanupCommand();
 			}
 		}
 		break;
@@ -165,7 +165,7 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 		current_object = i->second;
 		current_handler = current_object->OpenRequest(current_mh.command_id, current_mh.payload_size, opener);
 	} catch(trn::ResultError &e) {
-		if(!current_state->has_begun) {
+		if(current_state && !current_state->has_begun) {
 			opener.RespondError(e.code);
 		} else {
 			throw e;
@@ -173,8 +173,16 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 	}
 }
 
+void TCPBridge::Connection::CleanupCommand() {
+	if(current_object) {
+		current_object->FinalizeCommand();
+		current_object.reset();
+	}
+	ResetHandler();
+}
+
 void TCPBridge::Connection::ResetHandler() {
-	current_object.reset();
+	current_state.reset();
 	current_handler = DiscardingRequestHandler::GetInstance();
 }
 

@@ -191,7 +191,7 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 			opener.RespondError(e.code);
 		} else {
 			printf("USBRequestReader: dropped error during FlushReceiveBuffer: 0x%x\n", e.code.code);
-			ResetHandler();
+			CleanupCommand();
 		}
 	} catch(std::bad_alloc &e) {
 		if(!current_state->has_begun) {
@@ -199,7 +199,7 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 			opener.RespondError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 		} else {
 			printf("USBRequestReader: dropped std::bad_alloc during FlushReceiveBuffer\n");
-			ResetHandler();
+			CleanupCommand();
 		}
 	}
 	
@@ -246,13 +246,13 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 		current_object = i->second;
 		current_handler = current_object->OpenRequest(current_header.command_id, current_header.payload_size, opener);
 	} catch(trn::ResultError &e) {
-		if(!current_state->has_begun) {
+		if(current_state && !current_state->has_begun) {
 			opener.RespondError(e.code);
 		} else {
 			throw e;
 		}
 	} catch(std::bad_alloc &e) {
-		if(!current_state->has_begun) {
+		if(current_state && !current_state->has_begun) {
 			printf("out of memory!\n");
 			opener.RespondError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 		} else {
@@ -263,10 +263,10 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 
 void USBBridge::RequestReader::FinalizeCommand() {
 	try {
-		current_object->FinalizeCommand(payload_buffer);
-		ResetHandler();
+		current_handler->Finalize(payload_buffer);
+		CleanupCommand();
 	} catch(ResultError &e) {
-		if(!current_state->has_begun) {
+		if(current_state && !current_state->has_begun) {
 			ResponseOpener opener(current_state);
 			opener.RespondError(e.code);
 		} else {
@@ -276,8 +276,16 @@ void USBBridge::RequestReader::FinalizeCommand() {
 	}
 }
 
+void USBBridge::RequestReader::CleanupCommand() {
+	if(current_object) {
+		current_object->FinalizeCommand();
+		current_object.reset();
+	}
+	ResetHandler();
+}
+
 void USBBridge::RequestReader::ResetHandler() {
-	current_object.reset();
+	current_state.reset();
 	current_handler = DiscardingRequestHandler::GetInstance();
 }
 

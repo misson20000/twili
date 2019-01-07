@@ -151,11 +151,8 @@ struct SmartRequestDispatcher {
 		return SmartDispatchImpl((typename T::CommandID) command_id, payload_size, opener, std::index_sequence_for<Commands...>());
 	}
 
-	void FinalizeCommand(util::Buffer &buffer) {
-		if(handler) {
-			handler->Finalize(buffer);
-			handler = nullptr;
-		}
+	void FinalizeCommand() {
+		handler = nullptr;
 		commands.template emplace<0>(); // clear handler
 	}
 
@@ -174,6 +171,8 @@ struct SmartRequestDispatcher {
 		return handler;
 	}
 	T &object;
+	
+	// variant used for managing lifetime
 	std::variant<std::monostate, Commands...> commands;
 	RequestHandler *handler;
 };
@@ -189,8 +188,8 @@ class ObjectDispatcherProxy : public Object {
 	virtual RequestHandler *OpenRequest(uint32_t command_id, size_t payload_size, bridge::ResponseOpener opener) override {
 		return self.dispatcher.OpenRequest(command_id, payload_size, opener);
 	}
-	virtual void FinalizeCommand(util::Buffer &buffer) override {
-		self.dispatcher.FinalizeCommand(buffer);
+	virtual void FinalizeCommand() override {
+		self.dispatcher.FinalizeCommand();
 	}
  private:
 	T &self;
