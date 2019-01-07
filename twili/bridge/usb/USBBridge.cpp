@@ -72,7 +72,7 @@ static usb_interface_descriptor_t interface_descriptor = {
 using trn::ResultCode;
 using trn::ResultError;
 
-static const size_t TRANSFER_BUFFER_SIZE = 0x8000;
+static const size_t TRANSFER_BUFFER_SIZE = 64 * 1024; // 64 KiB
 
 USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),

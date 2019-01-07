@@ -73,12 +73,10 @@ void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, InputStream 
 	
 	code.receive =
 		[file, opener](util::Buffer &buffer) {
-			printf("nro stream writes 0x%lx bytes to file on sd card\n", buffer.ReadAvailable());
 			size_t ret = fwrite(buffer.Read(), 1, buffer.ReadAvailable(), file);
 			if(ret != buffer.ReadAvailable()) {
 				opener.RespondError(TWILI_ERR_IO_ERROR);
 			} else {
-				printf("  success! flushing...\n");
 				fflush(file);
 				buffer.MarkRead(ret);
 			}
