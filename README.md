@@ -70,7 +70,6 @@ These are temporary and are planned to be addressed.
 
 - Applets cannot be launched without an active control applet (hbmenu open).
 - Applets are library applets, not applications (this means they're limited to using memory in the APPLET pool).
-- ASET RomFS doesn't work [pending on a new HBABI key](https://switchbrew.org/wiki/Talk:Homebrew_ABI#RomFS_Override).
 
 ## Application Development
 
@@ -82,7 +81,7 @@ If you're developing a sysmodule, you can use `twib run` without `-a` to run it 
 
 # Installation
 
-Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère (v0.7.4+). Running Twili on piracy firmware will make me cry, so don't do it. :cry:
+Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère. As of writing, Twili depends on a feature not yet in the latest version of Atmosphère. Running Twili on piracy firmware will make me cry, so don't do it. :cry:
 
 You will also need to install the workstation-side tools, `twib` and `twibd`.
 
