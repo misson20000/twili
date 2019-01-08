@@ -25,20 +25,32 @@
 
 #include<sstream>
 
+#include "twili.hpp"
+
 namespace twili {
 
-FileManager::FileManager() {
+FileManager::FileManager(Twili &twili) {
 	trn_dir_t dir;
 	result_t r;
 
-	printf("opening %s\n", temp_location);
-	r = trn_fs_opendir(&dir, temp_location);
+	std::ostringstream path_stream;
+	path_stream << "/sd";
+	path_stream << twili.config.temp_directory;
+	temp_location = path_stream.str();
+
+	std::ostringstream hbabi_path_stream;
+	hbabi_path_stream << "sdmc:";
+	hbabi_path_stream << twili.config.temp_directory;
+	temp_hbabi_location = hbabi_path_stream.str();
+	
+	printf("opening %s\n", temp_location.c_str());
+	r = trn_fs_opendir(&dir, temp_location.c_str());
 	if(r != RESULT_OK) {
 		if(r == FSPSRV_ERR_NOT_FOUND) {
 			printf("  not found, making...\n");
-			trn::ResultCode::AssertOk(trn_fs_mkdir(temp_location));
+			trn::ResultCode::AssertOk(trn_fs_mkdir(temp_location.c_str()));
 			printf("  opening again...\n");
-			trn::ResultCode::AssertOk(trn_fs_opendir(&dir, temp_location));
+			trn::ResultCode::AssertOk(trn_fs_opendir(&dir, temp_location.c_str()));
 		} else {
 			printf("  failed: 0x%x\n", r);
 			trn::ResultCode::AssertOk(r);
@@ -52,7 +64,7 @@ FileManager::FileManager() {
 	trn_dirent_t dirent;
 	while((r = dir.ops->next(dir.data, &dirent)) == RESULT_OK) {
 		printf("found %.*s\n", dirent.name_size, dirent.name);
-		snprintf(path, sizeof(path), "%s/%.*s", temp_location, dirent.name_size, dirent.name);
+		snprintf(path, sizeof(path), "%s/%.*s", temp_location.c_str(), dirent.name_size, dirent.name);
 		printf("  unlinking %s\n", path);
 		trn::ResultCode::AssertOk(trn_fs_unlink(path));
 	}

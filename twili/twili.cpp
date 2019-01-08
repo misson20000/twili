@@ -37,6 +37,8 @@ typedef bool _Bool;
 #include<unistd.h>
 #include<stdio.h>
 
+#include "inih/INIReader.h"
+
 #include "util.hpp"
 #include "twili.hpp"
 #include "process_creation.hpp"
@@ -53,23 +55,39 @@ int main() {
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));
 	
 	try {
-		if(usb_serial_init() == RESULT_OK) {
-			// set up serial console
-			int usb_fd = usb_serial_open_fd();
-			if(usb_fd < 0) {
-				throw trn::ResultError(-usb_fd);
+		twili::Twili::Config config;
+
+		if(config.enable_usb_log) {
+			if(usb_serial_init() == RESULT_OK) {
+				// set up serial console
+				int usb_fd = usb_serial_open_fd();
+				if(usb_fd < 0) {
+					throw trn::ResultError(-usb_fd);
+				}
+				dup2(usb_fd, STDOUT_FILENO);
+				dup2(usb_fd, STDERR_FILENO);
+				dup2(usb_fd, STDIN_FILENO);
+				dbg_set_file(fd_file_get(usb_fd));
+				printf("brought up USB serial\n");
+			} else {
+				// ignore
 			}
-			dup2(usb_fd, STDOUT_FILENO);
-			dup2(usb_fd, STDERR_FILENO);
-			dup2(usb_fd, STDIN_FILENO);
-			dbg_set_file(fd_file_get(usb_fd));
-			printf("brought up USB serial\n");
-		} else {
-			// ignore
+		}
+
+		switch(config.state) {
+		case twili::Twili::Config::State::Fresh:
+			printf("using fresh config\n");
+			break;
+		case twili::Twili::Config::State::Loaded:
+			printf("using config from file\n");
+			break;
+		case twili::Twili::Config::State::Error:
+			printf("error loading config (line %d)\n", config.error_line);
+			break;
 		}
 		
 		// initialize twili
-		static twili::Twili twili;
+		static twili::Twili twili(config);
 		
 		while(!twili.destroy_flag) {
 			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
@@ -96,18 +114,76 @@ int main() {
 
 namespace twili {
 
-Twili::Twili() :
+Twili::Twili(const Config &config) :
+	config(config),
 	event_waiter(),
 	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
 	twili_registration(
-		server, "twili",
+		server, config.service_name.c_str(),
 		[this](auto s) {
 			return new twili::service::ITwiliService(this);
 		}),
-	usb_bridge(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
-	tcp_bridge(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this)),
+	file_manager(*this),
 	applet_tracker(*this) {
+	if(config.enable_usb_bridge) {
+		usb_bridge.emplace(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+	}
+	if(config.enable_tcp_bridge) {
+		tcp_bridge.emplace(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+	}
+
 	printf("initialized Twili\n");
+}
+
+Twili::Config::Config() {
+	FILE *f = fopen("/sd/twili.ini", "r");
+	if(!f) {
+		// write default config
+		f = fopen("/sd/twili.ini", "w");
+		if(!f) {
+			return;
+		}
+		fprintf(f, "; Twili Configuration File\n");
+		fprintf(f, "[twili]\n");
+		fprintf(f, "service_name = %s\n", service_name.c_str());
+		fprintf(f, "; paths are relative to root of sd card\n");
+		fprintf(f, "hbmenu_path = %s\n", hbm_path.c_str());
+		fprintf(f, "temp_directory = %s\n", temp_directory.c_str());
+		fprintf(f, "\n");
+		fprintf(f, "[logging]\n");
+		fprintf(f, "verbosity = %d\n", logging_verbosity);
+		fprintf(f, "enable_usb = %s\n", enable_usb_log ? "true" : "false");
+		fprintf(f, "\n");
+		fprintf(f, "[usb_bridge]\n");
+		fprintf(f, "enabled = %s\n", enable_usb_bridge ? "true" : "false");
+		fprintf(f, "\n");
+		fprintf(f, "[tcp_bridge]\n");
+		fprintf(f, "enabled = %s\n", enable_tcp_bridge ? "true" : "false");
+		fprintf(f, "port = %d\n", tcp_bridge_port);
+		fclose(f);
+	} else {
+		// load config
+		INIReader reader(f);
+		if(reader.ParseError() != 0) {
+			state = State::Error;
+			error_line = reader.ParseError();
+			return;
+		}
+
+		service_name = reader.Get("twili", "service_name", service_name);
+		hbm_path = reader.Get("twili", "hbmenu_path", hbm_path);
+		temp_directory = reader.Get("twili", "temp_directory", temp_directory);
+
+		logging_verbosity = reader.GetInteger("logging", "verbosity", logging_verbosity);
+		enable_usb_log = reader.GetBoolean("logging", "enable_usb", enable_usb_log);
+		
+		enable_usb_bridge = reader.GetBoolean("usb_bridge", "enabled", true);
+		
+		enable_tcp_bridge = reader.GetBoolean("tcp_bridge", "enabled", true);
+		tcp_bridge_port = reader.GetInteger("tcp_bridge", "port", tcp_bridge_port);
+
+		state = State::Loaded;
+	}
 }
 
 std::shared_ptr<process::MonitoredProcess> Twili::FindMonitoredProcess(uint64_t pid) {

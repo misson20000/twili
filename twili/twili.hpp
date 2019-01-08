@@ -41,13 +41,40 @@ namespace twili {
 
 class Twili {
  public:
-	Twili();
+	struct Config {
+		Config();
 
+		// [twili]
+		std::string service_name = "twili";
+		std::string hbm_path = "/hbmenu.nro";
+		std::string temp_directory = "/.twili_temp";
+
+		// [logging]
+		int logging_verbosity = 0;
+		bool enable_usb_log = true;
+
+		// [usb_bridge]
+		bool enable_usb_bridge = true;
+
+		// [tcp_bridge]
+		bool enable_tcp_bridge = true;
+		int tcp_bridge_port = 15152;
+
+		enum class State {
+			Fresh, Loaded, Error
+		} state = State::Fresh;
+		int error_line;
+	};
+	
+	Twili(const Config &config);
+
+	const Config &config;
+	
 	bool destroy_flag = false;
 	bool relaunch_flag = false;
 	trn::Waiter event_waiter;
 	trn::ipc::server::IPCServer server;
-
+	
 	struct ServiceRegistration {
 	 public:
 		ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory);
@@ -71,8 +98,8 @@ class Twili {
 	FileManager file_manager;
 	AppletTracker applet_tracker;
 	
-	bridge::usb::USBBridge usb_bridge;
-	bridge::tcp::TCPBridge tcp_bridge;
+	std::optional<bridge::usb::USBBridge> usb_bridge;
+	std::optional<bridge::tcp::TCPBridge> tcp_bridge;
 	
 	std::list<std::shared_ptr<process::MonitoredProcess>> monitored_processes;
 	std::shared_ptr<process::MonitoredProcess> FindMonitoredProcess(uint64_t pid);

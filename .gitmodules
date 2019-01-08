@@ -7,3 +7,6 @@
 [submodule "twib2/externals/msgpack11"]
 	path = twib/externals/msgpack11
 	url = https://github.com/misson20000/msgpack11.git
+[submodule "twili/inih"]
+	path = twili/inih
+	url = https://github.com/misson20000/inih.git

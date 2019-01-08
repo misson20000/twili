@@ -215,7 +215,7 @@ void TCPBridge::ResetSockets() {
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(15152);
+	addr.sin_port = htons(twili.config.tcp_bridge_port);
 	addr.sin_addr = {INADDR_ANY};
 				
 	if(bsd_bind(server_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {

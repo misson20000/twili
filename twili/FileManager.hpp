@@ -26,14 +26,16 @@
 
 namespace twili {
 
+class Twili;
+
 class FileManager {
  public:
-	FileManager();
+	FileManager(Twili &twili);
 
 	FILE *CreateFile(const char *extension, std::string &path, std::string &hbabi_path);
  private:
-	static constexpr const char *temp_location = "/sd/.twili_temp";
-	static constexpr const char *temp_hbabi_location = "sdmc:/.twili_temp";
+	std::string temp_location;
+	std::string temp_hbabi_location;
 	int next_index = 0;
 };
 
