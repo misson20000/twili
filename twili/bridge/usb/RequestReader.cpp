@@ -132,6 +132,7 @@ void USBBridge::RequestReader::MetadataTransactionCompleted() {
 	payload_size = 0;
 	object_ids.clear();
 	payload_buffer.Clear();
+	ResetHandler();
 	
 	// pick command handler
 	BeginProcessingCommand();
