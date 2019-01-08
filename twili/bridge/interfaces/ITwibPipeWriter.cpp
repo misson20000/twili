@@ -79,10 +79,8 @@ void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) 
 						}
 					} else {
 						if(extension->is_done && !extension->buffer.ReadAvailable()) {
-							printf("ITPW Write callback: stream finished and buffer empty!\n");
 							extension->opener.RespondOk();
 						} else {
-							printf("IPTW Write callback: is_done(%d) buffer_available(0x%lx)\n", (int) extension->is_done, extension->buffer.ReadAvailable());
 							extension->Write();
 						}
 					}
@@ -108,7 +106,6 @@ void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) 
 	
 	stream.finish =
 		[state](util::Buffer &input) {
-			printf("ITwibPipeWriter stream finished...\n");
 			state->is_done = true;
 			if(!state->is_writing) {
 				state->Write();

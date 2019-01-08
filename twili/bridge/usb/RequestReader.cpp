@@ -127,7 +127,9 @@ void USBBridge::RequestReader::MetadataTransactionCompleted() {
 		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	memcpy(&current_header, bridge->request_meta_buffer.data, sizeof(protocol::MessageHeader));
-	printf("got header, object 0x%x, command %u, payload size 0x%lx\n", current_header.object_id, current_header.command_id, current_header.payload_size);
+	if(bridge->twili->config.logging_verbosity >= 1) {
+		printf("got header, object 0x%x, command %u, payload size 0x%lx\n", current_header.object_id, current_header.command_id, current_header.payload_size);
+	}
 
 	payload_size = 0;
 	object_ids.clear();
