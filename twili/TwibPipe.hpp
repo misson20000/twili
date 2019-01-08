@@ -22,42 +22,47 @@
 
 #include<libtransistor/cpp/types.hpp>
 
+#include<variant>
+#include<functional>
+
 namespace twili {
 
 class TwibPipe {
  public:
 	TwibPipe();
 	~TwibPipe();
-	// callback returns how much data was read
+	
+	// Callback returns how much data was read.
+	// Callback may not call Read or Write.
 	void Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
 	void Write(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
 	void Close();
+
+	bool IsClosed();
  private:
-	class IdleState {
-	 public:
+	struct IdleState {
 	};
-	class WritePendingState {
-	 public:
+	struct WritePendingState {
+		WritePendingState(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
+
+		void Read(std::function<size_t(uint8_t *data, size_t actual_size)> read_cb);
+		
 		uint8_t *data;
 		size_t size;
 		std::function<void(bool eof)> cb;
 	};
-	class ReadPendingState {
-	 public:
+	struct ReadPendingState {
+		ReadPendingState(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
+		
 		std::function<size_t(uint8_t *data, size_t actual_size)> cb;
 	};
-	enum class State {
-		Idle,
-		WritePending,
-		ReadPending,
-		Closed,
+	struct ClosedState {
 	};
-	State current_state_id = State::Idle;
-	IdleState state_idle;
-	WritePendingState state_write_pending;
-	ReadPendingState state_read_pending;
 
-	static const char *StateName(State state);
+	using state_variant = std::variant<IdleState, WritePendingState, ReadPendingState, ClosedState>;
+	state_variant state;
+	
+	static const char *StateName(state_variant &v);
 };
 
 }
