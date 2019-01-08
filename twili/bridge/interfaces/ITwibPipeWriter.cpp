@@ -28,91 +28,96 @@ using trn::ResultError;
 namespace twili {
 namespace bridge {
 
-ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : ObjectDispatcherProxy(*this, device_id), pipe(pipe), dispatcher(*this) {
+ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::shared_ptr<TwibPipe> pipe) : ObjectDispatcherProxy(*this, device_id), pipe(pipe), dispatcher(*this) {
+}
+
+ITwibPipeWriter::~ITwibPipeWriter() {
+	pipe->Close();
 }
 
 void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) {
-	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
-		struct State : std::enable_shared_from_this<State> {
-			State(bridge::ResponseOpener opener, std::shared_ptr<TwibPipe> pipe) :
-				opener(opener), pipe(pipe) {
-			}
-			
-			bridge::ResponseOpener opener;
-			std::shared_ptr<TwibPipe> pipe;
-			util::Buffer buffer;
-			bool is_writing = false;
-			bool is_done = false;
-
-			void Write() {
-				if(!buffer.ReadAvailable()) {
-					return;
-				}
-				
-				is_writing = true;
-				
-				// move data to start of buffer so it doesn't get moved later
-				buffer.Compact();
-
-				size_t size = buffer.ReadAvailable();
-				
-				std::shared_ptr<State> extension = shared_from_this(); // extend our lifetime
-				pipe->Write(
-					buffer.Read(), size,
-					[extension, size](bool eof) mutable {
-						extension->buffer.MarkRead(size);
-						extension->is_writing = false;
-						if(eof) {
-							if(!extension->is_done) {
-								extension->is_done = true;
-								extension->opener.RespondError(TWILI_ERR_EOF);
-							}
-						} else {
-							if(extension->is_done) {
-								extension->opener.RespondOk();
-							} else {
-								extension->Write();
-							}
-						}
-					});
-			}
-		};
-
-		std::shared_ptr<State> state = std::make_shared<State>(opener, observe);
-		
-		stream.receive =
-			[state](util::Buffer &input) {
-				size_t size = input.ReadAvailable();
-				if(state->is_writing) {
-					// if this flag is set, we have a reference to data in the buffer
-					// and we don't want it to be moved
-					size = std::min(size, state->buffer.WriteAvailableHint());
-				}
-				input.Read(state->buffer, std::min(input.ReadAvailable(), size));
-				if(!state->is_writing) {
-					state->Write();
-				}
-			};
-
-		stream.finish =
-			[state](util::Buffer &input) {
-				if(!state->is_done) {
-					state->is_done = true;
-					if(!state->is_writing) {
-						state->Write();
-					}
-				}
-			};
-	} else {
+	if(pipe->IsClosed()) {
 		opener.RespondError(TWILI_ERR_EOF);
 	}
+	
+	struct State : std::enable_shared_from_this<State> {
+		State(bridge::ResponseOpener opener, std::shared_ptr<TwibPipe> pipe) :
+			opener(opener), pipe(pipe) {
+		}
+		
+		bridge::ResponseOpener opener;
+		std::shared_ptr<TwibPipe> pipe;
+		util::Buffer buffer;
+		bool is_writing = false;
+		bool is_done = false;
+		
+		void Write() {
+			if(!buffer.ReadAvailable()) {
+				if(is_done) {
+					opener.RespondOk();
+				}
+				return;
+			}
+			
+			is_writing = true;
+			
+			// move data to start of buffer so it doesn't get moved later
+			buffer.Compact();
+			
+			size_t size = buffer.ReadAvailable();
+			
+			std::shared_ptr<State> extension = shared_from_this(); // extend our lifetime
+			pipe->Write(
+				buffer.Read(), size,
+				[extension, size](bool eof) mutable {
+					extension->buffer.MarkRead(size);
+					extension->is_writing = false;
+					if(eof) {
+						if(!extension->is_done) {
+							extension->is_done = true;
+							extension->opener.RespondError(TWILI_ERR_EOF);
+						}
+					} else {
+						if(extension->is_done && !extension->buffer.ReadAvailable()) {
+							printf("ITPW Write callback: stream finished and buffer empty!\n");
+							extension->opener.RespondOk();
+						} else {
+							printf("IPTW Write callback: is_done(%d) buffer_available(0x%lx)\n", (int) extension->is_done, extension->buffer.ReadAvailable());
+							extension->Write();
+						}
+					}
+				});
+		}
+	};
+	
+	std::shared_ptr<State> state = std::make_shared<State>(opener, pipe);
+	
+	stream.receive =
+		[state](util::Buffer &input) {
+			size_t size = input.ReadAvailable();
+			if(state->is_writing) {
+				// if this flag is set, we have a reference to data in the buffer
+				// and we don't want it to be moved
+				size = std::min(size, state->buffer.WriteAvailableHint());
+			}
+			input.Read(state->buffer, std::min(input.ReadAvailable(), size));
+			if(!state->is_writing) {
+				state->Write();
+			}
+		};
+	
+	stream.finish =
+		[state](util::Buffer &input) {
+			printf("ITwibPipeWriter stream finished...\n");
+			state->is_done = true;
+			if(!state->is_writing) {
+				state->Write();
+			}
+		};
 }
 
 void ITwibPipeWriter::Close(bridge::ResponseOpener opener) {
-	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
-		observe->Close();
-		pipe.reset();
-	}
+	pipe->Close();
 	opener.RespondOk();
 }
 

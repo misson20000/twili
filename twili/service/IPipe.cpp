@@ -85,6 +85,9 @@ trn::ResultCode IPipeTwib::Dispatch(trn::ipc::Message msg, uint32_t request_id) 
 trn::ResultCode IPipeTwib::Read(std::function<void(trn::ResultCode)> cb, trn::ipc::OutRaw<uint64_t> size, trn::ipc::Buffer<uint8_t, 0x6, 0> buffer) {
 	pipe->Read(
 		[cb, size, buffer](void *data, size_t data_size) mutable {
+			if(data_size == 0) {
+				cb(TWILI_ERR_EOF);
+			}
 			if(data_size > buffer.size) {
 				data_size = buffer.size;
 			}

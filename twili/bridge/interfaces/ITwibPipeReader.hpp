@@ -32,12 +32,12 @@ namespace bridge {
 
 class ITwibPipeReader : public ObjectDispatcherProxy<ITwibPipeReader> {
  public:
-	ITwibPipeReader(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
+	ITwibPipeReader(uint32_t object_id, std::shared_ptr<TwibPipe> pipe);
 
 	using CommandID = protocol::ITwibPipeReader::Command;
 	
  private:
-	std::weak_ptr<TwibPipe> pipe;
+	std::shared_ptr<TwibPipe> pipe;
 
 	void Read(bridge::ResponseOpener opener);
 

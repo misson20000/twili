@@ -28,23 +28,19 @@ using trn::ResultError;
 namespace twili {
 namespace bridge {
 
-ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::weak_ptr<TwibPipe> pipe) : ObjectDispatcherProxy(*this, device_id), pipe(pipe), dispatcher(*this) {
+ITwibPipeReader::ITwibPipeReader(uint32_t device_id, std::shared_ptr<TwibPipe> pipe) : ObjectDispatcherProxy(*this, device_id), pipe(pipe), dispatcher(*this) {
 }
 
 void ITwibPipeReader::Read(bridge::ResponseOpener opener) {
-	if(std::shared_ptr<TwibPipe> observe = pipe.lock()) {
-		observe->Read(
-			[opener](uint8_t *data, size_t actual_size) mutable {
-				if(actual_size == 0) {
-					opener.RespondError(TWILI_ERR_EOF);
-				} else {
-					opener.RespondOk(std::vector<uint8_t>(data, data + actual_size));
-				}
-				return actual_size;
-			});
-	} else {
-		opener.RespondError(TWILI_ERR_EOF);
-	}
+	pipe->Read(
+		[opener](uint8_t *data, size_t actual_size) mutable {
+			if(actual_size == 0) {
+				opener.RespondError(TWILI_ERR_EOF);
+			} else {
+				opener.RespondOk(std::vector<uint8_t>(data, data + actual_size));
+			}
+			return actual_size;
+		});
 }
 
 } // namespace bridge

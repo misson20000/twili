@@ -32,12 +32,13 @@ namespace bridge {
 
 class ITwibPipeWriter : public ObjectDispatcherProxy<ITwibPipeWriter> {
  public:
-	ITwibPipeWriter(uint32_t object_id, std::weak_ptr<TwibPipe> pipe);
-
+	ITwibPipeWriter(uint32_t object_id, std::shared_ptr<TwibPipe> pipe);
+	virtual ~ITwibPipeWriter() override;
+	
 	using CommandID = protocol::ITwibPipeWriter::Command;
 	
  private:
-	std::weak_ptr<TwibPipe> pipe;
+	std::shared_ptr<TwibPipe> pipe;
 
 	void Write(bridge::ResponseOpener opener, InputStream &stream);
 	void Close(bridge::ResponseOpener opener);
