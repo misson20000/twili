@@ -244,7 +244,8 @@ void ELFCrashReport::Generate(process::Process &process, twili::bridge::Response
 	size_t ph_offset = total_size;
 	total_size+= sizeof(ELF::Elf64_Phdr) * (1 + vmas.size());
 
-	bridge::ResponseWriter r = ro.BeginOk(total_size);
+	bridge::ResponseWriter r = ro.BeginOk(sizeof(uint64_t) + total_size);
+	r.Write<uint64_t>(total_size);
 	r.Write<ELF::Elf64_Ehdr>({
 			.e_ident = {
 				.ei_class = ELF::ELFCLASS64,
