@@ -258,6 +258,8 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);
 		printf("      target entry: 0x%lx\n", proc->GetTargetEntry());
+		printf("      detail:\n");
+		proc->PrintDebugInfo("        ");
 	}
 	twili.applet_tracker.PrintDebugInfo();
 

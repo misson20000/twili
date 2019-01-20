@@ -81,6 +81,17 @@ void MonitoredProcess::Kill() {
 	Terminate();
 }
 
+void MonitoredProcess::PrintDebugInfo(const char *indent) {
+	char sub_indent[64];
+	snprintf(sub_indent, 64, "%s  ", indent);
+	printf("%stp_stdin:\n", indent);
+	tp_stdin->PrintDebugInfo(sub_indent);
+	printf("%stp_stdout:\n", indent);
+	tp_stdout->PrintDebugInfo(sub_indent);
+	printf("%stp_stderr:\n", indent);
+	tp_stderr->PrintDebugInfo(sub_indent);
+}
+
 MonitoredProcess::State MonitoredProcess::GetState() {
 	return state;
 }
