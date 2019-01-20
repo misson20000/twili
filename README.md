@@ -39,6 +39,7 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
   * [twib get-memory-info](#twib-get-memory-info)
 - [Developer Details](#developer-details)
   * [Project Organization](#project-organization)
+  * [Title Table](#title-table)
   * [Process Management](#process-management)
   * [Homebrew ABI Shim](#homebrew-abi-shim)
   * [Applet Shim](#applet-shim)
@@ -323,6 +324,14 @@ Applet Category Limit: 82 MiB / 501 MiB (16%)
   - **twili/service**: IPC service code
 - **twili_applet_shim**: Applet shim code
 - **twili_common**: Code common between twili components that run on console
+
+## Title Table
+
+| Title ID         | Description |
+|------------------|---|
+| 0100000000006480 | Twili Sysmodule |
+| 0100000000006481 | Twili Managed Process (twib run) |
+| 0100000000006482 | Twili Applet Shim |
 
 ## Process Management
 
