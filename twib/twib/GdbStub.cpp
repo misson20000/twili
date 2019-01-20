@@ -515,26 +515,26 @@ void GdbStub::Process::IngestEvents(GdbStub &stub) {
 		if(event->thread_id) {
 			auto t_i = threads.find(event->thread_id);
 			if(t_i != threads.end()) {
-				stub.current_thread = &(*t_i);
+				stub.current_thread = &t_i->second;
 			}
 		}
 		
 		switch(event->event_type) {
-		case nx::DebugEvent::EventType::AttachProcess:
-			break;
-		case nx::DebugEvent::EventType::AttachThread:
+		case nx::DebugEvent::EventType::AttachProcess: {
+			break; }
+		case nx::DebugEvent::EventType::AttachThread: {
 			uint64_t thread_id = event->attach_thread.thread_id;
 			LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
 			auto r = threads.emplace(thread_id, Thread(*this, thread_id));
 			stub.current_thread = &r.first->second;
-			break;
-		case nx::DebugEvent::EventType::ExitProcess:
+			break; }
+		case nx::DebugEvent::EventType::ExitProcess: {
 			LogMessage(Warning, "process exited");
-			break;
-		case nx::DebugEvent::EventType::ExitThread:
+			break; }
+		case nx::DebugEvent::EventType::ExitThread: {
 			LogMessage(Warning, "thread exited");
-			break;
-		case nx::DebugEvent::EventType::Exception:
+			break; }
+		case nx::DebugEvent::EventType::Exception: {
 			switch(event->exception.exception_type) {
 			case nx::DebugEvent::ExceptionType::Trap:
 				signal = 5; // SIGTRAP
@@ -567,7 +567,7 @@ void GdbStub::Process::IngestEvents(GdbStub &stub) {
 				signal = 10; // SIGBUS
 				break;
 			}
-			break;
+			break; }
 		}
 	}
 
