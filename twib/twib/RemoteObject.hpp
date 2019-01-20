@@ -43,7 +43,7 @@ class RemoteObject {
 	uint32_t SendSmartSyncRequestWithoutAssert(T command_id, Args&&... args) {
 		util::Buffer input_buffer;
 		(detail::WrappingHelper<Args>::Pack(std::move(args), input_buffer), ...);
-		Response r = SendSyncRequest((uint32_t) command_id, input_buffer.GetData());
+		Response r = SendSyncRequestWithoutAssert((uint32_t) command_id, input_buffer.GetData());
 		if(r.result_code) {
 			return r.result_code;
 		}
