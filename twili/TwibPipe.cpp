@@ -29,6 +29,10 @@ using trn::ResultError;
 
 namespace twili {
 
+// voodoo
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 TwibPipe::TwibPipe() {
 }
 
@@ -55,15 +59,27 @@ const char *TwibPipe::StateName(state_variant &v) {
 	}
 }
 
+void TwibPipe::PrintDebugInfo(const char *indent) {
+	printf("%sstate: %s\n", indent, StateName(state));
+	std::visit(overloaded {
+			[&](IdleState &idle) {
+			},
+			[&](WritePendingState &wps) {
+				printf("%s  data: %p\n", indent, wps.data);
+				printf("%s  size: 0x%lx\n", indent, wps.size);
+			},
+			[&](ReadPendingState &rps) {
+			},
+			[&](ClosedState &cs) {
+			}
+		}, state);
+}
+
 TwibPipe::WritePendingState::WritePendingState(uint8_t *data, size_t size, std::function<void(bool eof)> cb) : data(data), size(size), cb(cb) {
 }
 
 TwibPipe::ReadPendingState::ReadPendingState(std::function<size_t(uint8_t*, size_t)> cb) : cb(cb) {
 }
-
-// voodoo
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb) {
 	TP_Debug("TwibPipe(%s): Read\n", StateName(state));

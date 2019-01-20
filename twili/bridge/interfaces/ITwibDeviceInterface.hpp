@@ -51,6 +51,7 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 	void OpenActiveDebugger(bridge::ResponseOpener opener, uint64_t pid);
 	void GetMemoryInfo(bridge::ResponseOpener opener);
 	void PrintDebugInfo(bridge::ResponseOpener opener);
+	void LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage);
 
  public:
 	SmartRequestDispatcher<
@@ -66,7 +67,8 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 		SmartCommand<CommandID::OPEN_NAMED_PIPE, &ITwibDeviceInterface::OpenNamedPipe>,
 		SmartCommand<CommandID::OPEN_ACTIVE_DEBUGGER, &ITwibDeviceInterface::OpenActiveDebugger>,
 		SmartCommand<CommandID::GET_MEMORY_INFO, &ITwibDeviceInterface::GetMemoryInfo>,
-		SmartCommand<CommandID::PRINT_DEBUG_INFO, &ITwibDeviceInterface::PrintDebugInfo>
+		SmartCommand<CommandID::PRINT_DEBUG_INFO, &ITwibDeviceInterface::PrintDebugInfo>,
+		SmartCommand<CommandID::LAUNCH_UNMONITORED_PROCESS, &ITwibDeviceInterface::LaunchUnmonitoredProcess>
 		> dispatcher;
 };
 

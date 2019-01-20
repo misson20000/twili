@@ -61,6 +61,8 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	virtual void AddNotes(ELFCrashReport &report) override;
 	virtual void Terminate() override;
 	virtual void Kill(); // terminate cleanly, if possible
+
+	virtual void PrintDebugInfo(const char *indent);
 	
 	State GetState();
 	trn::ResultCode GetResult();

@@ -116,5 +116,16 @@ void ITwibDeviceInterface::PrintDebugInfo() {
 		CommandID::PRINT_DEBUG_INFO);
 }
 
+uint64_t ITwibDeviceInterface::LaunchUnmonitoredProcess(uint64_t title_id, uint64_t storage_id, uint32_t launch_flags) {
+	uint64_t pid;
+	obj->SendSmartSyncRequest(
+		CommandID::LAUNCH_UNMONITORED_PROCESS,
+		in(launch_flags),
+		in(title_id),
+		in(storage_id),
+		out(pid));
+	return pid;
+}
+
 } // namespace twib
 } // namespace twili

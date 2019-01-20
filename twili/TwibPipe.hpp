@@ -38,6 +38,8 @@ class TwibPipe {
 	void Write(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
 	void Close();
 
+	void PrintDebugInfo(const char *indent);
+	
 	bool IsClosed();
  private:
 	struct IdleState {

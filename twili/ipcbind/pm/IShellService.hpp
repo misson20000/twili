@@ -33,6 +33,7 @@ class IShellService {
 	IShellService(trn::ipc::client::Object &&object);
 
 	trn::Result<std::nullopt_t> TerminateProcessByPid(uint64_t pid);
+	trn::Result<uint64_t> LaunchProcess(uint32_t flags, uint64_t tid, uint64_t storage);
 	
 	trn::ipc::client::Object object;
 };

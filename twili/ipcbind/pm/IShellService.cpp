@@ -37,6 +37,16 @@ trn::Result<std::nullopt_t> IShellService::TerminateProcessByPid(uint64_t pid) {
 		ipc::InRaw<uint64_t>(pid));
 }
 
+trn::Result<uint64_t> IShellService::LaunchProcess(uint32_t flags, uint64_t tid, uint64_t storage) {
+	uint64_t pid;
+	return object.SendSyncRequest<0>(
+		ipc::InRaw<uint32_t>(flags),
+		ipc::InRaw<uint64_t>(tid),
+		ipc::InRaw<uint64_t>(storage),
+		ipc::OutRaw<uint64_t>(pid))
+		.map([&](auto &&_) { return pid; });
+}
+
 } // namespace pm
 } // namespace service
 } // namespace twili
