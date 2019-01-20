@@ -264,5 +264,9 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 	opener.RespondOk();
 }
 
+void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage) {
+	opener.RespondOk(ResultCode::AssertOk(twili.services.pm_shell.LaunchProcess(flags, tid, storage)));
+}
+
 } // namespace bridge
 } // namespace twili

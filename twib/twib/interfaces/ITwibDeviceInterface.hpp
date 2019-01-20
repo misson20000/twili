@@ -56,6 +56,7 @@ class ITwibDeviceInterface {
 	ITwibPipeReader OpenNamedPipe(std::string name);
 	msgpack11::MsgPack GetMemoryInfo();
 	void PrintDebugInfo();
+	uint64_t LaunchUnmonitoredProcess(uint64_t title_id, uint64_t storage_id, uint32_t launch_flags);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

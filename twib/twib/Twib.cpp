@@ -231,6 +231,14 @@ int main(int argc, char *argv[]) {
 	CLI::App *get_memory_info = app.add_subcommand("get-memory-info", "Gets memory usage information from the device");
 
 	CLI::App *print_debug_info = app.add_subcommand("debug", "Prints debug info");
+
+	CLI::App *launch = app.add_subcommand("launch", "Launches an installed title");
+	std::string launch_title_id;
+	std::string launch_storage;
+	uint32_t launch_flags = 0;
+	launch->add_option("title-id", launch_title_id, "Title ID to launch")->required();
+	launch->add_set_ignore_case("storage", launch_storage, {"host", "gamecard", "gc", "nand-system", "system", "nand-user", "user", "sdcard", "sd"}, "Storage for title")->required();
+	launch->add_option("launch-flags", launch_flags, "Flags for launch");
 	
 	app.require_subcommand(1);
 	
@@ -465,6 +473,29 @@ int main(int argc, char *argv[]) {
 	if(print_debug_info->parsed()) {
 		itdi.PrintDebugInfo();
 		return 0;
+	}
+
+	if(launch->parsed()) {
+		uint64_t storage_id = 0;
+		if(launch_storage == "none") {
+			storage_id = 0;
+		} else if(launch_storage == "host") {
+			storage_id = 1;
+		} else if(launch_storage == "gamecard" || launch_storage == "gc") {
+			storage_id = 2;
+		} else if(launch_storage == "nand-system" || launch_storage == "system") {
+			storage_id = 3;
+		} else if(launch_storage == "nand-user" || launch_storage == "user") {
+			storage_id = 4;
+		} else if(launch_storage == "sdcard" || launch_storage == "sd") {
+			storage_id = 5;
+		} else {
+			LogMessage(Error, "unrecognized storage: %s\n", launch_storage.c_str());
+		}
+
+		uint64_t title_id = std::stoull(launch_title_id, nullptr, 16);
+
+		printf("0x%lx\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
 	}
 	
 	return 0;
