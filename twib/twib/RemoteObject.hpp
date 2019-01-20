@@ -63,10 +63,10 @@ class RemoteObject {
 	}
 
 	template<typename T, typename... Args>
-	void SendSmartRequest(T command_id, Args&&... args, std::function<void(uint32_t)> &&func) {
+	void SendSmartRequest(T command_id, std::function<void(uint32_t)> &&func, Args&&... args) {
 		util::Buffer input_buffer;
 		(detail::WrappingHelper<Args>::Pack(std::move(args), input_buffer), ...);
-		Response r = SendRequest(
+		SendRequest(
 			(uint32_t) command_id,
 			input_buffer.GetData(),
 			[&](Response r) {
