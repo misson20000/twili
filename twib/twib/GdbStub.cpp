@@ -467,7 +467,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 		for(auto &t : thread_ids) {
 			LogMessage(Debug, "  tid 0x%lx", t);
 		}
-		proc.debugger.ContinueDebugEvent(5, thread_ids);
+		proc.debugger.ContinueDebugEvent(7, thread_ids);
 		proc.running = true;
 	}
 	waiting_for_stop = true;
