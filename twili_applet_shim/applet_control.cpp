@@ -161,7 +161,7 @@ void ControlMode(ipc::client::Object &iappletshim) {
 	auto wh = waiter.Add(
 		event,
 		[&]() -> bool {
-			printf("iappletshim controller spawning host\n");
+			printf("iappletshim controller event signalled\n");
 			try {
 				event.ResetSignal();
 				

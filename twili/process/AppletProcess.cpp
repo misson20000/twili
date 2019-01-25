@@ -53,8 +53,6 @@ void AppletProcess::ChangeState(State state) {
 	MonitoredProcess::ChangeState(state);
 	if(state == State::Attached) {
 		ecs_pending = false;
-
-		PushCommand(1); // REQUEST_FOREGROUND
 		
 		if(run_opener) {
 			auto w = run_opener->BeginOk(sizeof(uint64_t));
