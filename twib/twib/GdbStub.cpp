@@ -217,15 +217,20 @@ void GdbStub::HandleReadGeneralRegisters() {
 		connection.RespondError(1);
 	}
 
-	util::Buffer response;
-	std::vector<uint64_t> registers = current_thread->GetRegisters();
-	GdbConnection::Encode((uint8_t*) registers.data(), 284, response);
-	std::string str;
-	size_t sz = response.ReadAvailable();
-	response.Read(str, sz);
-	response.MarkRead(-sz);
-	LogMessage(Debug, "responding with '%s'", str.c_str());
-	connection.Respond(response);
+	try {
+		util::Buffer response;
+		std::vector<uint64_t> registers = current_thread->GetRegisters();
+		GdbConnection::Encode((uint8_t*) registers.data(), 284, response);
+		std::string str;
+		size_t sz = response.ReadAvailable();
+		response.Read(str, sz);
+		response.MarkRead(-sz);
+		LogMessage(Debug, "responding with '%s'", str.c_str());
+		connection.Respond(response);
+	} catch(ResultError &e) {
+		LogMessage(Debug, "failed to read registers: 0x%x", e.code);
+		connection.RespondError(e.code);
+	}
 }
 
 void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
