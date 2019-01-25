@@ -41,6 +41,13 @@ std::vector<uint8_t> ITwibDebugger::ReadMemory(uint64_t addr, uint64_t size) {
 	return bytes;
 }
 
+void ITwibDebugger::WriteMemory(uint64_t addr, std::vector<uint8_t> &bytes) {
+	obj->SendSmartSyncRequest(
+		CommandID::WRITE_MEMORY,
+		in<uint64_t>(addr),
+		in<std::vector<uint8_t>>(std::move(bytes)));
+}
+
 std::optional<nx::DebugEvent> ITwibDebugger::GetDebugEvent() {
 	nx::DebugEvent event;
 	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(

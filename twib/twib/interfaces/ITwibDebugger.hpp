@@ -36,6 +36,7 @@ class ITwibDebugger {
 	using CommandID = protocol::ITwibDebugger::Command;
 	
 	std::vector<uint8_t> ReadMemory(uint64_t addr, uint64_t size);
+	void WriteMemory(uint64_t addr, std::vector<uint8_t> &bytes);
 	std::optional<nx::DebugEvent> GetDebugEvent();
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);

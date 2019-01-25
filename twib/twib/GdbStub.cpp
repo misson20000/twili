@@ -281,11 +281,46 @@ void GdbStub::HandleReadMemory(util::Buffer &packet) {
 	}
 
 	LogMessage(Debug, "reading 0x%lx bytes from 0x%lx", size, address);
+
+	try {
+		util::Buffer response;
+		std::vector<uint8_t> mem = current_thread->process.debugger.ReadMemory(address, size);
+		GdbConnection::Encode(mem.data(), mem.size(), response);
+		connection.Respond(response);
+	} catch(ResultError &e) {
+		connection.RespondError(e.code);
+	}
+}
+
+void GdbStub::HandleWriteMemory(util::Buffer &packet) {
+	uint64_t address, size;
+	GdbConnection::DecodeWithSeparator(address, ',', packet);
+	GdbConnection::DecodeWithSeparator(size, ':', packet);
+
+	if(!current_thread) {
+		LogMessage(Warning, "attempted to write without selected thread");
+		connection.RespondError(1);
+	}
+
+	LogMessage(Debug, "writing 0x%lx bytes to 0x%lx", size, address);
+
+	std::vector<uint8_t> bytes;
+	GdbConnection::Decode(bytes, packet);
+	if(bytes.size() != size) {
+		LogMessage(Error, "size mismatch (0x%lx != 0x%lx)", bytes.size(), size);
+		connection.RespondError(1);
+		return;
+	}
+
+	LogMessage(Debug, "  %lx", *(uint32_t*) bytes.data());
 	
-	util::Buffer response;
-	std::vector<uint8_t> mem = current_thread->process.debugger.ReadMemory(address, size);
-	GdbConnection::Encode(mem.data(), mem.size(), response);
-	connection.Respond(response);
+	try {
+		util::Buffer response;
+		current_thread->process.debugger.WriteMemory(address, bytes);
+		connection.RespondOk();
+	} catch(ResultError &e) {
+		connection.RespondError(e.code);
+	}
 }
 
 void GdbStub::HandleVAttach(util::Buffer &packet) {
@@ -681,6 +716,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		case 'm': // read memory
 			stub.HandleReadMemory(*buffer);
+			break;
+		case 'M': // write memory
+			stub.HandleWriteMemory(*buffer);
 			break;
 		case 'q': // general get query
 			stub.HandleGeneralGetQuery(*buffer);
