@@ -69,7 +69,7 @@ class RemoteObject {
 		SendRequest(
 			(uint32_t) command_id,
 			input_buffer.GetData(),
-			[&](Response r) {
+			[&, func{std::move(func)}](Response r) {
 				if(r.result_code) {
 					func(r.result_code);
 				}
