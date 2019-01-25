@@ -401,9 +401,9 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 				}
 				LogMessage(Debug, "vCont %ld, %ld action %c\n", pid, thread_id, ch);
 				if(pid == -1) {
-					for(auto p : attached_processes) {
+					for(auto &p : attached_processes) {
 						std::map<uint64_t, Action> &thread_actions = process_actions.insert({p.first, {}}).first->second;
-						for(auto t : p.second.threads) {
+						for(auto &t : p.second.threads) {
 							thread_actions.insert({t.first, action});
 						}
 					}
@@ -412,7 +412,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 					if(p != attached_processes.end()) {
 						std::map<uint64_t, Action> &thread_actions = process_actions.insert({p->first, {}}).first->second;
 						if(thread_id == -1) {
-							for(auto t : p->second.threads) {
+							for(auto &t : p->second.threads) {
 								thread_actions.insert({t.first, action});
 							}
 						} else {
@@ -455,7 +455,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			return;
 		}
 		std::vector<uint64_t> thread_ids;
-		for(auto t : p.second) {
+		for(auto &t : p.second) {
 			auto t_i = proc.threads.find(t.first);
 			if(t_i == proc.threads.end()) {
 				LogMessage(Warning, "no such thread: 0x%lx", t.first);
@@ -464,7 +464,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			thread_ids.push_back(t.first);
 		}
 		LogMessage(Debug, "continuing process");
-		for(auto t : thread_ids) {
+		for(auto &t : thread_ids) {
 			LogMessage(Debug, "  tid 0x%lx", t);
 		}
 		proc.debugger.ContinueDebugEvent(5, thread_ids);
@@ -745,7 +745,7 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 	}
 
 	if(interrupted || stub.waiting_for_stop) {
-		for(auto p : stub.attached_processes) {
+		for(auto &p : stub.attached_processes) {
 			if(interrupted && p.second.running) {
 				p.second.debugger.BreakProcess();
 			}
