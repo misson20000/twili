@@ -88,6 +88,11 @@ void GdbStub::AddMultiletterHandler(std::string name, void (GdbStub::*handler)(u
 	multiletter_handlers.emplace(name, handler);
 }
 
+void GdbStub::Stop() {
+	waiting_for_stop = false;
+	HandleGetStopReason(); // send reason
+}
+
 void GdbStub::ReadThreadId(util::Buffer &packet, int64_t &pid, int64_t &thread_id) {
 	pid = current_thread ? current_thread->process.pid : 0;
 	
@@ -150,6 +155,10 @@ void GdbStub::HandleGeneralSetQuery(util::Buffer &packet) {
 		LogMessage(Info, "unsupported query: '%s'", field.c_str());
 		connection.RespondEmpty();
 	}
+}
+
+void GdbStub::HandleIsThreadAlive(util::Buffer &packet) {
+	connection.RespondOk();
 }
 
 void GdbStub::HandleMultiletterPacket(util::Buffer &packet) {
@@ -294,6 +303,7 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	}
 
 	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
+	
 	r.first->second.IngestEvents(*this);
 
 	// ok
@@ -349,6 +359,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 				if(thread_id_buffer.ReadAvailable()) {
 					ReadThreadId(thread_id_buffer, pid, thread_id);
 				}
+				LogMessage(Debug, "vCont %ld, %ld action %c\n", pid, thread_id, ch);
 				if(pid == -1) {
 					for(auto p : attached_processes) {
 						std::map<uint64_t, Action> &thread_actions = process_actions.insert({p.first, {}}).first->second;
@@ -397,6 +408,12 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			continue;
 		}
 		Process &proc = p_i->second;
+		LogMessage(Debug, "ingesting process events before continue...");
+		if(proc.IngestEvents(*this)) {
+			LogMessage(Debug, "  stopped");
+			Stop();
+			return;
+		}
 		std::vector<uint64_t> thread_ids;
 		for(auto t : p.second) {
 			auto t_i = proc.threads.find(t.first);
@@ -406,8 +423,15 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			}
 			thread_ids.push_back(t.first);
 		}
+		LogMessage(Debug, "continuing process");
+		for(auto t : thread_ids) {
+			LogMessage(Debug, "  tid 0x%lx", t);
+		}
 		proc.debugger.ContinueDebugEvent(5, thread_ids);
+		proc.running = true;
 	}
+	waiting_for_stop = true;
+	LogMessage(Debug, "reached end of vCont");
 }
 
 void GdbStub::QueryGetSupported(util::Buffer &packet) {
@@ -504,14 +528,17 @@ void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 	connection.RespondOk();
 }
 
-void GdbStub::Process::IngestEvents(GdbStub &stub) {
+bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 	std::optional<nx::DebugEvent> event;
 
 	int signal = 0;
+	bool stopped = false;
 	
 	while(event = debugger.GetDebugEvent()) {
 		LogMessage(Debug, "got event: %d", event->event_type);
 
+		stopped = true;
+		
 		if(event->thread_id) {
 			auto t_i = threads.find(event->thread_id);
 			if(t_i != threads.end()) {
@@ -535,35 +562,47 @@ void GdbStub::Process::IngestEvents(GdbStub &stub) {
 			LogMessage(Warning, "thread exited");
 			break; }
 		case nx::DebugEvent::EventType::Exception: {
+			LogMessage(Warning, "hit exception");
+			running = false;
 			switch(event->exception.exception_type) {
 			case nx::DebugEvent::ExceptionType::Trap:
+				LogMessage(Warning, "trap");
 				signal = 5; // SIGTRAP
 				break;
 			case nx::DebugEvent::ExceptionType::InstructionAbort:
+				LogMessage(Warning, "instruction abort");
 				signal = 145; // EXC_BAD_ACCESS
 				break;
 			case nx::DebugEvent::ExceptionType::DataAbortMisc:
+				LogMessage(Warning, "data abort misc");
 				signal = 11; // SIGSEGV
 				break;
 			case nx::DebugEvent::ExceptionType::PcSpAlignmentFault:
+				LogMessage(Warning, "pc sp alignment fault");
 				signal = 145; // EXC_BAD_ACCESS
 				break;
 			case nx::DebugEvent::ExceptionType::DebuggerAttached:
+				LogMessage(Warning, "debugger attached");
 				signal = 0; // no signal
 				break;
 			case nx::DebugEvent::ExceptionType::BreakPoint:
+				LogMessage(Warning, "breakpoint");
 				signal = 5; // SIGTRAP
 				break;
 			case nx::DebugEvent::ExceptionType::UserBreak:
+				LogMessage(Warning, "user break");
 				signal = 149; // EXC_SOFTWARE
 				break;
 			case nx::DebugEvent::ExceptionType::DebuggerBreak:
+				LogMessage(Warning, "debugger break");
 				signal = 2; // SIGINT
 				break;
 			case nx::DebugEvent::ExceptionType::BadSvcId:
+				LogMessage(Warning, "bad svc id");
 				signal = 12; // SIGSYS
 				break;
 			case nx::DebugEvent::ExceptionType::SError:
+				LogMessage(Warning, "SError");
 				signal = 10; // SIGBUS
 				break;
 			}
@@ -571,10 +610,30 @@ void GdbStub::Process::IngestEvents(GdbStub &stub) {
 		}
 	}
 
-	util::Buffer stop_reason;
-	stop_reason.Write('T');
-	GdbConnection::Encode(signal, 1, stop_reason);
-	stub.stop_reason = stop_reason.GetString();
+	if(stopped) {
+		util::Buffer stop_reason;
+		stop_reason.Write('T');
+		GdbConnection::Encode(signal, 1, stop_reason);
+		stub.stop_reason = stop_reason.GetString();
+	}
+
+	if(!stub.has_async_wait) {
+		std::shared_ptr<bool> has_events = this->has_events;
+		debugger.AsyncWait(
+			[has_events, &stub](uint32_t r) {
+				stub.has_async_wait = false;
+				if(r == 0) {
+					LogMessage(Debug, "process got event signal");
+					*has_events = true;
+					stub.server.notifier.Notify();
+				} else {
+					LogMessage(Error, "process got error signal");
+				}
+			});
+		stub.has_async_wait = true;
+	}
+
+	return stopped;
 }
 
 GdbStub::Thread::Thread(Process &process, uint64_t thread_id) : process(process), thread_id(thread_id) {
@@ -585,6 +644,7 @@ std::vector<uint64_t> GdbStub::Thread::GetRegisters() {
 }
 
 GdbStub::Process::Process(uint64_t pid, ITwibDebugger debugger) : pid(pid), debugger(debugger) {
+	has_events = std::make_shared<bool>(false);
 }
 
 GdbStub::Logic::Logic(GdbStub &stub) : stub(stub) {
@@ -593,7 +653,8 @@ GdbStub::Logic::Logic(GdbStub &stub) : stub(stub) {
 void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 	server.Clear();
 	util::Buffer *buffer;
-	while((buffer = stub.connection.Process()) != nullptr) {
+	bool interrupted;
+	while((buffer = stub.connection.Process(interrupted)) != nullptr) {
 		LogMessage(Debug, "got message (0x%lx bytes)", buffer->ReadAvailable());
 		char ident;
 		if(!buffer->Read(ident)) {
@@ -627,6 +688,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 		case 'Q': // general set query
 			stub.HandleGeneralSetQuery(*buffer);
 			break;
+		case 'T': // is thread alive
+			stub.HandleIsThreadAlive(*buffer);
+			break;
 		case 'v': // variable
 			stub.HandleMultiletterPacket(*buffer);
 			break;
@@ -636,6 +700,21 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		}
 	}
+
+	if(interrupted || stub.waiting_for_stop) {
+		for(auto p : stub.attached_processes) {
+			if(interrupted && p.second.running) {
+				p.second.debugger.BreakProcess();
+			}
+			if(stub.waiting_for_stop && *p.second.has_events) {
+				if(p.second.IngestEvents(stub)) {
+					LogMessage(Debug, "stopping due to received event");
+					stub.Stop();
+				}
+			}
+		}
+	}
+	
 	server.AddSocket(stub.connection.in_socket);
 }
 

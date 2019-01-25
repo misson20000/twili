@@ -28,15 +28,21 @@ namespace gdb {
 GdbConnection::GdbConnection(int input_fd, int output_fd) : in_socket(*this, input_fd), out_socket(output_fd) {
 }
 
-util::Buffer *GdbConnection::Process() {
+util::Buffer *GdbConnection::Process(bool &interrupted) {
 	std::unique_lock<std::mutex> lock(mutex);
 	char ch;
+	interrupted = false;
 	while(in_buffer.Read(ch)) {
 		switch(state) {
 		case State::WAITING_PACKET_OPEN:
 			if(ch == '+') {
 				// ignore ack
 				break;
+			}
+			if(ch == 0x03) {
+				// break
+				interrupted = true;
+				return nullptr;
 			}
 			if(ch != '$') {
 				LogMessage(Error, "packet opened with bad character %c", ch);

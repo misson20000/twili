@@ -36,7 +36,7 @@ class GdbConnection {
 
 	// NULL pointer means no message.
 	// Entire buffer should be consumed before calling this again.
-	util::Buffer *Process();
+	util::Buffer *Process(bool &interrupted);
 
 	std::mutex mutex;
 	std::condition_variable error_condvar;

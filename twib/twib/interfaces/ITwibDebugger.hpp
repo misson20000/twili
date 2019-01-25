@@ -40,6 +40,7 @@ class ITwibDebugger {
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
 	void BreakProcess();
+	void AsyncWait(std::function<void(uint32_t)> &&cb);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

@@ -77,5 +77,11 @@ void ITwibDebugger::BreakProcess() {
 	obj->SendSmartSyncRequest(CommandID::BREAK_PROCESS);
 }
 
+void ITwibDebugger::AsyncWait(std::function<void(uint32_t)> &&func) {
+	obj->SendSmartRequest(
+		CommandID::WAIT_EVENT,
+		std::move(func));
+}
+
 } // namespace twib
 } // namespace twili

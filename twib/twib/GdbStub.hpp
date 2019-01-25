@@ -61,10 +61,12 @@ class GdbStub {
 	class Process {
 	 public:
 		Process(uint64_t pid, ITwibDebugger debugger);
-		void IngestEvents(GdbStub &stub);
+		bool IngestEvents(GdbStub &stub); // returns whether process is stopped
 		uint64_t pid;
 		ITwibDebugger debugger;
 		std::map<uint64_t, Thread> threads;
+		std::shared_ptr<bool> has_events;
+		bool running = false;
 	};
 	
 	Thread *current_thread = nullptr;
@@ -76,6 +78,10 @@ class GdbStub {
 	void AddMultiletterHandler(std::string name, void (GdbStub::*handler)(util::Buffer&));
 	
 	std::string stop_reason = "W00";
+	bool waiting_for_stop = false;
+	bool has_async_wait = false;
+
+	void Stop();
 	
  private:
 	ITwibDeviceInterface &itdi;
@@ -106,6 +112,7 @@ class GdbStub {
 	// packets
 	void HandleGeneralGetQuery(util::Buffer &packet);
 	void HandleGeneralSetQuery(util::Buffer &packet);
+	void HandleIsThreadAlive(util::Buffer &packet);
 	void HandleMultiletterPacket(util::Buffer &packet);
 	void HandleGetStopReason();
 	void HandleDetach(util::Buffer &packet);
