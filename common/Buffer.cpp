@@ -21,6 +21,7 @@
 #include "Buffer.hpp"
 
 #include<algorithm>
+#include<cstring>
 
 namespace twili {
 namespace util {
@@ -39,6 +40,13 @@ Buffer::~Buffer() {
 void Buffer::Write(const uint8_t *io, size_t size) {
 	EnsureSpace(size);
 	std::copy_n(io, size, data.begin() + write_head);
+	write_head+= size;
+}
+
+void Buffer::Write(const char *str) {
+	size_t size = strlen(str);
+	EnsureSpace(size);
+	std::copy_n(str, size, data.begin() + write_head);
 	write_head+= size;
 }
 

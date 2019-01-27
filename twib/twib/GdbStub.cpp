@@ -39,6 +39,7 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "fThreadInfo", &GdbStub::QueryGetFThreadInfo, false));
 	AddGettableQuery(Query(*this, "sThreadInfo", &GdbStub::QueryGetSThreadInfo, false));
 	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false));
+	AddGettableQuery(Query(*this, "Offsets", &GdbStub::QueryGetOffsets, false));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
 	AddMultiletterHandler("Cont?", &GdbStub::HandleVContQuery);
@@ -560,6 +561,30 @@ void GdbStub::QueryGetThreadExtraInfo(util::Buffer &packet) {
 	std::string extra_info("extra info goes here");
 	util::Buffer response;
 	GdbConnection::Encode(extra_info, response);
+	connection.Respond(response);
+}
+
+void GdbStub::QueryGetOffsets(util::Buffer &packet) {
+	if(current_thread == nullptr) {
+		connection.RespondError(1);
+		return;
+	}
+	
+	uint64_t addr = 0;
+	nx::MemoryInfo mi;
+	while((mi = std::get<0>(current_thread->process.debugger.QueryMemory(addr))).memory_type != 3) {
+		if(mi.base_addr + mi.size < addr) {
+			connection.RespondError(2);
+			return;
+		}
+		addr = mi.base_addr + mi.size;
+	}
+
+	LogMessage(Debug, "found aslr base at 0x%lx", addr);
+	
+	util::Buffer response;
+	response.Write("TextSeg=");
+	GdbConnection::Encode(addr, 8, response);
 	connection.Respond(response);
 }
 

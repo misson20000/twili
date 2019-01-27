@@ -31,6 +31,17 @@ ITwibDebugger::ITwibDebugger(std::shared_ptr<RemoteObject> obj) : obj(obj) {
 	
 }
 
+std::tuple<nx::MemoryInfo, nx::PageInfo> ITwibDebugger::QueryMemory(uint64_t addr) {
+	nx::MemoryInfo mi;
+	nx::PageInfo pi;
+	obj->SendSmartSyncRequest(
+		CommandID::QUERY_MEMORY,
+		in<uint64_t>(addr),
+		out<nx::MemoryInfo>(mi),
+		out<nx::PageInfo>(pi));
+	return std::make_tuple(mi, pi);
+}
+
 std::vector<uint8_t> ITwibDebugger::ReadMemory(uint64_t addr, uint64_t size) {
 	std::vector<uint8_t> bytes;
 	obj->SendSmartSyncRequest(

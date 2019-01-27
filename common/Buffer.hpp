@@ -43,7 +43,8 @@ public:
 	// bytes were actually read.
 	std::tuple<uint8_t*, size_t> Reserve(size_t size);
 	void MarkWritten(size_t size);
-	
+
+	void Write(const char *data);
 	void Write(const uint8_t *data, size_t size);
 	
 	template<typename T>

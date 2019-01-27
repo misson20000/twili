@@ -22,6 +22,19 @@ namespace twili {
 namespace twib {
 namespace nx {
 
+using PageInfo = uint32_t;
+
+struct MemoryInfo {
+	uint64_t base_addr;
+	uint64_t size;
+	uint32_t memory_type;
+	uint32_t memory_attribute;
+	uint32_t permission;
+	uint32_t device_ref_count;
+	uint32_t ipc_ref_count;
+	uint32_t padding;
+};
+
 struct DebugEvent {
 	enum class EventType : uint32_t {
 		AttachProcess = 0,

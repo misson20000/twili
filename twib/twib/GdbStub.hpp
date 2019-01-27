@@ -132,6 +132,7 @@ class GdbStub {
 	void QueryGetFThreadInfo(util::Buffer &packet);
 	void QueryGetSThreadInfo(util::Buffer &packet);
 	void QueryGetThreadExtraInfo(util::Buffer &packet);
+	void QueryGetOffsets(util::Buffer &packet);
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);

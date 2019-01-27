@@ -22,6 +22,7 @@
 
 #include<vector>
 #include<optional>
+#include<tuple>
 
 #include "../RemoteObject.hpp"
 #include "../DebugTypes.hpp"
@@ -34,7 +35,8 @@ class ITwibDebugger {
 	ITwibDebugger(std::shared_ptr<RemoteObject> obj);
 
 	using CommandID = protocol::ITwibDebugger::Command;
-	
+
+	std::tuple<nx::MemoryInfo, nx::PageInfo> QueryMemory(uint64_t addr);
 	std::vector<uint8_t> ReadMemory(uint64_t addr, uint64_t size);
 	void WriteMemory(uint64_t addr, std::vector<uint8_t> &bytes);
 	std::optional<nx::DebugEvent> GetDebugEvent();
