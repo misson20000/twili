@@ -107,6 +107,14 @@ void ITwibDebugger::BreakProcess() {
 	obj->SendSmartSyncRequest(CommandID::BREAK_PROCESS);
 }
 
+uint64_t ITwibDebugger::GetTargetEntry() {
+	uint64_t e;
+	obj->SendSmartSyncRequest(
+		CommandID::GET_TARGET_ENTRY,
+		out<uint64_t>(e));
+	return e;
+}
+
 void ITwibDebugger::AsyncWait(std::function<void(uint32_t)> &&func) {
 	obj->SendSmartRequest(
 		CommandID::WAIT_EVENT,

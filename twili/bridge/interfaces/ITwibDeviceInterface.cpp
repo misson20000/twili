@@ -218,7 +218,7 @@ void ITwibDeviceInterface::OpenActiveDebugger(bridge::ResponseOpener opener, uin
 	trn::KDebug debug = ResultCode::AssertOk(
 		trn::svc::DebugActiveProcess(pid));
 
-	opener.RespondOk(opener.MakeObject<ITwibDebugger>(twili, std::move(debug)));
+	opener.RespondOk(opener.MakeObject<ITwibDebugger>(twili, std::move(debug), twili.FindMonitoredProcess(pid)));
 }
 
 void ITwibDeviceInterface::GetMemoryInfo(bridge::ResponseOpener opener) {

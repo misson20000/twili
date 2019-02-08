@@ -98,6 +98,7 @@ class ITwibDebugger {
 		SET_THREAD_CONTEXT = 18,
 		GET_NSO_INFOS = 19,
 		WAIT_EVENT = 20,
+		GET_TARGET_ENTRY = 21,
 	};
 };
 

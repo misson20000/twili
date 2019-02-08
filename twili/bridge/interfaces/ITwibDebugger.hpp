@@ -31,11 +31,17 @@ namespace twili {
 
 class Twili;
 
+namespace process {
+
+class MonitoredProcess;
+
+} // namespace process
+
 namespace bridge {
 
 class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
  public:
-	ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug);
+	ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug, std::shared_ptr<process::MonitoredProcess> proc);
 
 	using CommandID = protocol::ITwibDebugger::Command;
 	
@@ -43,6 +49,7 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
 	Twili &twili;
 	trn::KDebug debug;
 	std::shared_ptr<trn::WaitHandle> wait_handle;
+	std::shared_ptr<process::MonitoredProcess> proc;
 	
 	void QueryMemory(bridge::ResponseOpener opener, uint64_t address);
 	void ReadMemory(bridge::ResponseOpener opener, uint64_t address, uint64_t size);
@@ -55,6 +62,7 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
 	void SetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id, uint32_t flags, thread_context_t context);
 	void GetNsoInfos(bridge::ResponseOpener opener);
 	void WaitEvent(bridge::ResponseOpener opener);
+	void GetTargetEntry(bridge::ResponseOpener opener);
 
  public:
 	SmartRequestDispatcher<
@@ -69,7 +77,8 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
 		SmartCommand<CommandID::CONTINUE_DEBUG_EVENT, &ITwibDebugger::ContinueDebugEvent>,
 		SmartCommand<CommandID::SET_THREAD_CONTEXT, &ITwibDebugger::SetThreadContext>,
 		SmartCommand<CommandID::GET_NSO_INFOS, &ITwibDebugger::GetNsoInfos>,
-		SmartCommand<CommandID::WAIT_EVENT, &ITwibDebugger::WaitEvent>
+		SmartCommand<CommandID::WAIT_EVENT, &ITwibDebugger::WaitEvent>,
+		SmartCommand<CommandID::GET_TARGET_ENTRY, &ITwibDebugger::GetTargetEntry>
 		> dispatcher;
 };
 

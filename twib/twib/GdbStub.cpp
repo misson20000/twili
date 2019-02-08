@@ -591,17 +591,19 @@ void GdbStub::QueryGetOffsets(util::Buffer &packet) {
 		return;
 	}
 	
-	uint64_t addr = 0;
-	nx::MemoryInfo mi;
-	while((mi = std::get<0>(current_thread->process.debugger.QueryMemory(addr))).memory_type != 3) {
-		if(mi.base_addr + mi.size < addr) {
-			connection.RespondError(2);
-			return;
+	uint64_t addr = current_thread->process.debugger.GetTargetEntry();
+	if(addr == 0) {
+		nx::MemoryInfo mi;
+		while((mi = std::get<0>(current_thread->process.debugger.QueryMemory(addr))).memory_type != 3) {
+			if(mi.base_addr + mi.size < addr) {
+				connection.RespondError(2);
+				return;
+			}
+			addr = mi.base_addr + mi.size;
 		}
-		addr = mi.base_addr + mi.size;
-	}
 
-	LogMessage(Debug, "found aslr base at 0x%lx", addr);
+		LogMessage(Debug, "found aslr base at 0x%lx", addr);
+	}
 	
 	util::Buffer response;
 	response.Write("TextSeg=");

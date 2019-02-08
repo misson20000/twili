@@ -24,13 +24,14 @@
 
 #include "err.hpp"
 #include "../../twili.hpp"
+#include "../../process/MonitoredProcess.hpp"
 
 using namespace trn;
 
 namespace twili {
 namespace bridge {
 
-ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug) : ObjectDispatcherProxy(*this, object_id), twili(twili), debug(std::move(debug)), dispatcher(*this) {
+ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug, std::shared_ptr<process::MonitoredProcess> proc) : ObjectDispatcherProxy(*this, object_id), twili(twili), debug(std::move(debug)), proc(proc), dispatcher(*this) {
 	
 }
 
@@ -135,6 +136,16 @@ void ITwibDebugger::WaitEvent(bridge::ResponseOpener opener) {
 			printf("reset wait handle\n");
 			return false;
 		});
+}
+
+void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
+	uint64_t addr = 0;
+
+	if(proc) {
+		addr = proc->GetTargetEntry();
+	}
+	
+	opener.RespondOk(std::move(addr));
 }
 
 } // namespace bridge
