@@ -41,6 +41,7 @@ class ITwibDebugger {
 	void WriteMemory(uint64_t addr, std::vector<uint8_t> &bytes);
 	std::optional<nx::DebugEvent> GetDebugEvent();
 	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
+	void SetThreadContext(uint64_t thread_id, std::vector<uint64_t> registeres);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
 	void BreakProcess();
 	void AsyncWait(std::function<void(uint32_t)> &&cb);

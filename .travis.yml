@@ -12,7 +12,7 @@ addons:
 env:
   global:
     - LIBTRANSISTOR_REPO=misson20000/libtransistor
-    - LIBTRANSISTOR_VERSION=v2.2.0-rc3
+    - LIBTRANSISTOR_VERSION=v2.2.0-rc4
 language: cpp
 jobs:
   include:

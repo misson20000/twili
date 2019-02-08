@@ -54,6 +54,7 @@ class GdbStub {
 	 public:
 		Thread(Process &process, uint64_t thread_id);
 		std::vector<uint64_t> GetRegisters();
+		void SetRegisters(std::vector<uint64_t> regs);
 		Process &process;
 		uint64_t thread_id = 0;
 	};
@@ -117,6 +118,7 @@ class GdbStub {
 	void HandleGetStopReason();
 	void HandleDetach(util::Buffer &packet);
 	void HandleReadGeneralRegisters();
+	void HandleWriteGeneralRegisters(util::Buffer &packet);
 	void HandleSetCurrentThread(util::Buffer &packet);
 	void HandleReadMemory(util::Buffer &packet);
 	void HandleWriteMemory(util::Buffer &packet);

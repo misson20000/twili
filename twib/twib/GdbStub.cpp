@@ -234,6 +234,27 @@ void GdbStub::HandleReadGeneralRegisters() {
 	}
 }
 
+void GdbStub::HandleWriteGeneralRegisters(util::Buffer &packet) {
+	if(current_thread == nullptr) {
+		LogMessage(Warning, "attempt to write registers with no selected thread");
+		connection.RespondError(1);
+	}
+
+	std::vector<uint8_t> registers_binary;
+	GdbConnection::Decode(registers_binary, packet);
+
+	std::vector<uint64_t> registers(36);
+	memcpy(registers.data(), registers_binary.data(), 284);
+	
+	try {
+		current_thread->SetRegisters(registers);
+		connection.RespondOk();
+	} catch(ResultError &e) {
+		LogMessage(Debug, "failed to write registers: 0x%x", e.code);
+		connection.RespondError(e.code);
+	}
+}
+
 void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 	if(packet.ReadAvailable() < 2) {
 		LogMessage(Warning, "invalid thread id");
@@ -708,6 +729,10 @@ std::vector<uint64_t> GdbStub::Thread::GetRegisters() {
 	return process.debugger.GetThreadContext(thread_id);
 }
 
+void GdbStub::Thread::SetRegisters(std::vector<uint64_t> registers) {
+	return process.debugger.SetThreadContext(thread_id, registers);
+}
+
 GdbStub::Process::Process(uint64_t pid, ITwibDebugger debugger) : pid(pid), debugger(debugger) {
 	has_events = std::make_shared<bool>(false);
 }
@@ -740,6 +765,9 @@ void GdbStub::Logic::Prepare(twibc::SocketServer &server) {
 			break;
 		case 'g': // read general registers
 			stub.HandleReadGeneralRegisters();
+			break;
+		case 'G': // write general registers
+			stub.HandleWriteGeneralRegisters(*buffer);
 			break;
 		case 'H': // set current thread
 			stub.HandleSetCurrentThread(*buffer);

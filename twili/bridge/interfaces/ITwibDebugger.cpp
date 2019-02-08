@@ -105,8 +105,11 @@ void ITwibDebugger::ContinueDebugEvent(bridge::ResponseOpener opener, uint32_t f
 	opener.RespondOk();
 }
 
-void ITwibDebugger::SetThreadContext(bridge::ResponseOpener opener) {
-	throw ResultError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
+void ITwibDebugger::SetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id, uint32_t flags, thread_context_t context) {
+	ResultCode::AssertOk(
+		trn::svc::SetDebugThreadContext(debug, thread_id, &context, flags));
+
+	opener.RespondOk();
 }
 
 void ITwibDebugger::GetNsoInfos(bridge::ResponseOpener opener) {

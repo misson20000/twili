@@ -84,6 +84,18 @@ std::vector<uint64_t> ITwibDebugger::GetThreadContext(uint64_t thread_id) {
 	return std::vector<uint64_t>(&tc.regs[0], &tc.regs[100]);
 }
 
+void ITwibDebugger::SetThreadContext(uint64_t thread_id, std::vector<uint64_t> regs) {
+	struct ThreadContext {
+		uint64_t regs[100];
+	} tc;
+	std::copy(regs.begin(), regs.end(), tc.regs);
+	obj->SendSmartSyncRequest(
+		CommandID::SET_THREAD_CONTEXT,
+		in<uint64_t>(thread_id),
+		in<uint32_t>(3), // gprs + pc + sp + cpsr
+		in<ThreadContext>(tc));
+}
+
 void ITwibDebugger::ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids) {
 	obj->SendSmartSyncRequest(
 		CommandID::CONTINUE_DEBUG_EVENT,
