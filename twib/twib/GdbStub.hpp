@@ -52,11 +52,12 @@ class GdbStub {
 	
 	class Thread {
 	 public:
-		Thread(Process &process, uint64_t thread_id);
+		Thread(Process &process, uint64_t thread_id, uint64_t tls_addr);
 		std::vector<uint64_t> GetRegisters();
 		void SetRegisters(std::vector<uint64_t> regs);
 		Process &process;
 		uint64_t thread_id = 0;
+		uint64_t tls_addr = 0;
 	};
 
 	class Process {

@@ -579,7 +579,39 @@ void GdbStub::QueryGetThreadExtraInfo(util::Buffer &packet) {
 	int64_t pid, thread_id;
 	ReadThreadId(packet, pid, thread_id);
 
-	std::string extra_info("extra info goes here");
+	auto i = attached_processes.find(pid);
+	if(i == attached_processes.end()) {
+		LogMessage(Debug, "no such process with pid 0x%x", pid);
+		connection.RespondError(1);
+		return;
+	}
+
+	Process &p = i->second;
+	
+	auto j = p.threads.find(thread_id);
+	if(j == p.threads.end()) {
+		LogMessage(Debug, "no such thread with tid 0x%x", thread_id);
+		connection.RespondError(1);
+		return;
+	}
+
+	Thread &t = j->second;
+
+	std::string extra_info;
+
+	try {
+		std::vector<uint8_t> tls_ctx_ptr_u8 = p.debugger.ReadMemory(t.tls_addr + 0x1f8, 8);
+		uint64_t tls_ctx_addr = *(uint64_t*) tls_ctx_ptr_u8.data();
+		std::vector<uint8_t> name_ptr_u8 = p.debugger.ReadMemory(tls_ctx_addr + 0x1a8, 8);
+		uint64_t name_addr = *(uint64_t*) name_ptr_u8.data();
+	
+		if(name_addr != 0) {
+			std::vector<uint8_t> name = p.debugger.ReadMemory(name_addr, 0x20);
+			extra_info = (char*) name.data();
+		}
+	} catch(ResultError &e) {
+	}
+	
 	util::Buffer response;
 	GdbConnection::Encode(extra_info, response);
 	connection.Respond(response);
@@ -640,7 +672,7 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 		case nx::DebugEvent::EventType::AttachThread: {
 			uint64_t thread_id = event->attach_thread.thread_id;
 			LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
-			auto r = threads.emplace(thread_id, Thread(*this, thread_id));
+			auto r = threads.emplace(thread_id, Thread(*this, thread_id, event->attach_thread.tls_pointer));
 			stub.current_thread = &r.first->second;
 			break; }
 		case nx::DebugEvent::EventType::ExitProcess: {
@@ -724,7 +756,7 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 	return stopped;
 }
 
-GdbStub::Thread::Thread(Process &process, uint64_t thread_id) : process(process), thread_id(thread_id) {
+GdbStub::Thread::Thread(Process &process, uint64_t thread_id, uint64_t tls_addr) : process(process), thread_id(thread_id), tls_addr(tls_addr) {
 }
 
 std::vector<uint64_t> GdbStub::Thread::GetRegisters() {
