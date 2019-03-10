@@ -32,32 +32,38 @@ namespace twili {
 namespace util {
 
 class Buffer {
-public:
+ public:
 	Buffer();
+	Buffer(size_t limit);
 	Buffer(std::vector<uint8_t> data);
 	~Buffer();
 
-	// reserves at least `size` bytes, returns a tuple of
-	// the write head pointer and a size of how many bytes
+	// Tries to reserve at least `size` bytes, returns a tuple
+	// of the write head pointer and a size of how many bytes
 	// can be written. call MarkWritten to mark how many
 	// bytes were actually read.
+	// If the buffer is unlimited, this will always return at
+	// least `size` bytes. Otherwise, it may return less.
 	std::tuple<uint8_t*, size_t> Reserve(size_t size);
 	void MarkWritten(size_t size);
-	
-	void Write(const uint8_t *data, size_t size);
+
+	// Write functions true on success, only failing if buffer is limited.
+	// If you've made an unlimited buffer, you don't have to worry about
+	// failures.
+	bool Write(const uint8_t *data, size_t size);
 	
 	template<typename T>
-	void Write(std::vector<T> data) {
+	bool Write(std::vector<T> data) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
-		Write((uint8_t*) data.data(), sizeof(T) * data.size());
+		return Write((uint8_t*) data.data(), sizeof(T) * data.size());
 	}
 
-	void Write(std::string &str);
+	bool Write(std::string &str);
 	
 	template<typename T>
-	void Write(T t) {
+	bool Write(T t) {
 		static_assert(std::is_standard_layout<T>::value, "T must be standard layout");
-		Write((uint8_t*) &t, sizeof(T));
+		return Write((uint8_t*) &t, sizeof(T));
 	}
 	
 	// if there is enough data in the buffer, it will overwrite
@@ -99,12 +105,17 @@ public:
 	std::vector<uint8_t> GetData();
 
 	void Compact(); // guarantees that data pending read won't be moved around
-private:
+ private:
 	std::vector<uint8_t> data;
 	size_t read_head = 0;
 	size_t write_head = 0;
+	std::optional<size_t> limit;
 
-	void EnsureSpace(size_t size);
+	// returns false if we would exceed limit, and doesn't expand
+	// vector.
+	bool EnsureSpace(size_t size);
+	// tries to expand vector, up to limit if necessary.
+	void TryEnsureSpace(size_t size);
 };
 
 } // namespace util

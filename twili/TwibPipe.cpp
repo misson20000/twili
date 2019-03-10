@@ -24,8 +24,8 @@
 
 using trn::ResultError;
 
-#define TP_Debug(...)
-//#define TP_Debug(...) printf(__VA_ARGS__)
+//#define TP_Debug(...)
+#define TP_Debug(...) printf(__VA_ARGS__)
 
 namespace twili {
 
@@ -33,7 +33,9 @@ namespace twili {
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-TwibPipe::TwibPipe() {
+TwibPipe::TwibPipe(size_t buffer_limit) :
+	buffer(buffer_limit) {
+	TP_Debug("made TwibPipe(0x%lx)\n", buffer_limit);
 }
 
 TwibPipe::~TwibPipe() {
@@ -83,40 +85,87 @@ TwibPipe::ReadPendingState::ReadPendingState(std::function<size_t(uint8_t*, size
 
 void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb) {
 	TP_Debug("TwibPipe(%s): Read\n", StateName(state));
-
+	
 	std::visit(overloaded {
 			[&](IdleState &idle) {
-				state.template emplace<ReadPendingState>(cb);
+				// Try to read from buffer.
+				if(buffer.ReadAvailable() > 0) {
+					TP_Debug("  buffer has 0x%lx bytes remaining\n", buffer.ReadAvailable());
+					// There was buffered data, so send it to the read handler.
+					size_t read_size = cb(buffer.Read(), buffer.ReadAvailable());
+					// Mark how many bytes we read out of the buffer.
+					buffer.MarkRead(read_size);
+					TP_Debug("  read 0x%lx bytes from buffer\n", read_size);
+				} else {
+					// Didn't read, so enter read pending state.
+					state.template emplace<ReadPendingState>(cb);
+					TP_Debug("  entering read pending state\n");
+				}
 			},
 			[&](WritePendingState &wps) {
-				// signal our async read handler that there was data waiting for us
-				size_t read_size = cb(wps.data, wps.size);
-				if(!std::holds_alternative<WritePendingState>(state)) {
-					if(!IsClosed()) {
-						throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
-					} else {
-						return;
-					}
+				TP_Debug("  trying to flush WPS to buffer\n");
+				// Try to exit write-pending state by flushing to buffer.
+				if(FlushWritePendingState(wps)) {
+					// Re-enter if that worked, since we will have changed state.
+					TP_Debug("  flushed, retrying...\n");
+					return Read(cb);
 				}
 
-				if(read_size < wps.size) {
-					// we didn't read everything, so adjust the write pending state
-					// and stay in it.
+				TP_Debug("  trying to read from buffer before WPS (remaining 0x%lx)\n", buffer.ReadAvailable());
+				
+				// Try to read out of buffer.
+				if(buffer.ReadAvailable() > 0) {
+					// There was buffered data, so send it to the read handler.
+					size_t read_size = cb(buffer.Read(), buffer.ReadAvailable());
+
+					TP_Debug("  read 0x%lx\n", read_size);
+					
+					// Check if that made us exit WPS, and assert that if we did exit WPS,
+					// it's because we closed.
+					if(!std::holds_alternative<WritePendingState>(state)) {
+						if(!IsClosed()) {
+							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+						} else {
+							return;
+						}
+					}
+					
+					// Mark how many bytes we read out of the buffer.
+					buffer.MarkRead(read_size);
+
+					// Try to flush write-pending state to buffer.
+					FlushWritePendingState(wps);
+
+					// Don't need to re-enter, since we already used up this read callback.
+				} else {
+					TP_Debug ("  transferring directly from WPS\n");
+					// Couldn't read from buffer.
+					// Either limit = 0 (enforcing synchronous pipes), or wps' data
+					// wouldn't fit in buffer. Read data directly from wps in that case.
+					size_t read_size = cb(wps.data, wps.size);
+
+					// Check if that made us exit WPS, and assert that if we did exit WPS,
+					// it's because we closed.
+					if(!std::holds_alternative<WritePendingState>(state)) {
+						if(!IsClosed()) {
+							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+						} else {
+							return;
+						}
+					}
+
+					// sanity
+					if(read_size > wps.size) {
+						throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+					}
+
+					// Adjust WPS based on how much we read out.
 					wps.data+= read_size;
 					wps.size-= read_size;
-				} else if(read_size == wps.size) {
-					// move this out so we control lifetime, since we change state.
-					std::function<void(bool eof)> cb = std::move(wps.cb);
 
-					// switch state before invoking write handler so that write handler
-					// can change state if it wants.
-					state.template emplace<IdleState>();
-					
-					// we read everything, so signal our write handler that it finished
-					// writing.
-					cb(false);
-				} else {
-					throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+					// Try to flush out WPS again, now that it's smaller.
+					// If we read the whole thing, this will exit WPS.
+					FlushWritePendingState(wps);
 				}
 			},
 			[&](ReadPendingState &rps) {
@@ -139,7 +188,14 @@ void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> c
 
 	std::visit(overloaded {
 			[&](IdleState &idle) {
-				state.template emplace<WritePendingState>(data, size, cb);
+				// Try to buffer and return immediately.
+				if(buffer.Write(data, size)) {
+					// Successfully stored in buffer, return immediately.
+					cb(false);
+				} else {
+					// Buffer was full, need to wait.
+					state.template emplace<WritePendingState>(data, size, cb);
+				}
 			},
 			[&](WritePendingState &wps) {
 				throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
@@ -182,6 +238,36 @@ void TwibPipe::Close() {
 			},
 		}, state);
 	state.template emplace<ClosedState>();
+}
+
+bool TwibPipe::FlushWritePendingState(WritePendingState &wps) {
+	// Try to transfer bytes from wps to buffer.
+	std::tuple<uint8_t*, size_t> r = buffer.Reserve(wps.size);
+	size_t allowed_transfer_size = std::min(std::get<1>(r), wps.size);
+	std::copy_n(wps.data, allowed_transfer_size, std::get<0>(r));
+
+	if(allowed_transfer_size < wps.size) {
+		// didn't transfer everything, so adjust write pending state
+		// and stay in it.
+		wps.data+= std::get<1>(r);
+		wps.size-= std::get<1>(r);
+		return false;
+	} else {
+		ExitWritePendingState(wps);
+		
+		return true;
+	}
+}
+
+void TwibPipe::ExitWritePendingState(WritePendingState &wps) {
+	// move this out so we control lifetime, since we change state.
+	std::function<void(bool eof)> write_cb = std::move(wps.cb);
+
+	// Switch state before invoking write handler so that write handler
+	// can change state if it wants.
+	state.template emplace<IdleState>();
+					
+	write_cb(false);
 }
 
 } // namespace twili

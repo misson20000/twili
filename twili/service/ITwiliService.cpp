@@ -140,7 +140,7 @@ trn::ResultCode ITwiliService::OpenAppletShim(trn::ipc::InPid pid, trn::ipc::InH
 trn::ResultCode ITwiliService::CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0x5, 0> name_buffer, trn::ipc::OutObject<IPipe> &val) {
 	std::string name((char*) name_buffer.data, (char*) name_buffer.data + strnlen((char*) name_buffer.data, name_buffer.size));
 
-	auto r = twili->named_pipes.emplace(name, std::make_shared<TwibPipe>());
+	auto r = twili->named_pipes.emplace(name, std::make_shared<TwibPipe>(twili->config.pipe_buffer_size_limit));
 	if(r.second) {
 		val.value = trn::ResultCode::AssertOk(server->CreateObject<IPipeTwib>(this, r.first->second));
 		return RESULT_OK;

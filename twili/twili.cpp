@@ -150,6 +150,10 @@ Twili::Config::Config() {
 		fprintf(f, "hbmenu_path = %s\n", hbm_path.c_str());
 		fprintf(f, "temp_directory = %s\n", temp_directory.c_str());
 		fprintf(f, "\n");
+		fprintf(f, "[pipes]\n");
+		fprintf(f, "; 0 forces pipes to be synchronous\n");
+		fprintf(f, "pipe_buffer_size_limit = 0x%lx\n", pipe_buffer_size_limit);
+		fprintf(f, "\n");
 		fprintf(f, "[logging]\n");
 		fprintf(f, "verbosity = %d\n", logging_verbosity);
 		fprintf(f, "enable_usb = %s\n", enable_usb_log ? "true" : "false");
@@ -174,6 +178,8 @@ Twili::Config::Config() {
 		hbm_path = reader.Get("twili", "hbmenu_path", hbm_path);
 		temp_directory = reader.Get("twili", "temp_directory", temp_directory);
 
+		pipe_buffer_size_limit = reader.GetInteger("pipes", "pipe_buffer_size_limit", pipe_buffer_size_limit);
+		
 		logging_verbosity = reader.GetInteger("logging", "verbosity", logging_verbosity);
 		enable_usb_log = reader.GetBoolean("logging", "enable_usb", enable_usb_log);
 		

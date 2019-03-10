@@ -37,7 +37,11 @@ namespace process {
 
 using trn::ResultCode;
 
-MonitoredProcess::MonitoredProcess(Twili &twili) : Process(twili) {
+MonitoredProcess::MonitoredProcess(Twili &twili) :
+	Process(twili),
+	tp_stdin(std::make_shared<TwibPipe>(twili.config.pipe_buffer_size_limit)),
+	tp_stdout(std::make_shared<TwibPipe>(twili.config.pipe_buffer_size_limit)),
+	tp_stderr(std::make_shared<TwibPipe>(twili.config.pipe_buffer_size_limit)) {
 
 }
 

@@ -25,11 +25,13 @@
 #include<variant>
 #include<functional>
 
+#include "Buffer.hpp"
+
 namespace twili {
 
 class TwibPipe {
  public:
-	TwibPipe();
+	TwibPipe(size_t buffer_limit);
 	~TwibPipe();
 	
 	// Callback returns how much data was read.
@@ -44,6 +46,7 @@ class TwibPipe {
  private:
 	struct IdleState {
 	};
+	
 	struct WritePendingState {
 		WritePendingState(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
 
@@ -53,11 +56,13 @@ class TwibPipe {
 		size_t size;
 		std::function<void(bool eof)> cb;
 	};
+	
 	struct ReadPendingState {
 		ReadPendingState(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
 		
 		std::function<size_t(uint8_t *data, size_t actual_size)> cb;
 	};
+	
 	struct ClosedState {
 	};
 
@@ -65,6 +70,14 @@ class TwibPipe {
 	state_variant state;
 	
 	static const char *StateName(state_variant &v);
+	
+	// Try to flush WPS to buffer. If we flush the whole thing, exit it.
+	bool FlushWritePendingState(WritePendingState &wps);
+	
+	// Exit WPS.
+	void ExitWritePendingState(WritePendingState &wps);
+	
+	util::Buffer buffer;
 };
 
 }

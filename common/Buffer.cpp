@@ -29,6 +29,11 @@ Buffer::Buffer() :
 	data(2048, 0) {
 }
 
+Buffer::Buffer(size_t limit) :
+	data(std::min((size_t) 2048, limit), 0),
+	limit(limit) {
+}
+
 Buffer::Buffer(std::vector<uint8_t> data) :
 	data(data), write_head(data.size()) {
 }
@@ -36,18 +41,21 @@ Buffer::Buffer(std::vector<uint8_t> data) :
 Buffer::~Buffer() {
 }
 
-void Buffer::Write(const uint8_t *io, size_t size) {
-	EnsureSpace(size);
+bool Buffer::Write(const uint8_t *io, size_t size) {
+	if(!EnsureSpace(size)) {
+		return false;
+	}
 	std::copy_n(io, size, data.begin() + write_head);
 	write_head+= size;
+	return true;
 }
 
-void Buffer::Write(std::string &string) {
-	Write((uint8_t*) string.data(), string.size());
+bool Buffer::Write(std::string &string) {
+	return Write((uint8_t*) string.data(), string.size());
 }
 
 std::tuple<uint8_t*, size_t> Buffer::Reserve(size_t size) {
-	EnsureSpace(size);
+	TryEnsureSpace(size);
 	return std::make_tuple(data.data() + write_head, data.size() - write_head);
 }
 
@@ -94,12 +102,29 @@ size_t Buffer::WriteAvailableHint() {
 	return data.size() - write_head;
 }
 
-void Buffer::EnsureSpace(size_t size) {
+bool Buffer::EnsureSpace(size_t size) {
 	if(write_head + size > data.size()) {
 		Compact();
 	}
 	if(write_head + size > data.size()) {
+		if(limit && write_head + size > *limit) {
+			return false;
+		}
 		data.resize(write_head + size);
+	}
+	return true;
+}
+
+void Buffer::TryEnsureSpace(size_t size) {
+	if(write_head + size > data.size()) {
+		Compact();
+	}
+	if(write_head + size > data.size()) {
+		if(limit && write_head + size > *limit) {
+			data.resize(*limit);
+		} else {
+			data.resize(write_head + size);
+		}
 	}
 }
 
