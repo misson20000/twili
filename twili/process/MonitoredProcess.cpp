@@ -124,9 +124,9 @@ void MonitoredProcess::ChangeState(State new_state) {
 	printf("process [0x%lx] changing to state %d\n", GetPid(), (int) new_state);
 	if(new_state == State::Exited) {
 		// close pipes
-		tp_stdin->Close();
-		tp_stdout->Close();
-		tp_stderr->Close();
+		tp_stdin->CloseReader();
+		tp_stdout->CloseWriter();
+		tp_stderr->CloseWriter();
 	}
 	state = new_state;
 	const std::list<ProcessMonitor*> monitors_immut(monitors);
@@ -167,9 +167,9 @@ void MonitoredProcess::RemoveMonitor(ProcessMonitor &monitor) {
 }
 
 MonitoredProcess::~MonitoredProcess() {
-	tp_stdin->Close();
-	tp_stdout->Close();
-	tp_stderr->Close();
+	tp_stdin->CloseReader();
+	tp_stdout->CloseWriter();
+	tp_stderr->CloseWriter();
 }
 
 } // namespace process

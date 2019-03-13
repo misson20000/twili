@@ -32,11 +32,11 @@ ITwibPipeWriter::ITwibPipeWriter(uint32_t device_id, std::shared_ptr<TwibPipe> p
 }
 
 ITwibPipeWriter::~ITwibPipeWriter() {
-	pipe->Close();
+	pipe->CloseWriter();
 }
 
 void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) {
-	if(pipe->IsClosed()) {
+	if(pipe->IsWriterClosed()) {
 		opener.RespondError(TWILI_ERR_EOF);
 	}
 	
@@ -114,7 +114,7 @@ void ITwibPipeWriter::Write(bridge::ResponseOpener opener, InputStream &stream) 
 }
 
 void ITwibPipeWriter::Close(bridge::ResponseOpener opener) {
-	pipe->Close();
+	pipe->CloseWriter();
 	opener.RespondOk();
 }
 

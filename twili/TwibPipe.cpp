@@ -24,8 +24,8 @@
 
 using trn::ResultError;
 
-//#define TP_Debug(...)
-#define TP_Debug(...) printf(__VA_ARGS__)
+#define TP_Debug(...)
+//#define TP_Debug(...) printf(__VA_ARGS__)
 
 namespace twili {
 
@@ -39,11 +39,7 @@ TwibPipe::TwibPipe(size_t buffer_limit) :
 }
 
 TwibPipe::~TwibPipe() {
-	Close();
-}
-
-bool TwibPipe::IsClosed() {
-	return std::holds_alternative<ClosedState>(state);
+	CloseWriter();
 }
 
 const char *TwibPipe::StateName(state_variant &v) {
@@ -54,14 +50,13 @@ const char *TwibPipe::StateName(state_variant &v) {
 		return "WritePending";
 	case 2:
 		return "ReadPending";
-	case 3:
-		return "Closed";
 	default:
 		return "Invalid";
 	}
 }
 
 void TwibPipe::PrintDebugInfo(const char *indent) {
+	printf("%shit_eof: %s\n", indent, hit_eof ? "true" : "false");
 	printf("%sstate: %s\n", indent, StateName(state));
 	std::visit(overloaded {
 			[&](IdleState &idle) {
@@ -71,10 +66,12 @@ void TwibPipe::PrintDebugInfo(const char *indent) {
 				printf("%s  size: 0x%lx\n", indent, wps.size);
 			},
 			[&](ReadPendingState &rps) {
-			},
-			[&](ClosedState &cs) {
 			}
 		}, state);
+}
+
+bool TwibPipe::IsWriterClosed() {
+	return hit_eof;
 }
 
 TwibPipe::WritePendingState::WritePendingState(uint8_t *data, size_t size, std::function<void(bool eof)> cb) : data(data), size(size), cb(cb) {
@@ -97,9 +94,14 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 					buffer.MarkRead(read_size);
 					TP_Debug("  read 0x%lx bytes from buffer\n", read_size);
 				} else {
-					// Didn't read, so enter read pending state.
-					state.template emplace<ReadPendingState>(cb);
-					TP_Debug("  entering read pending state\n");
+					if(hit_eof) {
+						TP_Debug("  hit eof, signaling as such\n");
+						cb(nullptr, 0);
+					} else {
+						// Didn't read, so enter read pending state.
+						state.template emplace<ReadPendingState>(cb);
+						TP_Debug("  entering read pending state\n");
+					}
 				}
 			},
 			[&](WritePendingState &wps) {
@@ -121,9 +123,9 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 					TP_Debug("  read 0x%lx\n", read_size);
 					
 					// Check if that made us exit WPS, and assert that if we did exit WPS,
-					// it's because we closed.
+					// it's because we hit EoF.
 					if(!std::holds_alternative<WritePendingState>(state)) {
-						if(!IsClosed()) {
+						if(!hit_eof) {
 							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
 						} else {
 							return;
@@ -147,7 +149,7 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 					// Check if that made us exit WPS, and assert that if we did exit WPS,
 					// it's because we closed.
 					if(!std::holds_alternative<WritePendingState>(state)) {
-						if(!IsClosed()) {
+						if(!hit_eof) {
 							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
 						} else {
 							return;
@@ -171,9 +173,6 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 			[&](ReadPendingState &rps) {
 				throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
 			},
-			[&](ClosedState &c) {
-				cb(nullptr, 0);
-			},
 		}, state);
 }
 
@@ -181,11 +180,11 @@ void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> c
 	TP_Debug("TwibPipe(%s): Write(%p, 0x%lx)\n", StateName(state), data, size);
 
 	// short-circuit zero-size writes so as not to confuse read handler
-	if(size == 0) {
-		cb(IsClosed());
+	if(size == 0 || hit_eof) {
+		cb(hit_eof);
 		return;
 	}
-
+	
 	std::visit(overloaded {
 			[&](IdleState &idle) {
 				// Try to buffer and return immediately.
@@ -219,25 +218,42 @@ void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> c
 				} else {
 					throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
 				}
-			},
-			[&](ClosedState &cs) {
-				throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
-			},
+			}
 		}, state);
 }
 
-void TwibPipe::Close() {
+void TwibPipe::CloseReader() {
+	hit_eof = true;
 	std::visit(overloaded {
+			[&](IdleState &is) {
+			},
 			[&](WritePendingState &wps) {
+				// signal EoF for writer
 				wps.cb(true);
 			},
 			[&](ReadPendingState &rps) {
+				// signal EoF for reader
 				rps.cb(nullptr, 0);
 			},
-			[&](auto &_) {
+		}, state);
+	state.template emplace<IdleState>();
+}
+
+void TwibPipe::CloseWriter() {
+	hit_eof = true;
+	std::visit(overloaded {
+			[&](IdleState &is) {
+			},
+			[&](WritePendingState &wps) {
+				// closing while you're writing is a strange thing to do...
+				// signal EoF after pending data has been read out.
+			},
+			[&](ReadPendingState &rps) {
+				// signal EoF for reader
+				rps.cb(nullptr, 0);
+				state.template emplace<IdleState>();
 			},
 		}, state);
-	state.template emplace<ClosedState>();
 }
 
 bool TwibPipe::FlushWritePendingState(WritePendingState &wps) {
