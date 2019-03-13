@@ -26,7 +26,7 @@ namespace twili {
 namespace util {
 
 Buffer::Buffer() :
-	data(2 * 1024 * 1024, 0) {
+	data(2048, 0) {
 }
 
 Buffer::Buffer(std::vector<uint8_t> data) :
