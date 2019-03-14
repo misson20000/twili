@@ -20,8 +20,9 @@
 
 #pragma once
 
+#include "platform.hpp"
+#include "platform/EventLoop.hpp"
 #include "MessageConnection.hpp"
-#include "SocketServer.hpp"
 #include "EventThreadNotifier.hpp"
 
 namespace twili {
@@ -29,12 +30,12 @@ namespace twibc {
 
 class SocketMessageConnection : public MessageConnection {
  public:
-	SocketMessageConnection(SOCKET fd, const EventThreadNotifier &notifier);
+	SocketMessageConnection(platform::Socket &&socket, const EventThreadNotifier &notifier);
 	virtual ~SocketMessageConnection() override;
 
-	class MessageSocket : public SocketServer::Socket {
+	class ConnectionMember : public platform::EventLoop::SocketMember {
 	 public:
-		MessageSocket(SocketMessageConnection &connection, SOCKET fd);
+		ConnectionMember(SocketMessageConnection &connection, platform::Socket &&socket);
 
 		virtual bool WantsRead() override;
 		virtual bool WantsWrite() override;
@@ -43,7 +44,7 @@ class SocketMessageConnection : public MessageConnection {
 		virtual void SignalError() override;
 	 private:
 		SocketMessageConnection &connection;
-	} socket;
+	} member;
 
  protected:
 	virtual bool RequestInput() override;

@@ -51,7 +51,7 @@ class TCPBackend {
 	
 	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
 	 public:
-		Device(SOCKET fd, TCPBackend &backend);
+		Device(platform::Socket &&socket, TCPBackend &backend);
 		~Device();
 
 		void Begin();
@@ -73,30 +73,26 @@ class TCPBackend {
 	Twibd &twibd;
 	std::list<std::shared_ptr<Device>> devices;
 
-	class ListenSocket : public twibc::SocketServer::Socket {
+	class ListenMember : public platform::EventLoop::SocketMember {
 	 public:
-		ListenSocket(TCPBackend &backend);
-		ListenSocket(TCPBackend &backend, SOCKET fd);
+		ListenMember(TCPBackend &backend, platform::Socket &&socket);
 
-		ListenSocket &operator=(SOCKET fd);
-		
 		virtual bool WantsRead() override;
 		virtual void SignalRead() override;
 		virtual void SignalError() override;
-		
 	 private:
 		TCPBackend &backend;
-	} listen_socket;
+	} listen_member;
 
-	class ServerLogic : public twibc::SocketServer::Logic {
+	class ServerLogic : public platform::EventLoop::Logic {
 	 public:
 		ServerLogic(TCPBackend &backend);
-		virtual void Prepare(twibc::SocketServer &server) override;
+		virtual void Prepare(platform::EventLoop &loop) override;
 	 private:
 		TCPBackend &backend;
 	} server_logic;
 	
-	twibc::SocketServer socket_server;
+	platform::EventLoop event_loop;
 };
 
 } // namespace backend

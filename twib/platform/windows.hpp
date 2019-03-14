@@ -20,12 +20,32 @@
 
 #pragma once
 
+#ifdef _WINDOWS_
+#error windows already included
+#endif
+
+#define NOMINMAX
+#include<Winsock2.h>
+#include<WS2tcpip.h>
+#include<io.h>
 #include<Windows.h>
 
 #include<stdint.h>
 
+typedef signed long long ssize_t; // pls
+
 namespace twili {
 namespace platform {
+
+static inline char *NetErrStr() {
+	char *s = NULL;
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, WSAGetLastError(),
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPTSTR)&s, 0, NULL);
+	return s;
+}
+
 namespace windows {
 
 class KObject {
@@ -60,6 +80,31 @@ public:
 	Pipe &operator=(HANDLE handle);
 };
 
+class Socket {
+ public:
+	Socket();
+	Socket(Socket &&);
+	Socket &operator=(Socket &&);
+	Socket(const Socket&) = delete;
+	Socket &operator=(const Socket&) = delete;
+	
+	Socket(SOCKET fd);
+	~Socket();
+
+	Socket &operator=(SOCKET fd);
+
+	bool IsValid();
+	void Close();
+
+	SOCKET fd;
+ private:
+	bool is_valid = false;
+};
+
 } // namespace windows
+
+using EventType = windows::Event;
+using SocketType = windows::Socket;
+
 } // namespace platform
 } // namespace twili

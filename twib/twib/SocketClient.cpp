@@ -26,13 +26,13 @@ namespace twili {
 namespace twib {
 namespace client {
 
-SocketClient::SocketClient(SOCKET fd) : server_logic(*this), socket_server(server_logic), connection(fd, socket_server.notifier) {
-	socket_server.Begin();
+SocketClient::SocketClient(platform::Socket &&socket) : server_logic(*this), event_loop(server_logic), connection(std::move(socket), event_loop.GetEventThreadNotifier()) {
+	event_loop.Begin();
 }
 
 SocketClient::~SocketClient() {
-	socket_server.Destroy();
-	connection.socket.Close();
+	event_loop.Destroy();
+	connection.member.socket.Close();
 }
 
 void SocketClient::SendRequestImpl(const Request &rq) {
@@ -51,14 +51,14 @@ void SocketClient::SendRequestImpl(const Request &rq) {
 SocketClient::Logic::Logic(SocketClient &client) : client(client) {
 }
 
-void SocketClient::Logic::Prepare(twibc::SocketServer &server) {
-	server.Clear();
+void SocketClient::Logic::Prepare(platform::EventLoop &loop) {
+	loop.Clear();
 	twibc::MessageConnection::Request *rq;
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}
 	if(!client.connection.error_flag) {
-		server.AddSocket(client.connection.socket);
+		loop.AddMember(client.connection.member);
 	} else {
 		client.FailAllRequests(TWILI_ERR_IO_ERROR);
 	}

@@ -29,53 +29,53 @@
 
 #include<stdint.h>
 
-#include "platform/windows.hpp"
+#include "platform/unix.hpp"
 #include "platform/EventLoop.hpp"
 
 namespace twili {
 namespace platform {
-namespace windows {
+namespace unix {
 namespace detail {
 
 class EventLoop;
 
-class EventLoopEventMember {
+class EventLoopFileMember {
 	friend class EventLoop;
- protected:
-	virtual bool WantsSignal();
-	virtual void Signal();
-	virtual Event &GetEvent() = 0;
- private:
-	size_t last_service = 0;
-};
-
-class EventLoopSocketMember : public EventLoopEventMember {
  protected:
 	virtual bool WantsRead();
 	virtual bool WantsWrite();
 	virtual void SignalRead();
 	virtual void SignalWrite();
 	virtual void SignalError();
-	virtual Socket &GetSocket() = 0;
+	virtual File &GetFile() = 0;
  private:
-	virtual bool WantsSignal() override final;
-	virtual void Signal() override final;
-	virtual Event &GetEvent() override final = 0;
-	
-	platform::windows::Event event;
 	size_t last_service = 0;
 };
 
-class EventLoop : public platform::detail::EventLoopBase<EventLoop, EventMember> {
+// to provide a common interface
+class EventLoopSocketMember : public EventLoopFileMember {
+ public:
+	EventLoopSocketMember(Socket &&socket);
+
+	Socket socket;
+ private:
+	virtual File &GetFile() final override;
+};
+
+class EventLoop : public platform::detail::EventLoopBase<EventLoop, EventLoopFileMember> {
 public:
-	using EventMember = EventLoopEventMember;
+	using FileMember = EventLoopFileMember;
 	using SocketMember = EventLoopSocketMember;
+
+	EventLoop(Logic &logic);
+	~EventLoop();
 	
 	virtual const twibc::EventThreadNotifier &GetEventThreadNotifier() override;
 protected:
 	virtual void event_thread_func() override;
 
-	Event notification_event;
+	// TODO: use File to RAII this
+	int notification_pipe[2];
 	class EventThreadNotifier : public twibc::EventThreadNotifier {
 	public:
 		EventThreadNotifier(EventLoop &loop);
@@ -86,9 +86,9 @@ protected:
 };
 
 } // namespace detail
-} // namespace windows
+} // namespace unix
 
-using EventLoop = windows::detail::EventLoop;
+using EventLoop = unix::detail::EventLoop;
 
 } // namespace platform
 } // namespace twili

@@ -45,12 +45,12 @@ namespace frontend {
 class SocketFrontend : public Frontend {
 	public:
 	SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen);
-	SocketFrontend(Twibd &twibd, int fd);
+	SocketFrontend(Twibd &twibd, platform::Socket &&socket);
 	~SocketFrontend();
 
 	class Client : public twibd::Client {
 		public:
-		Client(SOCKET fd, SocketFrontend &frontend);
+		Client(platform::Socket &&socket, SocketFrontend &frontend);
 		~Client();
 
 		virtual void PostResponse(Response &r) override;
@@ -62,25 +62,21 @@ class SocketFrontend : public Frontend {
 
  private:
 	Twibd &twibd;
-	class ServerSocket : public twibc::SocketServer::Socket {
+	class ServerMember : public platform::EventLoop::SocketMember {
 	 public:
-		ServerSocket(SocketFrontend &frontend);
-		ServerSocket(SocketFrontend &frontend, SOCKET fd);
-
-		ServerSocket &operator=(SOCKET fd);
+		ServerMember(SocketFrontend &frontend, platform::Socket &&socket);
 		
 		virtual bool WantsRead() override;
 		virtual void SignalRead() override;
 		virtual void SignalError() override;
-		
 	 private:
 		SocketFrontend &frontend;
-	} server_socket;
+	} server_member;
 
-	class ServerLogic : public twibc::SocketServer::Logic {
+	class ServerLogic : public platform::EventLoop::Logic {
 	 public:
 		ServerLogic(SocketFrontend &frontend);
-		virtual void Prepare(twibc::SocketServer &server) override;
+		virtual void Prepare(platform::EventLoop &loop) override;
 	 private:
 		SocketFrontend &frontend;
 	} server_logic;
@@ -89,10 +85,10 @@ class SocketFrontend : public Frontend {
 	int socktype;
 	struct sockaddr_storage bind_addr;
 	size_t bind_addrlen;
-	void UnlinkIfUnix();
+	//TODO: void UnlinkIfUnix();
 	
 	std::list<std::shared_ptr<Client>> clients;
-	twibc::SocketServer socket_server;
+	platform::EventLoop event_loop;
 };
 
 } // namespace frontend

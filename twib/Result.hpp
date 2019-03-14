@@ -20,30 +20,30 @@
 
 #pragma once
 
-/*
+#include<optional>
+#include<expected.hpp>
+
 namespace twili {
-namespace platform {
+namespace twib {
 
-char *NetErrStr();
+struct ResultCode {
+ public:
+	static tl::expected<std::nullopt_t, ResultCode> ExpectOk(result_t code);
+	static void AssertOk(result_t code);
+	template<typename T> static T&& AssertOk(tl::expected<T, ResultCode> &&monad);
+	
+	ResultCode(result_t code);
+	inline bool IsOk() {
+		return code == RESULT_OK;
+	}
 
-class EventLoopType : EventLoop {
+	trn_result_description_t Lookup();
+	
+	result_t code;
 };
 
-} // namespace platform
+template<typename T>
+using Result = tl::expected<T, ResultCode>;
+
+} // namespace twib
 } // namespace twili
-*/
-
-
-#ifdef _WIN32
-// this needs to be included super early, because
-// windows.h is a load of garbage and includes
-// winsock.h, which is incompatible with winsock2.h,
-// if we don't include winsock2.h first.
-
-#include "platform/windows.hpp"
-
-#else
-
-#include "platform/unix.hpp"
-
-#endif

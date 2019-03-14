@@ -31,37 +31,28 @@ namespace backend {
 TCPBackend::TCPBackend(Twibd &twibd) :
 	twibd(twibd),
 	server_logic(*this),
-	socket_server(server_logic),
-	listen_socket(*this) {
-	listen_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	if(listen_socket.fd < 0) {
-		LogMessage(Error, "Failed to create listening socket: %s", NetErrStr());
-		exit(1);
-	}
-
+	event_loop(server_logic),
+	listen_member(*this, platform::Socket(AF_INET, SOCK_DGRAM, 0)) {
 	sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(15153);
-	if(bind(listen_socket.fd, (sockaddr*) &addr, sizeof(addr)) != 0) {
-		LogMessage(Error, "Failed to bind listening socket: %s", NetErrStr());
-		exit(1);
-	}
+	listen_member.socket.Bind((sockaddr*) &addr, sizeof(addr));
 
 	ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("224.0.53.55");
 	mreq.imr_interface.s_addr = INADDR_ANY;
-	if(setsockopt(listen_socket.fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*) &mreq, sizeof(mreq)) != 0) {
+	if(listen_member.socket.SetSockOpt(IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*) &mreq, sizeof(mreq)) != 0) {
 		LogMessage(Error, "Failed to join multicast group");
 		exit(1);
 	}
 
-	socket_server.Begin();
+	event_loop.Begin();
 }
 
 TCPBackend::~TCPBackend() {
-	socket_server.Destroy();
-	listen_socket.Close();
+	event_loop.Destroy();
+	listen_member.socket.Close();
 }
 
 std::string TCPBackend::Connect(std::string hostname, std::string port) {
@@ -70,25 +61,28 @@ std::string TCPBackend::Connect(std::string hostname, std::string port) {
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	struct addrinfo *res = 0;
-	int err = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &res);
+	struct addrinfo *res_raw = 0;
+	int err = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &res_raw);
 	if(err != 0) {
 		return gai_strerror(err);
 	}
-	
-	int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if(fd == -1) {
-		return NetErrStr();
-	}
-	if(connect(fd, res->ai_addr, res->ai_addrlen) == -1) {
-		closesocket(fd);
-		return NetErrStr();
-	}
-	freeaddrinfo(res);
 
-	devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
-	socket_server.notifier.Notify();
-	return "Ok";
+	auto deleter =
+		[](struct addrinfo *r) {
+			freeaddrinfo(r);
+		};
+	std::unique_ptr<addrinfo, decltype(deleter)> res(res_raw, deleter);
+	
+	try {
+		platform::Socket socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		socket.Connect(res->ai_addr, res->ai_addrlen);
+
+		devices.emplace_back(std::make_shared<Device>(std::move(socket), *this))->Begin();
+		event_loop.GetEventThreadNotifier().Notify();
+		return "Ok"; 
+	} catch(platform::NetworkError &e) {
+		return e.what();
+	}
 }
 
 void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
@@ -97,29 +91,20 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 		LogMessage(Info, "  from %s", inet_ntoa(addr_in->sin_addr));
 		addr_in->sin_port = htons(15152); // force port number
 		
-		int fd = socket(addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
-		if(fd == -1) {
-			LogMessage(Error, "could not create socket: %s", NetErrStr());
-			return;
-		}
+		platform::Socket socket(addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
+		socket.Connect(addr, addr_len);
 
-		if(connect(fd, addr, addr_len) == -1) {
-			LogMessage(Error, "could not connect: %s", NetErrStr());
-			closesocket(fd);
-			return;
-		}
-
-		devices.emplace_back(std::make_shared<Device>(fd, *this))->Begin();
+		devices.emplace_back(std::make_shared<Device>(std::move(socket), *this))->Begin();
 		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
-		socket_server.notifier.Notify();
+		event_loop.GetEventThreadNotifier().Notify();
 	} else {
 		LogMessage(Info, "not an IPv4 address");
 	}
 }
 
-TCPBackend::Device::Device(SOCKET fd, TCPBackend &backend) :
+TCPBackend::Device::Device(platform::Socket &&socket, TCPBackend &backend) :
 	backend(backend),
-	connection(fd, backend.socket_server.notifier) {
+	connection(std::move(socket), backend.event_loop.GetEventThreadNotifier()) {
 }
 
 TCPBackend::Device::~Device() {
@@ -212,30 +197,22 @@ std::string TCPBackend::Device::GetBridgeType() {
 	return "tcp";
 }
 
-TCPBackend::ListenSocket::ListenSocket(TCPBackend &backend) : backend(backend) {
+TCPBackend::ListenMember::ListenMember(TCPBackend &backend, platform::Socket &&socket) : platform::EventLoop::SocketMember(std::move(socket)), backend(backend) {
 }
 
-TCPBackend::ListenSocket::ListenSocket(TCPBackend &backend, SOCKET fd) : Socket(fd), backend(backend) {
-}
-
-TCPBackend::ListenSocket &TCPBackend::ListenSocket::operator=(SOCKET fd) {
-	twibc::SocketServer::Socket::operator=(fd);
-	return *this;
-}
-
-bool TCPBackend::ListenSocket::WantsRead() {
+bool TCPBackend::ListenMember::WantsRead() {
 	return true;
 }
 
-void TCPBackend::ListenSocket::SignalRead() {
+void TCPBackend::ListenMember::SignalRead() {
 	char buffer[256];
 	sockaddr_storage addr_storage;
 	sockaddr *addr = (sockaddr*) &addr_storage;
 	socklen_t addr_len = sizeof(addr);
-	ssize_t r = recvfrom(backend.listen_socket.fd, buffer, sizeof(buffer)-1, 0, addr, &addr_len);
+	ssize_t r = socket.RecvFrom(buffer, sizeof(buffer)-1, 0, addr, &addr_len);
 	LogMessage(Debug, "got 0x%x bytes from listen socket", r);
 	if(r < 0) {
-		LogMessage(Fatal, "listen socket error: %s", NetErrStr());
+		LogMessage(Fatal, "listen socket error: %s", platform::NetErrStr());
 		exit(1);
 	} else {
 		buffer[r] = 0;
@@ -246,17 +223,17 @@ void TCPBackend::ListenSocket::SignalRead() {
 	}
 }
 
-void TCPBackend::ListenSocket::SignalError() {
-	LogMessage(Fatal, "listen socket error: %s", NetErrStr());
+void TCPBackend::ListenMember::SignalError() {
+	LogMessage(Fatal, "listen socket error: %s", platform::NetErrStr());
 	exit(1);
 }
 
 TCPBackend::ServerLogic::ServerLogic(TCPBackend &backend) : backend(backend) {
 }
 
-void TCPBackend::ServerLogic::Prepare(twibc::SocketServer &server) {
-	server.Clear();
-	server.AddSocket(backend.listen_socket);
+void TCPBackend::ServerLogic::Prepare(platform::EventLoop &loop) {
+	loop.Clear();
+	loop.AddMember(backend.listen_member);
 	for(auto i = backend.devices.begin(); i != backend.devices.end(); ) {
 		twibc::MessageConnection::Request *rq;
 		while((rq = (*i)->connection.Process()) != nullptr) {
@@ -280,7 +257,7 @@ void TCPBackend::ServerLogic::Prepare(twibc::SocketServer &server) {
 			}
 		}
 
-		server.AddSocket((*i)->connection.socket);
+		loop.AddMember((*i)->connection.member);
 		
 		i++;
 	}

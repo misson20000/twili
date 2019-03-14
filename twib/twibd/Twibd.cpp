@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Info, "got %d sockets from systemd", num_fds);
 			for(int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + num_fds; fd++) {
 				if(sd_is_socket(fd, 0, SOCK_STREAM, 1) == 1) {
-					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(twibd, fd));
+					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(twibd, twili::platform::Socket(fd)));
 				} else {
 					LogMessage(Warning, "got an FD from systemd that wasn't a SOCK_STREAM: %d", fd);
 				}

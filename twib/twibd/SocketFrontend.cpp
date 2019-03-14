@@ -37,12 +37,12 @@ namespace frontend {
 
 SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
 	twibd(twibd),
-	server_socket(*this),
 	address_family(address_family),
 	socktype(socktype),
 	bind_addrlen(bind_addrlen),
+	server_member(*this, platform::Socket(address_family, socktype, 0)),
 	server_logic(*this),
-	socket_server(server_logic) {
+	event_loop(server_logic) {
 
 	if(bind_addr == NULL) {
 		LogMessage(Fatal, "failed to allocate bind_addr");
@@ -50,53 +50,35 @@ SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, s
 	}
 	memcpy((char*) &this->bind_addr, bind_addr, bind_addrlen);
 	
-	server_socket = socket(address_family, socktype, 0);
-	if(!server_socket.IsValid()) {
-		LogMessage(Fatal, "failed to create socket: %s", NetErrStr());
-		exit(1);
-	}
-	
 	if(address_family == AF_INET6) {
 		int ipv6only = 0;
-		if(setsockopt(server_socket.fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*) &ipv6only, sizeof(ipv6only)) == -1) {
-			LogMessage(Fatal, "failed to make ipv6 server dual stack: %s", NetErrStr());
+		if(server_member.socket.SetSockOpt(IPPROTO_IPV6, IPV6_V6ONLY, (char*) &ipv6only, sizeof(ipv6only)) == -1) {
+			LogMessage(Fatal, "failed to make ipv6 server dual stack: %s", platform::NetErrStr());
 		}
 	}
 
-	UnlinkIfUnix();
-	
-	if(bind(server_socket.fd, bind_addr, bind_addrlen) < 0) {
-		LogMessage(Fatal, "failed to bind socket: %s", NetErrStr());
-		server_socket.Close();
-		exit(1);
-	}
-
-	if(listen(server_socket.fd, 20) < 0) {
-		LogMessage(Fatal, "failed to listen on socket: %s", NetErrStr());
-		server_socket.Close();
-		UnlinkIfUnix();
-		exit(1);
-	}
-
-	socket_server.Begin();
+	server_member.socket.Bind(bind_addr, bind_addrlen);
+	server_member.socket.Listen(20);
+	event_loop.Begin();
 }
 
-SocketFrontend::SocketFrontend(Twibd &twibd, int fd) :
+SocketFrontend::SocketFrontend(Twibd &twibd, platform::Socket &&socket) :
 	twibd(twibd),
-	server_socket(*this, fd),
+	server_member(*this, std::move(socket)),
 	address_family(0),
 	socktype(SOCK_STREAM),
 	server_logic(*this),
-	socket_server(server_logic) {
-	socket_server.Begin();
+	event_loop(server_logic) {
+	event_loop.Begin();
 }
 
 SocketFrontend::~SocketFrontend() {
-	socket_server.Destroy();
-	server_socket.Close();
-	UnlinkIfUnix();
+	event_loop.Destroy();
+	server_member.socket.Close();
 }
 
+// TODO
+/*
 void SocketFrontend::UnlinkIfUnix() {
 #ifndef WIN32
 	if(address_family == AF_UNIX) {
@@ -104,36 +86,25 @@ void SocketFrontend::UnlinkIfUnix() {
 	}
 #endif
 }
+*/
 
-SocketFrontend::ServerSocket::ServerSocket(SocketFrontend &frontend) : frontend(frontend) {
+SocketFrontend::ServerMember::ServerMember(SocketFrontend &frontend, platform::Socket &&socket) : platform::EventLoop::SocketMember(std::move(socket)), frontend(frontend) {
 }
 
-SocketFrontend::ServerSocket::ServerSocket(SocketFrontend &frontend, SOCKET fd) : Socket(fd), frontend(frontend) {
-}
-
-SocketFrontend::ServerSocket &SocketFrontend::ServerSocket::operator=(SOCKET fd) {
-	twibc::SocketServer::Socket::operator=(fd);
-	return *this;
-}
-
-bool SocketFrontend::ServerSocket::WantsRead() {
+bool SocketFrontend::ServerMember::WantsRead() {
 	return true;
 }
 
-void SocketFrontend::ServerSocket::SignalRead() {
+void SocketFrontend::ServerMember::SignalRead() {
 	LogMessage(Debug, "incoming connection detected");
 	
-	int client_fd = accept(fd, NULL, NULL);
-	if(client_fd < 0) {
-		LogMessage(Warning, "failed to accept incoming connection");
-	} else {
-		std::shared_ptr<Client> c = std::make_shared<Client>(client_fd, frontend);
-		frontend.clients.push_back(c);
-		frontend.twibd.AddClient(c);
-	}
+	platform::Socket client_socket = socket.Accept(nullptr, nullptr);
+	std::shared_ptr<Client> c = std::make_shared<Client>(std::move(client_socket), frontend);
+	frontend.clients.push_back(c);
+	frontend.twibd.AddClient(c);
 }
 
-void SocketFrontend::ServerSocket::SignalError() {
+void SocketFrontend::ServerMember::SignalError() {
 	LogMessage(Fatal, "error on server socket");
 	exit(1);
 }
@@ -141,9 +112,9 @@ void SocketFrontend::ServerSocket::SignalError() {
 SocketFrontend::ServerLogic::ServerLogic(SocketFrontend &frontend) : frontend(frontend) {
 }
 
-void SocketFrontend::ServerLogic::Prepare(twibc::SocketServer &server) {
-	server.Clear();
-	server.AddSocket(frontend.server_socket);
+void SocketFrontend::ServerLogic::Prepare(platform::EventLoop &loop) {
+	loop.Clear();
+	loop.AddMember(frontend.server_member);
 	for(auto i = frontend.clients.begin(); i != frontend.clients.end(); ) {
 		twibc::MessageConnection::Request *rq;
 		while((rq = (*i)->connection.Process()) != nullptr) {
@@ -169,13 +140,13 @@ void SocketFrontend::ServerLogic::Prepare(twibc::SocketServer &server) {
 			continue;
 		}
 
-		server.AddSocket((*i)->connection.socket);
+		loop.AddMember((*i)->connection.member);
 		
 		i++;
 	}
 }
 
-SocketFrontend::Client::Client(SOCKET fd, SocketFrontend &frontend) : connection(fd, frontend.socket_server.notifier), frontend(frontend), twibd(frontend.twibd) {
+SocketFrontend::Client::Client(platform::Socket &&socket, SocketFrontend &frontend) : connection(std::move(socket), frontend.event_loop.GetEventThreadNotifier()), frontend(frontend), twibd(frontend.twibd) {
 }
 
 SocketFrontend::Client::~Client() {

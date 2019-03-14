@@ -31,21 +31,21 @@ namespace client {
 
 class SocketClient : public Client {
  public:
-	SocketClient(SOCKET fd);
+	SocketClient(platform::Socket &&socket);
 	~SocketClient();
 	
  protected:
 	virtual void SendRequestImpl(const Request &rq) override;
  private:
-	class Logic : public twibc::SocketServer::Logic {
+	class Logic : public platform::EventLoop::Logic {
 	 public:
 		Logic(SocketClient &client);
-		virtual void Prepare(twibc::SocketServer &server) override;
+		virtual void Prepare(platform::EventLoop &loop) override;
 	 private:
 		SocketClient &client;
 	} server_logic;
 	
-	twibc::SocketServer socket_server;
+	platform::EventLoop event_loop;
 	twibc::SocketMessageConnection connection;
 };
 

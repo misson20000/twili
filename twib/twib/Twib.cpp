@@ -313,11 +313,10 @@ int main(int argc, char *argv[]) {
 		if(!run_quiet) {
 			printf("PID: 0x%lx\n", pid);
 		}
-		volatile bool running = true;
 		auto pump_output =
-			[&running](twili::twib::ITwibPipeReader reader, FILE *stream) {
+			[](twili::twib::ITwibPipeReader reader, FILE *stream) {
 				try {
-					while(running) {
+					while(true) {
 						std::vector<uint8_t> str = reader.ReadSync();
 						size_t r = fwrite(str.data(), sizeof(str[0]), str.size(), stream);
 						if(r < str.size() && str.size() > 0) {
@@ -326,25 +325,22 @@ int main(int argc, char *argv[]) {
 						fflush(stream);
 					}
 				} catch(twili::twib::ResultError &e) {
-					running = false;
+					LogMessage(Debug, "output pump got 0x%x", e.code);
 					if(e.code == TWILI_ERR_EOF) {
-						running = false;
+						LogMessage(Debug, "  EoF");
 						return;
 					} else {
 						throw e;
 					}
-				} catch(...) {
-					running = false;
-					throw;
 				}
 			};
 		std::thread stdout_pump(pump_output, mon.OpenStdout(), stdout);
 		std::thread stderr_pump(pump_output, mon.OpenStderr(), stderr);
 		std::thread stdin_pump(
-			[&running](twili::twib::ITwibPipeWriter writer) {
+			[](twili::twib::ITwibPipeWriter writer) {
 				try {
 					std::vector<uint8_t> buffer(4096, 0);
-					while(running) {
+					while(true) {
 						buffer.resize(4096);
 						// fread won't return until it fills the buffer or errors.
 						// this is not what we want; we want to send data over the
@@ -361,16 +357,11 @@ int main(int argc, char *argv[]) {
 						}
 					}
 				} catch(twili::twib::ResultError &e) {
-					running = false;
 					if(e.code == TWILI_ERR_EOF) {
-						running = false;
 						return;
 					} else {
 						throw e;
 					}
-				} catch(...) {
-					running = false;
-					throw;
 				}
 			}, mon.OpenStdin());
 		stdout_pump.join();
@@ -381,6 +372,8 @@ int main(int argc, char *argv[]) {
 			LogMessage(Debug, "  state %d change...", state);
 		}
 		LogMessage(Debug, "  process exited");
+		fclose(stdin); // wake stdin pump
+		stdin_pump.join();
 		return 0;
 	}
 
@@ -509,11 +502,7 @@ std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 	LogMessage(Fatal, "TCP socket not supported");
 	return std::unique_ptr<client::Client>();
 #else
-	SOCKET fd = socket(AF_INET6, SOCK_STREAM, 0);
-	if(fd < 0) {
-		LogMessage(Fatal, "failed to create TCP socket: %s", NetErrStr());
-		return std::unique_ptr<client::Client>();
-	}
+	platform::Socket socket(AF_INET6, SOCK_STREAM, 0);
 
 	struct sockaddr_in6 addr;
 	memset(&addr, 0, sizeof(addr));
@@ -521,13 +510,10 @@ std::unique_ptr<client::Client> connect_tcp(uint16_t port) {
 	addr.sin6_addr = in6addr_loopback;
 	addr.sin6_port = htons(port);
 
-	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
-		closesocket(fd);
-		return std::unique_ptr<client::Client>();
-	}
-	LogMessage(Info, "connected to twibd: %d", fd);
-	return std::make_unique<client::SocketClient>(fd);
+	socket.Connect((struct sockaddr *) &addr, sizeof(addr));
+	LogMessage(Info, "connected to twibd: %d", socket.fd);
+	
+	return std::make_unique<client::SocketClient>(std::move(socket));
 #endif
 }
 
@@ -536,24 +522,17 @@ std::unique_ptr<client::Client> connect_unix(std::string path) {
 	LogMessage(Fatal, "UNIX domain socket not supported");
 	return std::unique_ptr<client::Client>();
 #else
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if(fd < 0) {
-		LogMessage(Fatal, "failed to create UNIX domain socket: %s", NetErrStr());
-		return std::unique_ptr<client::Client>();
-	}
+	platform::Socket socket(AF_UNIX, SOCK_STREAM, 0);
 
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
 
-	if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		LogMessage(Fatal, "failed to connect to twibd: %s", NetErrStr());
-		close(fd);
-		return std::unique_ptr<client::Client>();
-	}
-	LogMessage(Info, "connected to twibd: %d", fd);
-	return std::make_unique<client::SocketClient>(fd);
+	socket.Connect((struct sockaddr *) &addr, sizeof(addr));
+	LogMessage(Info, "connected to twibd: %d", socket.fd);
+	
+	return std::make_unique<client::SocketClient>(std::move(socket));
 #endif
 }
 

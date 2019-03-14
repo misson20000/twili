@@ -21,9 +21,9 @@
 #pragma once
 
 #include "platform.hpp"
+#include "platform/EventLoop.hpp"
 #include "MessageConnection.hpp"
 #include "EventThreadNotifier.hpp"
-#include "platform/windows/EventLoop.hpp"
 
 namespace twili {
 namespace twibc {
@@ -33,7 +33,7 @@ class NamedPipeMessageConnection : public MessageConnection {
 	NamedPipeMessageConnection(platform::windows::Pipe &&pipe, const EventThreadNotifier &notifier);
 	virtual ~NamedPipeMessageConnection() override;
 
-	class InputMember : public platform::windows::EventLoop::Member {
+	class InputMember : public platform::EventLoop::Member {
 	public:
 		InputMember(NamedPipeMessageConnection &connection);
 
@@ -47,7 +47,7 @@ class NamedPipeMessageConnection : public MessageConnection {
 		platform::windows::Event event;
 	} input_member;
 
-	class OutputMember : public platform::windows::EventLoop::Member {
+	class OutputMember : public platform::EventLoop::Member {
 	public:
 		OutputMember(NamedPipeMessageConnection &connection);
 
