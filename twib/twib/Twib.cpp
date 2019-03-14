@@ -336,34 +336,66 @@ int main(int argc, char *argv[]) {
 			};
 		std::thread stdout_pump(pump_output, mon.OpenStdout(), stdout);
 		std::thread stderr_pump(pump_output, mon.OpenStderr(), stderr);
-		std::thread stdin_pump(
-			[](twili::twib::ITwibPipeWriter writer) {
-				try {
-					std::vector<uint8_t> buffer(4096, 0);
-					while(true) {
-						buffer.resize(4096);
-						// fread won't return until it fills the buffer or errors.
-						// this is not what we want; we want to send data over the
-						// pipe as soon as it comes in.
-						ssize_t r = read(fileno(stdin), buffer.data(), buffer.size());
-						if(r > 0) {
-							buffer.resize(r);
-							writer.WriteSync(buffer);
-						} else if(r == 0) {
-							writer.Close();
-							break;
-						} else {
-							throw std::system_error(errno, std::generic_category());
-						}
-					}
-				} catch(twili::twib::ResultError &e) {
-					if(e.code == TWILI_ERR_EOF) {
-						return;
-					} else {
-						throw e;
-					}
+
+		class Logic : public twili::platform::EventLoop::Logic {
+		 public:
+			Logic(std::function<void(twili::platform::EventLoop&)> f) : f(f) {
+			}
+			virtual void Prepare(twili::platform::EventLoop &loop) override {
+				f(loop);
+			};
+		 private:
+			std::function<void(twili::platform::EventLoop&)> f;
+		};
+
+		class StdinPumpMember : public twili::platform::EventLoop::FileMember {
+		 public:
+			StdinPumpMember(twili::platform::unix::File &&f, twili::twib::ITwibPipeWriter writer) :
+				file(std::move(f)),
+				writer(writer),
+				buffer(4096) {
+			}
+
+			virtual bool WantsRead() {
+				return true;
+			}
+
+			virtual void SignalRead() {
+				// fread won't return until it fills the buffer or errors.
+				// this is not what we want; we want to send data over the
+				// pipe as soon as it comes in.
+				ssize_t r = read(fileno(stdin), buffer.data(), buffer.size());
+				if(r > 0) {
+					buffer.resize(r);
+					writer.WriteSync(buffer);
+				} else if(r == 0) {
+					writer.Close();
+				} else {
+					throw std::system_error(errno, std::generic_category());
 				}
-			}, mon.OpenStdin());
+			}
+
+			virtual void SignalError() {
+				writer.Close();
+			}
+
+			virtual twili::platform::unix::File &GetFile() {
+				return file;
+			}
+		 private:
+			std::vector<uint8_t> buffer;
+			twili::platform::unix::File file;
+			twili::twib::ITwibPipeWriter writer;
+		} file_member(twili::platform::unix::File(fileno(stdin), false), mon.OpenStdin());
+		
+		Logic logic(
+			[&](twili::platform::EventLoop &l) {
+				l.Clear();
+				l.AddMember(file_member);
+			});
+		twili::platform::EventLoop stdin_loop(logic);
+		stdin_loop.Begin();
+		
 		stdout_pump.join();
 		stderr_pump.join();
 		LogMessage(Debug, "output pump threads exited");
@@ -372,8 +404,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Debug, "  state %d change...", state);
 		}
 		LogMessage(Debug, "  process exited");
-		fclose(stdin); // wake stdin pump
-		stdin_pump.join();
+		stdin_loop.Destroy();
 		return 0;
 	}
 
