@@ -135,7 +135,7 @@ bool EventLoopSocketMember::WantsSignal() {
 
 void EventLoopSocketMember::Signal() {
 	WSANETWORKEVENTS netevents;
-	if(!WSAEnumNetworkEvents(socket.fd, event.handle, &netevents)) {
+	if(WSAEnumNetworkEvents(socket.fd, event.handle, &netevents) == SOCKET_ERROR) {
 		LogMessage(Fatal, "WSAEnumNetworkEvents failed");
 		throw NetworkError(WSAGetLastError());
 		exit(1);
