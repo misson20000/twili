@@ -107,7 +107,7 @@ int Socket::SetSockOpt(int level, int option_name, const void *option_value, soc
 void Socket::Bind(const struct sockaddr *address, socklen_t address_len) {
 	if(bind(fd, address, address_len) != 0) {
 		int en = errno;
-		if(errno == EADDRINUSE && address->sa_family == AF_UNIX) {
+		if(en == EADDRINUSE && address->sa_family == AF_UNIX) {
 			unlink(((struct sockaddr_un*) address)->sun_path);
 			if(bind(fd, address, address_len) != 0) {
 				throw NetworkError(errno);

@@ -58,6 +58,7 @@ class Daemon {
 
 	void AddDevice(std::shared_ptr<Device> device);
 	void AddClient(std::shared_ptr<Client> client);
+	void Awaken();
 	void PostRequest(Request &&request);
 	void PostResponse(Response &&response);
 	void RemoveDevice(std::shared_ptr<Device> device);
@@ -69,6 +70,16 @@ class Daemon {
 
 	std::shared_ptr<LocalClient> local_client;
  private:
+	moodycamel::BlockingConcurrentQueue<std::variant<std::monostate, Request, Response>> dispatch_queue;
+	
+	std::mutex device_map_mutex;
+	std::map<uint32_t, std::weak_ptr<Device>> devices;
+	
+	std::mutex client_map_mutex;
+	std::map<uint32_t, std::weak_ptr<Client>> clients;
+
+	std::random_device rng;
+
 #if TWIBD_TCP_BACKEND_ENABLED
 	backend::TCPBackend tcp;
 #endif
@@ -78,16 +89,6 @@ class Daemon {
 #if TWIBD_LIBUSBK_BACKEND_ENABLED
 	backend::USBKBackend usbk;
 #endif
-
-	moodycamel::BlockingConcurrentQueue<std::variant<Request, Response>> dispatch_queue;
-	
-	std::mutex device_map_mutex;
-	std::map<uint32_t, std::weak_ptr<Device>> devices;
-	
-	std::mutex client_map_mutex;
-	std::map<uint32_t, std::weak_ptr<Client>> clients;
-
-	std::random_device rng;
 };
 
 } // namespace daemon

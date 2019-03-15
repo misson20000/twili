@@ -44,27 +44,37 @@ int hotplug_cb_shim(libusb_context *ctx, libusb_device *device, libusb_hotplug_e
 	return 0;
 }
 
-USBBackend::USBBackend(Daemon &daemon) : daemon(daemon) {
+USBBackend::LibusbContext::LibusbContext() {
 	int r = libusb_init(&ctx);
 	if(r) {
 		LogMessage(Fatal, "failed to initialize libusb: %s", libusb_error_name(r));
 		exit(1);
 	}
+}
 
+USBBackend::LibusbContext::~LibusbContext() {
+	libusb_exit(ctx);
+}
+
+USBBackend::USBBackend(Daemon &daemon) : daemon(daemon) {
 	std::thread event_thread(&USBBackend::event_thread_func, this);
 	this->event_thread = std::move(event_thread);
 }
 
 USBBackend::~USBBackend() {
 	event_thread_destroy = true;
+	
+	for(auto i = devices.begin(); i != devices.end(); i++) {
+		(*i)->Destroy();
+	}
+	
 	if(TWIBD_LIBUSB_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-		libusb_hotplug_deregister_callback(ctx, hotplug_handle); // wakes up usb_event_thread
+		libusb_hotplug_deregister_callback(ctx.ctx, hotplug_handle); // wakes up usb_event_thread
 		if(TWIBD_ACCEPT_NINTENDO_SDK_DEBUGGER) {
-			libusb_hotplug_deregister_callback(ctx, hotplug_handle_nintendo_sdk_debugger);
+			libusb_hotplug_deregister_callback(ctx.ctx, hotplug_handle_nintendo_sdk_debugger);
 		}
 	}
 	event_thread.join();
-	libusb_exit(ctx);
 }
 
 USBBackend::Device::Device(USBBackend *backend, libusb_device_handle *handle, uint8_t endp_addrs[4], uint8_t interface_number) :
@@ -98,6 +108,13 @@ void USBBackend::Device::Begin() {
 
 	// request identification
 	SendRequest(Request(std::shared_ptr<Client>(), 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
+}
+
+void USBBackend::Device::Destroy() {
+	libusb_cancel_transfer(tfer_meta_out);
+	libusb_cancel_transfer(tfer_data_out);
+	libusb_cancel_transfer(tfer_meta_in);
+	libusb_cancel_transfer(tfer_data_in);
 }
 
 void USBBackend::Device::SendRequest(const Request &&request) {
@@ -408,7 +425,7 @@ void USBBackend::Device::ObjectInTransferShim(libusb_transfer *tfer) {
 void USBBackend::Probe() {
 	if(TWIBD_LIBUSB_HOTPLUG_ENABLED && libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		int r = libusb_hotplug_register_callback(
-			ctx,
+			ctx.ctx,
 			(libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
 			LIBUSB_HOTPLUG_ENUMERATE,
 			TWILI_VENDOR_ID, TWILI_PRODUCT_ID,
@@ -420,7 +437,7 @@ void USBBackend::Probe() {
 		}
 		if(TWIBD_ACCEPT_NINTENDO_SDK_DEBUGGER) {
 			int r = libusb_hotplug_register_callback(
-				ctx,
+				ctx.ctx,
 				(libusb_hotplug_event) (LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
 				LIBUSB_HOTPLUG_ENUMERATE,
 				TWIBD_NINTENDO_SDK_DEBUGGER_VENDOR_ID, TWIBD_NINTENDO_SDK_DEBUGGER_PRODUCT_ID,
@@ -666,8 +683,11 @@ void USBBackend::StdoutTransferState::Callback(libusb_transfer *tfer) {
 }
 
 void USBBackend::event_thread_func() {
-	while(!event_thread_destroy) {
-		libusb_handle_events(ctx);
+	// when event_thread_destroy is set, keep running the
+	// loop until all devices have their transfer cancelled
+	// and mark themselves as ready to delete.
+	while(!event_thread_destroy || !devices.empty()) {
+		libusb_handle_events(ctx.ctx);
 
 		while(!devices_to_add.empty()) {
 			libusb_device *d = devices_to_add.front();

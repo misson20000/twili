@@ -45,6 +45,7 @@
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <csignal>
 
 namespace twili {
 namespace twib {
@@ -103,6 +104,10 @@ void Daemon::AddClient(std::shared_ptr<Client> client) {
 	clients[client_id] = client;
 }
 
+void Daemon::Awaken() {
+	dispatch_queue.enqueue(std::monostate {});
+}
+
 void Daemon::PostRequest(Request &&request) {
 	dispatch_queue.enqueue(request);
 }
@@ -124,12 +129,13 @@ void Daemon::RemoveDevice(std::shared_ptr<Device> device) {
 }
 
 void Daemon::Process() {
-	std::variant<Request, Response> v;
+	std::variant<std::monostate, Request, Response> v;
 	LogMessage(Debug, "Process: dequeueing job...");
 	dispatch_queue.wait_dequeue(v);
 	LogMessage(Debug, "Process: dequeued job: %d", v.index());
 
-	if(v.index() == 0) {
+	if(v.index() == 0) { // monostate, just a signal to wake thread up
+	} else if(v.index() == 1) {
 		Request rq = std::get<Request>(v);
 		LogMessage(Debug, "dispatching request");
 		LogMessage(Debug, "  client id: %08x", rq.client->client_id);
@@ -178,7 +184,7 @@ void Daemon::Process() {
 			device->SendRequest(std::move(rq));
 			LogMessage(Debug, "sent request via device");
 		}
-	} else if(v.index() == 1) {
+	} else if(v.index() == 2) {
 		Response rs = std::get<Response>(v);
 		LogMessage(Debug, "dispatching response");
 		LogMessage(Debug, "  client id: %08x", rs.client_id);
@@ -320,6 +326,14 @@ static std::shared_ptr<frontend::NamedPipeFrontend> CreateNamedPipeFrontend(Daem
 using namespace twili;
 using namespace twili::twib;
 
+daemon::Daemon *g_Daemon;
+std::sig_atomic_t g_Running;
+
+extern "C" void sigint_handler(int) {
+	g_Running = 0;
+	g_Daemon->Awaken();
+}
+
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -419,6 +433,9 @@ int main(int argc, char *argv[]) {
 
 	LogMessage(Message, "starting twibd");
 	daemon::Daemon daemon;
+	g_Daemon = &daemon;
+	g_Running = true;
+	
 	std::vector<std::shared_ptr<daemon::frontend::Frontend>> frontends;
 	if(!systemd_mode) {
 #if TWIB_TCP_FRONTEND_ENABLED == 1
@@ -456,8 +473,10 @@ int main(int argc, char *argv[]) {
 		sd_notify(false, "READY=1");
 	}
 #endif
+
+	std::signal(SIGINT, &sigint_handler);
 	
-	while(1) {
+	while(g_Running) {
 		daemon.Process();
 	}
 	return 0;

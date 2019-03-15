@@ -47,6 +47,14 @@ class USBBackend {
  public:
 	USBBackend(Daemon &daemon);
 	~USBBackend();
+
+	class LibusbContext {
+	 public:
+		LibusbContext();
+		~LibusbContext();
+
+		libusb_context *ctx;
+	};
 	
 	class Device : public daemon::Device, public std::enable_shared_from_this<Device> {
 	 public:
@@ -58,6 +66,7 @@ class USBBackend {
 		};
 
 		void Begin();
+		void Destroy();
 		
 		// thread-agnostic
 		virtual void SendRequest(const Request &&r) override;
@@ -117,6 +126,7 @@ class USBBackend {
 
  private:
 	Daemon &daemon;
+	LibusbContext ctx;
 	std::list<std::shared_ptr<Device>> devices;
 	std::queue<libusb_device*> devices_to_add;
 	
@@ -145,7 +155,6 @@ class USBBackend {
 	void event_thread_func();
 	std::thread event_thread;
 
-	libusb_context *ctx;
 	libusb_hotplug_callback_handle hotplug_handle;
 	libusb_hotplug_callback_handle hotplug_handle_nintendo_sdk_debugger;
 };
