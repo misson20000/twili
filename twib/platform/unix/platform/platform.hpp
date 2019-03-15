@@ -71,6 +71,8 @@ class Socket : public File {
 	Socket(int domain, int type, int protocol);
 	Socket(File &&f);
 	Socket(Socket &&);
+	~Socket();
+	
 	Socket(const Socket &) = delete;
 	Socket &operator=(Socket &&);
 	Socket &operator=(const Socket &) = delete;
@@ -86,7 +88,9 @@ class Socket : public File {
 	Socket Accept(struct sockaddr *address, socklen_t *address_len);
 	void Connect(const struct sockaddr *address, socklen_t address_len);
 
-	// TODO: implement unix socket unlinking
+ private:
+	bool should_unlink_unix_socket = false;
+	struct sockaddr_un unix_addr;
 };
 
 } // namespace unix

@@ -77,6 +77,12 @@ Socket::Socket(File &&f) : File(std::move(f)) {
 Socket::Socket(Socket &&o) : File(std::move(o)) {
 }
 
+Socket::~Socket() {
+	if(should_unlink_unix_socket) {
+		unlink(unix_addr.sun_path);
+	}
+}
+
 Socket &Socket::operator=(Socket &&o) {
 	File::operator=(std::move(o));
 	return *this;
@@ -100,7 +106,24 @@ int Socket::SetSockOpt(int level, int option_name, const void *option_value, soc
 
 void Socket::Bind(const struct sockaddr *address, socklen_t address_len) {
 	if(bind(fd, address, address_len) != 0) {
-		throw NetworkError(errno);
+		int en = errno;
+		if(errno == EADDRINUSE && address->sa_family == AF_UNIX) {
+			unlink(((struct sockaddr_un*) address)->sun_path);
+			if(bind(fd, address, address_len) != 0) {
+				throw NetworkError(errno);
+			}
+		} else {
+			throw NetworkError(errno);
+		}
+	}
+	if(should_unlink_unix_socket) {
+		unlink(unix_addr.sun_path);
+	}
+	if(address->sa_family == AF_UNIX) {
+		should_unlink_unix_socket = true;
+		unix_addr = *(struct sockaddr_un*) address;
+	} else {
+		should_unlink_unix_socket = false;
 	}
 }
 

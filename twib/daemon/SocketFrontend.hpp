@@ -87,7 +87,6 @@ class SocketFrontend : public Frontend {
 	int socktype;
 	struct sockaddr_storage bind_addr;
 	size_t bind_addrlen;
-	//TODO: void UnlinkIfUnix();
 	
 	std::list<std::shared_ptr<Client>> clients;
 	platform::EventLoop event_loop;
