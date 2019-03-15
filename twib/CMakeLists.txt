@@ -89,5 +89,5 @@ add_subdirectory(externals EXCLUDE_FROM_ALL)
 
 add_subdirectory(platform)
 add_subdirectory(common)
-add_subdirectory(twibd)
-add_subdirectory(twib)
+add_subdirectory(daemon)
+add_subdirectory(tool)
