@@ -28,7 +28,7 @@ namespace platform {
 namespace windows {
 namespace detail {
 
-class InputPump : public EventLoopEventMember {
+class InputPump : public EventLoopNativeMember {
  public:
 	InputPump(
 		size_t buffer_size,
@@ -37,19 +37,16 @@ class InputPump : public EventLoopEventMember {
  private:
 	virtual bool WantsSignal() override final;
 	virtual void Signal() override final;
-	virtual Event &GetEvent() override final;
+	virtual HANDLE GetHandle() override final;
 	
 	void Read();
 
 	bool is_valid = true;
 
-	HANDLE hFile;
-	OVERLAPPED overlap = { 0 };
-	platform::windows::Event event;
+	HANDLE console;
 	std::function<void(std::vector<uint8_t>&)> cb;
 	std::function<void()> eof_cb;
 	std::vector<uint8_t> buffer;
-	size_t buffer_size;
 };
 
 } // namespace detail

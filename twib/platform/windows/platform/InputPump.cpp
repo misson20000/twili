@@ -31,27 +31,9 @@ InputPump::InputPump(
 	size_t buffer_size,
 	std::function<void(std::vector<uint8_t>&)> cb,
 	std::function<void()> eof_cb) :
-	hFile(GetStdHandle(STD_INPUT_HANDLE)),
+	console(GetStdHandle(STD_INPUT_HANDLE)),
 	cb(cb),
-	eof_cb(eof_cb),
-	buffer_size(buffer_size) {
-	overlap.hEvent = event.handle;
-	Read();
-}
-
-void InputPump::Read() {
-	DWORD bytes_read;
-	buffer.resize(buffer_size);
-	if(ReadFile(hFile, buffer.data(), buffer.size(), &bytes_read, &overlap)) {
-		buffer.resize(bytes_read);
-		cb(buffer);
-		Read();
-	} else {
-		if(GetLastError() != ERROR_IO_PENDING) {
-			eof_cb();
-			is_valid = false;
-		}
-	}
+	eof_cb(eof_cb) {
 }
 
 bool InputPump::WantsSignal() {
@@ -59,19 +41,38 @@ bool InputPump::WantsSignal() {
 }
 
 void InputPump::Signal() {
-	DWORD bytes_read = 0;
-	if(!GetOverlappedResult(hFile, &overlap, &bytes_read, false)) {
-		eof_cb();
+	INPUT_RECORD records[16];
+	DWORD num_events;
+	if(!ReadConsoleInput(console, records, 16, &num_events)) {
 		is_valid = false;
-	} else {
-		buffer.resize(bytes_read);
-		cb(buffer);
-		Read();
+		LogMessage(Warning, "ReadConsoleInput failed: %s", NetErrStr());
+		return;
+	}
+	for(int i = 0; i < num_events; i++) {
+		INPUT_RECORD &event = records[i];
+		if(event.EventType == KEY_EVENT) {
+			KEY_EVENT_RECORD &ker = event.Event.KeyEvent;
+			if(ker.bKeyDown) {
+				DWORD num_written;
+				putc(ker.uChar.AsciiChar, stdout);
+				if(ker.wVirtualKeyCode == VK_BACK) {
+					buffer.pop_back();
+					putc(' ', stdout);
+					putc('\b', stdout);
+				} else if(ker.wVirtualKeyCode == VK_RETURN) {
+					buffer.push_back('\n');
+					cb(buffer);
+					buffer.clear();
+				} else {
+					buffer.push_back(ker.uChar.AsciiChar);
+				}
+			}
+		}
 	}
 }
 
-Event &InputPump::GetEvent() {
-	return event;
+HANDLE InputPump::GetHandle() {
+	return console;
 }
 
 } // namespace detail
