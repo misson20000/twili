@@ -24,6 +24,7 @@
 #include<memory>
 #include<optional>
 
+#include "Semaphore.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
 #include "Logger.hpp"
@@ -56,7 +57,7 @@ class MessageConnection {
  protected:
 	util::Buffer in_buffer;
 
-	std::recursive_mutex out_buffer_mutex;
+	Semaphore out_buffer_sema;
 	util::Buffer out_buffer;
 
 	// these turn true if more data was obtained

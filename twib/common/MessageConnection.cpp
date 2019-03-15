@@ -24,7 +24,7 @@ namespace twili {
 namespace twib {
 namespace common {
 
-MessageConnection::MessageConnection() {
+MessageConnection::MessageConnection() : out_buffer_sema(1) {
 }
 
 MessageConnection::~MessageConnection() {
@@ -69,10 +69,12 @@ MessageConnection::Request *MessageConnection::Process() {
 }
 
 void MessageConnection::SendMessage(const protocol::MessageHeader &mh, const std::vector<uint8_t> &payload, const std::vector<uint32_t> &object_ids) {
-	std::lock_guard<std::recursive_mutex> lock(out_buffer_mutex);
-	out_buffer.Write(mh);
-	out_buffer.Write(payload);
-	out_buffer.Write(object_ids);
+	{
+		std::lock_guard<Semaphore> lock(out_buffer_sema);
+		out_buffer.Write(mh);
+		out_buffer.Write(payload);
+		out_buffer.Write(object_ids);
+	}
 	RequestOutput();
 }
 

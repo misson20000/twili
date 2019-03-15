@@ -68,7 +68,6 @@ private:
 	bool is_reading = false;
 	bool is_writing = false;
 	std::mutex state_mutex;
-	std::unique_lock<std::recursive_mutex> out_buffer_lock;
 	platform::windows::Pipe pipe;
 	platform::EventLoop::Notifier &notifier;
 };
