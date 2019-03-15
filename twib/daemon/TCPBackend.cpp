@@ -209,7 +209,7 @@ void TCPBackend::ListenMember::SignalRead() {
 	char buffer[256];
 	sockaddr_storage addr_storage;
 	sockaddr *addr = (sockaddr*) &addr_storage;
-	socklen_t addr_len = sizeof(addr);
+	socklen_t addr_len = sizeof(addr_storage);
 	ssize_t r = socket.RecvFrom(buffer, sizeof(buffer)-1, 0, addr, &addr_len);
 	LogMessage(Debug, "got 0x%x bytes from listen socket", r);
 	if(r < 0) {
