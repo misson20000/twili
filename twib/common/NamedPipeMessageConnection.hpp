@@ -20,20 +20,20 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 #include "platform/EventLoop.hpp"
 #include "MessageConnection.hpp"
-#include "EventThreadNotifier.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
 class NamedPipeMessageConnection : public MessageConnection {
- public:
-	NamedPipeMessageConnection(platform::windows::Pipe &&pipe, const EventThreadNotifier &notifier);
+public:
+	NamedPipeMessageConnection(platform::windows::Pipe &&pipe, platform::EventLoop::Notifier &notifier);
 	virtual ~NamedPipeMessageConnection() override;
 
-	class InputMember : public platform::EventLoop::Member {
+	class InputMember : public platform::EventLoop::EventMember {
 	public:
 		InputMember(NamedPipeMessageConnection &connection);
 
@@ -47,7 +47,7 @@ class NamedPipeMessageConnection : public MessageConnection {
 		platform::windows::Event event;
 	} input_member;
 
-	class OutputMember : public platform::EventLoop::Member {
+	class OutputMember : public platform::EventLoop::EventMember {
 	public:
 		OutputMember(NamedPipeMessageConnection &connection);
 
@@ -61,17 +61,18 @@ class NamedPipeMessageConnection : public MessageConnection {
 		platform::windows::Event event;
 	} output_member;
 
- protected:
+protected:
 	virtual bool RequestInput() override;
 	virtual bool RequestOutput() override;
- private:
+private:
 	bool is_reading = false;
 	bool is_writing = false;
 	std::mutex state_mutex;
 	std::unique_lock<std::recursive_mutex> out_buffer_lock;
 	platform::windows::Pipe pipe;
-	const EventThreadNotifier &notifier;
+	platform::EventLoop::Notifier &notifier;
 };
 
-} // namespace twibc
+} // namespace common
+} // namespace twib
 } // namespace twili

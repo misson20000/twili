@@ -27,7 +27,11 @@ namespace twib {
 namespace tool {
 namespace client {
 
-NamedPipeClient::NamedPipeClient(platform::windows::Pipe &&pipe) : Client(), pipe_logic(*this), event_loop(pipe_logic), connection(std::move(pipe), event_loop.notifier) {
+NamedPipeClient::NamedPipeClient(platform::windows::Pipe &&pipe) :
+	Client(),
+	pipe_logic(*this),
+	event_loop(pipe_logic),
+	connection(std::move(pipe), event_loop.GetNotifier()) {
 	event_loop.Begin();
 }
 
@@ -52,9 +56,9 @@ NamedPipeClient::Logic::Logic(NamedPipeClient &client) : client(client) {
 
 }
 
-void NamedPipeClient::Logic::Prepare(platform::windows::EventLoop &loop) {
+void NamedPipeClient::Logic::Prepare(platform::EventLoop &loop) {
 	loop.Clear();
-	twibc::MessageConnection::Request *rq;
+	common::MessageConnection::Request *rq;
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}

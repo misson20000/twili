@@ -46,6 +46,10 @@ class MessageConnection {
 
 	// The use of a pointer here is truly lamentable. I would've much preferred to use std::optional<Request&>
 	Request *Process(); // NULL pointer means no message
+
+	// fuck off, windows
+	#undef SendMessage
+
 	void SendMessage(const protocol::MessageHeader &mh, const std::vector<uint8_t> &payload, const std::vector<uint32_t> &object_ids);
 
 	bool error_flag = false;

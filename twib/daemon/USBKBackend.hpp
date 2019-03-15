@@ -20,7 +20,8 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
+#include "platform/EventLoop.hpp"
 
 #include<thread>
 #include<list>
@@ -34,19 +35,18 @@
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
-#include "platform/windows/EventLoop.hpp"
 
 namespace twili {
 namespace twib {
 namespace daemon {
 
-class Twibd;
+class Daemon;
 
 namespace backend {
 
 class USBKBackend {
  public:
-	USBKBackend(Twibd &twibd);
+	USBKBackend(Daemon &daemon);
 	~USBKBackend();
 	
 	void Probe();
@@ -55,7 +55,7 @@ class USBKBackend {
 	void AddDevice(KLST_DEVINFO_HANDLE device_info);
 
  private:
-	Twibd &twibd;
+	Daemon &daemon;
 	
 	KHOT_HANDLE hot_handle = nullptr;
 
@@ -88,7 +88,7 @@ class USBKBackend {
 	};
 
 
-	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
+	class Device : public daemon::Device, public std::enable_shared_from_this<Device> {
 	 public:
 		Device(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&handle, uint8_t ep_addrs[4]);
 		~Device();
@@ -98,7 +98,7 @@ class USBKBackend {
 		};
 
 		void Begin();
-		void AddMembers(platform::windows::EventLoop &loop);
+		void AddMembers(platform::EventLoop &loop);
 
 		// thread-agnostic
 		virtual void SendRequest(const Request &&r) override;
@@ -114,7 +114,7 @@ class USBKBackend {
 
 		UsbHandle handle;
 
-		class TransferMember : public platform::windows::EventLoop::Member {
+		class TransferMember : public platform::EventLoop::EventMember {
 		public:
 			TransferMember(Device &device, UsbOvlPool &pool, uint8_t ep_addr, void (Device::*callback)(size_t size));
 			~TransferMember();
@@ -170,7 +170,7 @@ class USBKBackend {
 		static size_t LimitTransferSize(size_t size);
 	};
 
-	class StdoutTransferState : public platform::windows::EventLoop::Member {
+	class StdoutTransferState : public platform::EventLoop::EventMember {
 	public:
 		StdoutTransferState(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&handle, uint8_t ep_addr);
 		~StdoutTransferState();
@@ -198,10 +198,10 @@ class USBKBackend {
 		util::Buffer string_buffer;
 	};
 
-	class Logic : public platform::windows::EventLoop::Logic {
+	class Logic : public platform::EventLoop::Logic {
 	public:
 		Logic(USBKBackend &backend);
-		virtual void Prepare(platform::windows::EventLoop &server) override;
+		virtual void Prepare(platform::EventLoop &server) override;
 	private:
 		USBKBackend &backend;
 	} logic;
@@ -212,7 +212,7 @@ class USBKBackend {
 	std::list<std::shared_ptr<Device>> devices;
 	std::list<std::shared_ptr<StdoutTransferState>> stdout_transfers;
 
-	platform::windows::EventLoop event_loop;
+	platform::EventLoop event_loop;
 };
 
 } // namespace backend

@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,37 +20,35 @@
 
 #pragma once
 
-#include "Client.hpp"
-
-#include "platform/platform.hpp"
+#include "platform.hpp"
 #include "platform/EventLoop.hpp"
-#include "Buffer.hpp"
-#include "common/NamedPipeMessageConnection.hpp"
 
 namespace twili {
-namespace twib {
-namespace tool {
-namespace client {
+namespace platform {
+namespace unix {
+namespace detail {
 
-class NamedPipeClient : public Client {
+class InputPump : public platform::EventLoop::FileMember {
 public:
-	NamedPipeClient(platform::windows::Pipe &&pipe);
-	~NamedPipeClient();
-protected:
-	virtual void SendRequestImpl(const Request &rq) override;
-private:
-	class Logic : public platform::EventLoop::Logic {
-	public:
-		Logic(NamedPipeClient &client);
-		virtual void Prepare(platform::EventLoop &loop) override;
-	private:
-		NamedPipeClient &client;
-	} pipe_logic;
-	platform::EventLoop event_loop;
-	common::NamedPipeMessageConnection connection;
-};
+	InputPump(
+		size_t buffer_size,
+		std::function<void(std::vector<uint8_t>&)> cb,
+		std::function<void()> eof_cb);
 
-} // namespace client
-} // namespace tool
-} // namespace twib
+private:
+	virtual bool WantsRead();
+	virtual void SignalRead();
+	virtual void SignalError();
+	virtual platform::unix::File &GetFile();
+
+	twili::platform::unix::File file;
+	std::vector<uint8_t> buffer;
+	size_t buffer_size;
+	std::function<void(std::vector<uint8_t>&)> cb;
+	std::function<void()> eof_cb;
+}
+
+} // namespace detail
+} // namespace unix
+} // namespace platform
 } // namespace twili

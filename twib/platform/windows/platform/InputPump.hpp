@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,37 +20,42 @@
 
 #pragma once
 
-#include "Client.hpp"
-
-#include "platform/platform.hpp"
+#include "platform.hpp"
 #include "platform/EventLoop.hpp"
-#include "Buffer.hpp"
-#include "common/NamedPipeMessageConnection.hpp"
 
 namespace twili {
-namespace twib {
-namespace tool {
-namespace client {
+namespace platform {
+namespace windows {
+namespace detail {
 
-class NamedPipeClient : public Client {
-public:
-	NamedPipeClient(platform::windows::Pipe &&pipe);
-	~NamedPipeClient();
-protected:
-	virtual void SendRequestImpl(const Request &rq) override;
-private:
-	class Logic : public platform::EventLoop::Logic {
-	public:
-		Logic(NamedPipeClient &client);
-		virtual void Prepare(platform::EventLoop &loop) override;
-	private:
-		NamedPipeClient &client;
-	} pipe_logic;
-	platform::EventLoop event_loop;
-	common::NamedPipeMessageConnection connection;
+class InputPump : public EventLoopEventMember {
+ public:
+	InputPump(
+		size_t buffer_size,
+		std::function<void(std::vector<uint8_t>&)> cb,
+		std::function<void()> eof_cb);
+ private:
+	virtual bool WantsSignal() override final;
+	virtual void Signal() override final;
+	virtual Event &GetEvent() override final;
+	
+	void Read();
+
+	bool is_valid = true;
+
+	HANDLE hFile;
+	OVERLAPPED overlap = { 0 };
+	platform::windows::Event event;
+	std::function<void(std::vector<uint8_t>&)> cb;
+	std::function<void()> eof_cb;
+	std::vector<uint8_t> buffer;
+	size_t buffer_size;
 };
 
-} // namespace client
-} // namespace tool
-} // namespace twib
+} // namespace detail
+} // namespace windows
+
+using InputPump = windows::detail::InputPump;
+
+} // namespace platform
 } // namespace twili

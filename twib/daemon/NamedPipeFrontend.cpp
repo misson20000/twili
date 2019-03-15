@@ -22,7 +22,7 @@
 
 #include<algorithm>
 
-#include "Twibd.hpp"
+#include "Daemon.hpp"
 
 using namespace twili::platform::windows;
 
@@ -31,7 +31,7 @@ namespace twib {
 namespace daemon {
 namespace frontend {
 
-NamedPipeFrontend::NamedPipeFrontend(Twibd &twibd, const char *name) : twibd(twibd), pipe_logic(*this), pending_pipe(*this), event_loop(pipe_logic) {
+NamedPipeFrontend::NamedPipeFrontend(Daemon &daemon, const char *name) : daemon(daemon), pipe_logic(*this), pending_pipe(*this), event_loop(pipe_logic) {
 	LogMessage(Debug, "created NamedPipeFrontend");
 	event_loop.Begin();
 }
@@ -40,7 +40,10 @@ NamedPipeFrontend::~NamedPipeFrontend() {
 	event_loop.Destroy();
 }
 
-NamedPipeFrontend::Client::Client(Pipe &&pipe, NamedPipeFrontend &frontend) : connection(std::move(pipe), frontend.event_loop.notifier), frontend(frontend), twibd(frontend.twibd) {
+NamedPipeFrontend::Client::Client(Pipe &&pipe, NamedPipeFrontend &frontend) :
+	connection(std::move(pipe), frontend.event_loop.GetNotifier()),
+	frontend(frontend),
+	daemon(frontend.daemon) {
 }
 
 NamedPipeFrontend::Client::~Client() {
@@ -70,16 +73,16 @@ NamedPipeFrontend::Logic::Logic(NamedPipeFrontend &frontend) : frontend(frontend
 
 }
 
-void NamedPipeFrontend::Logic::Prepare(EventLoop &loop) {
+void NamedPipeFrontend::Logic::Prepare(platform::EventLoop &loop) {
 	LogMessage(Debug, "NamedPipeFrontend preparing");
 	loop.Clear();
 	loop.AddMember(frontend.pending_pipe);
 
 	for(auto i = frontend.clients.begin(); i != frontend.clients.end(); ) {
-		twibc::MessageConnection::Request *rq;
+		common::MessageConnection::Request *rq;
 		while((rq = (*i)->connection.Process()) != nullptr) {
 			LogMessage(Debug, "posting request");
-			frontend.twibd.PostRequest(
+			frontend.daemon.PostRequest(
 				Request(
 					*i,
 					rq->mh.device_id,
@@ -95,7 +98,7 @@ void NamedPipeFrontend::Logic::Prepare(EventLoop &loop) {
 		}
 		
 		if((*i)->deletion_flag) {
-			frontend.twibd.RemoveClient(*i);
+			frontend.daemon.RemoveClient(*i);
 			i = frontend.clients.erase(i);
 			continue;
 		}
@@ -108,7 +111,7 @@ void NamedPipeFrontend::Logic::Prepare(EventLoop &loop) {
 }
 
 NamedPipeFrontend::PendingPipe::PendingPipe(NamedPipeFrontend &frontend) :
-	Member(),
+	EventLoopEventMember(),
 	frontend(frontend) {
 	overlap.hEvent = event.handle;
 	Reset();
@@ -143,7 +146,7 @@ void NamedPipeFrontend::PendingPipe::Reset() {
 
 void NamedPipeFrontend::PendingPipe::Connected() {
 	std::shared_ptr<Client> &client = frontend.clients.emplace_back(std::make_shared<Client>(std::forward<Pipe>(pipe), frontend));
-	frontend.twibd.AddClient(client);
+	frontend.daemon.AddClient(client);
 	Reset();
 }
 

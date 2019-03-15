@@ -18,11 +18,11 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "windows.hpp"
+#include "platform/platform.hpp"
 
 #include<optional>
 
-#include "Logger.hpp"
+#include "common/Logger.hpp"
 
 namespace twili {
 namespace platform {
@@ -88,6 +88,112 @@ Pipe &Pipe::operator=(HANDLE phand) {
 	}
 	handle = phand;
 	return *this;
+}
+
+NetworkError::NetworkError(int en) : std::runtime_error("Failed to retrieve error string") {
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, WSAGetLastError(),
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPTSTR) &string, 0, NULL);
+}
+
+NetworkError::~NetworkError() {
+	LocalFree((LPTSTR) string);
+}
+
+const char *NetworkError::what() const noexcept {
+	return string;
+}
+
+Socket::Socket(int domain, int type, int protocol) : fd(WSASocket(domain, type, protocol, nullptr, 0, 0)) {
+	if(fd == INVALID_SOCKET) {
+		throw NetworkError(WSAGetLastError());
+	}
+}
+
+Socket::Socket(SOCKET fd) : fd(fd) {
+
+}
+
+Socket::~Socket() {
+	if(fd != INVALID_SOCKET) {
+		closesocket(fd);
+	}
+}
+
+Socket::Socket(Socket &&other) : fd(other.fd) {
+	other.fd = INVALID_SOCKET;
+}
+
+Socket &Socket::operator=(Socket &&other) {
+	if(fd != INVALID_SOCKET) {
+		closesocket(fd);
+	}
+	fd = other.fd;
+	other.fd = -1;
+	return *this;
+}
+
+ssize_t Socket::Recv(void *buffer, size_t length, int flags) {
+	DWORD bytes;
+	WSABUF buf = { length, (CHAR*) buffer };
+	if(WSARecv(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+		return -1;
+	}
+	return bytes;
+}
+
+ssize_t Socket::RecvFrom(void *buffer, size_t length, int flags, struct sockaddr *address, socklen_t *address_len) {
+	DWORD bytes;
+	WSABUF buf = { length, (CHAR*) buffer };
+	if(WSARecvFrom(fd, &buf, 1, &bytes, 0, address, address_len, nullptr, nullptr) != 0) {
+		return -1;
+	}
+	return bytes;
+}
+
+ssize_t Socket::Send(const void *buffer, size_t length, int flags) {
+	DWORD bytes;
+	WSABUF buf = { length, (CHAR*) buffer };
+	if(WSASend(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+		return -1;
+	}
+	return bytes;
+}
+
+int Socket::SetSockOpt(int level, int option_name, const void *option_value, socklen_t option_len) {
+	return setsockopt(fd, level, option_name, (const char*) option_value, option_len);
+}
+
+void Socket::Bind(const struct sockaddr *address, socklen_t address_len) {
+	if(bind(fd, address, address_len) == SOCKET_ERROR) {
+		throw NetworkError(WSAGetLastError());
+	}
+}
+
+void Socket::Listen(int backlog) {
+	if(listen(fd, backlog) == SOCKET_ERROR) {
+		throw NetworkError(WSAGetLastError());
+	}
+}
+
+Socket Socket::Accept(struct sockaddr *address, socklen_t *address_len) {
+	SOCKET fd = WSAAccept(fd, address, address_len, nullptr, NULL); // :thinking: about that NULL
+	if(fd == SOCKET_ERROR) {
+		throw NetworkError(WSAGetLastError());
+	}
+	return Socket(fd);
+}
+
+void Socket::Connect(const struct sockaddr *address, socklen_t address_len) {
+	if(WSAConnect(fd, address, address_len, nullptr, nullptr, nullptr, nullptr) == SOCKET_ERROR) {
+		throw NetworkError(WSAGetLastError());
+	}
+}
+
+void Socket::Close() {
+	closesocket(fd);
+	fd = INVALID_SOCKET;
 }
 
 } // namespace windows

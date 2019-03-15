@@ -69,7 +69,7 @@ class EventLoop :
 	EventLoop(Logic &logic);
 	~EventLoop();
 	
-	virtual const Notifier &GetNotifier() override;
+	virtual Notifier &GetNotifier() override;
 protected:
 	virtual void event_thread_func() override;
 
@@ -81,7 +81,7 @@ protected:
 		virtual void Notify() const override;
 	private:
 		EventLoop &loop;
-	} const notifier;
+	} notifier;
 };
 
 } // namespace detail

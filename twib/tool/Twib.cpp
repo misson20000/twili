@@ -21,6 +21,7 @@
 #include "platform/platform.hpp"
 
 #include<iomanip>
+#include<array>
 
 #include<string.h>
 
@@ -31,6 +32,8 @@
 #include "common/Logger.hpp"
 #include "common/ResultError.hpp"
 #include "common/config.hpp"
+
+#include "platform/InputPump.hpp"
 
 #include "Protocol.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
@@ -352,50 +355,18 @@ int main(int argc, char *argv[]) {
 			std::function<void(platform::EventLoop&)> f;
 		};
 
-		class StdinPumpMember : public platform::EventLoop::FileMember {
-		 public:
-			StdinPumpMember(platform::unix::File &&f, tool::ITwibPipeWriter writer) :
-				file(std::move(f)),
-				writer(writer),
-				buffer(4096) {
-			}
-
-			virtual bool WantsRead() {
-				return true;
-			}
-
-			virtual void SignalRead() {
-				// fread won't return until it fills the buffer or errors.
-				// this is not what we want; we want to send data over the
-				// pipe as soon as it comes in.
-				ssize_t r = read(fileno(stdin), buffer.data(), buffer.size());
-				if(r > 0) {
-					buffer.resize(r);
-					writer.WriteSync(buffer);
-				} else if(r == 0) {
-					writer.Close();
-				} else {
-					throw std::system_error(errno, std::generic_category());
-				}
-			}
-
-			virtual void SignalError() {
-				writer.Close();
-			}
-
-			virtual platform::unix::File &GetFile() {
-				return file;
-			}
-		 private:
-			std::vector<uint8_t> buffer;
-			twili::platform::unix::File file;
-			tool::ITwibPipeWriter writer;
-		} file_member(platform::unix::File(fileno(stdin), false), mon.OpenStdin());
+		tool::ITwibPipeWriter r = mon.OpenStdin();
+		platform::InputPump input_pump(4096,
+			[&r](std::vector<uint8_t> &data) {
+				r.WriteSync(data);
+			}, [&r]() {
+				r.Close();
+			});
 		
 		Logic logic(
 			[&](platform::EventLoop &l) {
 				l.Clear();
-				l.AddMember(file_member);
+				l.AddMember(input_pump);
 			});
 		platform::EventLoop stdin_loop(logic);
 		stdin_loop.Begin();

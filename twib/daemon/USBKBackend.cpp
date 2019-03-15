@@ -20,15 +20,15 @@
 
 #include "USBKBackend.hpp"
 
-#include "Logger.hpp"
-#include "Twibd.hpp"
+#include "common/Logger.hpp"
+#include "Daemon.hpp"
 
 namespace twili {
 namespace twib {
 namespace daemon {
 namespace backend {
 
-USBKBackend::USBKBackend(Twibd &twibd) : twibd(twibd), logic(*this), event_loop(logic) {
+USBKBackend::USBKBackend(Daemon &daemon) : daemon(daemon), logic(*this), event_loop(logic) {
 	if(!LibK_Context_Init(nullptr, nullptr)) {
 		LogMessage(Fatal, "Failed to initialize usbK context: %d", GetLastError());
 		exit(1);
@@ -173,7 +173,7 @@ void USBKBackend::Device::Begin() {
 	SendRequest(Request(std::shared_ptr<Client>(), 0x0, 0x0, (uint32_t) protocol::ITwibDeviceInterface::Command::IDENTIFY, 0xFFFFFFFF, std::vector<uint8_t>()));
 }
 
-void USBKBackend::Device::AddMembers(platform::windows::EventLoop &loop) {
+void USBKBackend::Device::AddMembers(platform::EventLoop &loop) {
 	loop.AddMember(member_data_in);
 	loop.AddMember(member_data_out);
 	loop.AddMember(member_meta_in);
@@ -293,7 +293,7 @@ void USBKBackend::Device::DispatchResponse() {
 	std::transform(
 		object_ids_in.begin(), object_ids_in.end(), response_in.objects.begin(),
 		[this](uint32_t id) {
-			return std::make_shared<BridgeObject>(backend.twibd, response_in.device_id, id);
+			return std::make_shared<BridgeObject>(backend.daemon, response_in.device_id, id);
 		});
 
 	// remove from pending requests
@@ -304,7 +304,7 @@ void USBKBackend::Device::DispatchResponse() {
 	if(response_in.client_id == 0xFFFFFFFF) { // identification meta-client
 		Identified(response_in);
 	} else {
-		backend.twibd.PostResponse(std::move(response_in));
+		backend.daemon.PostResponse(std::move(response_in));
 	}
 	ResubmitMetaInTransfer();
 }
@@ -463,7 +463,7 @@ void USBKBackend::AddTwiliDevice(KLST_DEVINFO_HANDLE device_info) {
 	};
 
 	devices.emplace_back(std::make_shared<Device>(*this, Usb, std::move(handle), addrs))->Begin();
-	event_loop.notifier.Notify();
+	event_loop.GetNotifier().Notify();
 }
 
 void USBKBackend::AddSerialConsole(KLST_DEVINFO_HANDLE device_info) {
@@ -504,7 +504,7 @@ void USBKBackend::AddSerialConsole(KLST_DEVINFO_HANDLE device_info) {
 	}
 
 	stdout_transfers.emplace_back(std::make_shared<StdoutTransferState>(*this, Usb, std::move(handle), pipe_in_info.PipeId))->Submit();
-	event_loop.notifier.Notify();
+	event_loop.GetNotifier().Notify();
 }
 
 USBKBackend::StdoutTransferState::StdoutTransferState(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle &&hnd, uint8_t ep_addr) :
@@ -576,7 +576,7 @@ USBKBackend::Logic::Logic(USBKBackend &backend) : backend(backend) {
 
 }
 
-void USBKBackend::Logic::Prepare(platform::windows::EventLoop &loop) {
+void USBKBackend::Logic::Prepare(platform::EventLoop &loop) {
 	loop.Clear();
 	for(auto i = backend.stdout_transfers.begin(); i != backend.stdout_transfers.end();) {
 		if((*i)->deletion_flag) {
@@ -590,14 +590,14 @@ void USBKBackend::Logic::Prepare(platform::windows::EventLoop &loop) {
 		auto d = *i;
 		if(d->deletion_flag) {
 			if(d->added_flag) {
-				backend.twibd.RemoveDevice(d);
+				backend.daemon.RemoveDevice(d);
 			}
 			i = backend.devices.erase(i);
 			continue;
 		}
 
 		if(d->ready_flag && !d->added_flag) {
-			backend.twibd.AddDevice(d);
+			backend.daemon.AddDevice(d);
 			d->added_flag = true;
 		}
 

@@ -29,8 +29,8 @@
 
 #include<stdint.h>
 
-#include "platform/windows.hpp"
-#include "platform/EventLoop.hpp"
+#include "platform.hpp"
+#include "platform/common/EventLoop.hpp"
 
 namespace twili {
 namespace platform {
@@ -50,39 +50,43 @@ class EventLoopEventMember {
 };
 
 class EventLoopSocketMember : public EventLoopEventMember {
+ public:
+	EventLoopSocketMember(platform::Socket &&socket);
+	platform::Socket socket;
  protected:
 	virtual bool WantsRead();
 	virtual bool WantsWrite();
 	virtual void SignalRead();
 	virtual void SignalWrite();
 	virtual void SignalError();
-	virtual Socket &GetSocket() = 0;
  private:
 	virtual bool WantsSignal() override final;
 	virtual void Signal() override final;
-	virtual Event &GetEvent() override final = 0;
+	virtual Event &GetEvent() override final;
 	
 	platform::windows::Event event;
-	size_t last_service = 0;
 };
 
-class EventLoop : public platform::detail::EventLoopBase<EventLoop, EventMember> {
+class EventLoop : public platform::common::detail::EventLoopBase<EventLoop, EventLoopEventMember> {
 public:
 	using EventMember = EventLoopEventMember;
 	using SocketMember = EventLoopSocketMember;
 	
-	virtual const twibc::EventThreadNotifier &GetEventThreadNotifier() override;
+	EventLoop(Logic &logic);
+	~EventLoop();
+
+	virtual Notifier &GetNotifier() override;
 protected:
 	virtual void event_thread_func() override;
 
 	Event notification_event;
-	class EventThreadNotifier : public twibc::EventThreadNotifier {
+	class EventThreadNotifier : public Notifier {
 	public:
 		EventThreadNotifier(EventLoop &loop);
 		virtual void Notify() const override;
 	private:
 		EventLoop &loop;
-	} const notifier;
+	} notifier;
 };
 
 } // namespace detail

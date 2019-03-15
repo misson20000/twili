@@ -21,9 +21,10 @@
 #include "NamedPipeMessageConnection.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
-NamedPipeMessageConnection::NamedPipeMessageConnection(platform::windows::Pipe &&pipe, const EventThreadNotifier &notifier) :
+NamedPipeMessageConnection::NamedPipeMessageConnection(platform::windows::Pipe &&pipe, platform::EventLoop::Notifier &notifier) :
 	input_member(*this),
 	output_member(*this),
 	pipe(std::move(pipe)),
@@ -179,5 +180,6 @@ bool NamedPipeMessageConnection::RequestOutput() {
 	}
 }
 
-} // namespace twibc
+} // namespace common
+} // namespace twib
 } // namespace twili

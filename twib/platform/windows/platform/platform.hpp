@@ -38,6 +38,8 @@
 
 #include<stdint.h>
 
+#include<stdexcept>
+
 typedef signed long long ssize_t; // pls
 
 namespace twili {
@@ -86,31 +88,47 @@ public:
 	Pipe &operator=(HANDLE handle);
 };
 
+class NetworkError : public std::runtime_error {
+ public:
+	NetworkError(int err);
+	~NetworkError();
+
+	virtual const char *what() const noexcept override;
+ private:
+	const char *string;
+};
+
 class Socket {
  public:
-	Socket();
+	Socket(int domain, int type, int protocol);
+	Socket(SOCKET fd);
+
 	Socket(Socket &&);
 	Socket &operator=(Socket &&);
 	Socket(const Socket&) = delete;
 	Socket &operator=(const Socket&) = delete;
 	
-	Socket(SOCKET fd);
 	~Socket();
 
-	Socket &operator=(SOCKET fd);
+	ssize_t Recv(void *buf, size_t length, int flags);
+	ssize_t RecvFrom(void *buf, size_t length, int flags, struct sockaddr *address, socklen_t *address_len);
+	ssize_t Send(const void *buf, size_t length, int flags);
+	int SetSockOpt(int level, int option_name, const void *option_value, socklen_t option_len);
 
-	bool IsValid();
+	void Bind(const struct sockaddr *address, socklen_t address_len);
+	void Listen(int backlog);
+	Socket Accept(struct sockaddr *address, socklen_t *address_len);
+	void Connect(const struct sockaddr *address, socklen_t address_len);
+
 	void Close();
 
 	SOCKET fd;
- private:
-	bool is_valid = false;
 };
 
 } // namespace windows
 
-using EventType = windows::Event;
-using SocketType = windows::Socket;
+using Socket = windows::Socket;
+using NetworkError = windows::NetworkError;
 
 } // namespace platform
 } // namespace twili

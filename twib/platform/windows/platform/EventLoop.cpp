@@ -22,7 +22,7 @@
 
 #include<algorithm>
 
-#include "Logger.hpp"
+#include "common/Logger.hpp"
 
 namespace twili {
 namespace platform {
@@ -39,21 +39,31 @@ void EventLoop::EventThreadNotifier::Notify() const {
 	}
 }
 
+EventLoop::EventLoop(Logic &logic) :
+	platform::common::detail::EventLoopBase<EventLoop, EventLoopEventMember>(logic),
+	notifier(*this) {
+}
+
 EventLoop::~EventLoop() {
 	Destroy();
+}
+
+EventLoop::Notifier &EventLoop::GetNotifier() {
+	return notifier;
 }
 
 void EventLoop::event_thread_func() {
 	while(!event_thread_destroy) {
 		logic.Prepare(*this);
 
-		std::sort(members.begin(), members.end(), [](auto &a, auto &b) { return a.last_service > b.last_service; });
+		std::sort(members.begin(), members.end(), [](auto &a, auto &b) { return a.get().last_service > b.get().last_service; });
 		std::vector<HANDLE> event_handles;
-		std::vector<std::reference_wrapper<EventLoopMember>> event_members;
+		std::vector<std::reference_wrapper<EventMember>> event_members;
 		for(auto i = members.begin(); i != members.end(); i++) {
-			if(i->WantsSignal()) {
-				event_handles.push_back(i->GetEvent().handle);
-				event_members.push_back(*i);
+			EventMember &member = i->get();
+			if(member.WantsSignal()) {
+				event_handles.push_back(member.GetEvent().handle);
+				event_members.push_back(member);
 			}
 		}
 		// add notification event last since it's the one we're least interested in
@@ -85,43 +95,49 @@ void EventLoop::event_thread_func() {
 }
 
 // default implementations for EventMember
-bool EventMember::WantsSignal() {
+bool EventLoopEventMember::WantsSignal() {
 	return false;
 }
 
-void EventMember::Signal() {
+void EventLoopEventMember::Signal() {
+}
+
+EventLoopSocketMember::EventLoopSocketMember(Socket &&socket) : socket(std::move(socket)) {
+
 }
 
 // default implementations for SocketMember
-bool SocketMember::WantsRead() {
+bool EventLoopSocketMember::WantsRead() {
 	return false;
 }
 
-bool SocketMember::WantsWrite() {
+bool EventLoopSocketMember::WantsWrite() {
 	return false;
 }
 
-void SocketMember::SignalRead() {
+void EventLoopSocketMember::SignalRead() {
 	
 }
 
-void SocketMember::SignalWrite() {
+void EventLoopSocketMember::SignalWrite() {
 	
 }
 
-void SocketMember::SignalError() {
+void EventLoopSocketMember::SignalError() {
 	
 }
 
 // EventMember implementation for SocketMember
-bool SocketMember::WantsSignal() {
+bool EventLoopSocketMember::WantsSignal() {
 	return true; // we're always listening for close
 }
 
-void SocketMember::Signal() {
+
+void EventLoopSocketMember::Signal() {
 	WSANETWORKEVENTS netevents;
-	if(!WSAEnumNetworkEvents(GetSocket().fd, event.handle, &netevents)) {
+	if(!WSAEnumNetworkEvents(socket.fd, event.handle, &netevents)) {
 		LogMessage(Fatal, "WSAEnumNetworkEvents failed");
+		throw NetworkError(WSAGetLastError());
 		exit(1);
 	}
 	for(size_t i = 0; i < netevents.lNetworkEvents; i++) {
@@ -138,7 +154,7 @@ void SocketMember::Signal() {
 	}
 }
 
-Event &SocketMember::GetEvent() {
+Event &EventLoopSocketMember::GetEvent() {
 	long events = FD_CLOSE;
 	if(WantsRead()) {
 		events|= FD_READ;
@@ -147,7 +163,7 @@ Event &SocketMember::GetEvent() {
 	if(WantsWrite()) {
 		events|= FD_WRITE;
 	}
-	if(WSAEventSelect(GetSocket().fd, event.handle, events)) {
+	if(WSAEventSelect(socket.fd, event.handle, events)) {
 		LogMessage(Fatal, "failed to WSAEventSelect");
 		exit(1);
 	}

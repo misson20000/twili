@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<Windows.h>
 
@@ -31,25 +31,25 @@
 
 #include<stdint.h>
 
-#include "platform/windows.hpp"
-#include "platform/windows/EventLoop.hpp"
+#include "platform/platform.hpp"
+#include "platform/EventLoop.hpp"
+#include "common/NamedPipeMessageConnection.hpp"
 #include "Frontend.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
-#include "NamedPipeMessageConnection.hpp"
 
 namespace twili {
 namespace twib {
 namespace daemon {
 
-class Twibd;
+class Daemon;
 
 namespace frontend {
 
 class NamedPipeFrontend : public Frontend {
 public:
-	NamedPipeFrontend(Twibd &twibd, const char *name);
+	NamedPipeFrontend(Daemon &daemon, const char *name);
 	~NamedPipeFrontend();
 
 	class Client : public daemon::Client {
@@ -59,23 +59,23 @@ public:
 
 		virtual void PostResponse(Response &r);
 
-		twibc::NamedPipeMessageConnection connection;
+		common::NamedPipeMessageConnection connection;
 		NamedPipeFrontend &frontend;
-		Twibd &twibd;
+		Daemon &daemon;
 	};
 
 private:
-	Twibd &twibd;
+	Daemon &daemon;
 
-	class Logic : public platform::windows::EventLoop::Logic {
+	class Logic : public platform::EventLoop::Logic {
 	public:
 		Logic(NamedPipeFrontend &frontend);
-		virtual void Prepare(platform::windows::EventLoop &server) override;
+		virtual void Prepare(platform::EventLoop &server) override;
 	private:
 		NamedPipeFrontend &frontend;
 	} pipe_logic;
 
-	class PendingPipe : public platform::windows::EventLoop::Member {
+	class PendingPipe : public platform::EventLoop::EventMember {
 	public:
 		PendingPipe(NamedPipeFrontend &frontend);
 		void Reset();
@@ -92,7 +92,7 @@ private:
 
 	std::list<std::shared_ptr<Client>> clients;
 
-	platform::windows::EventLoop event_loop;
+	platform::EventLoop event_loop;
 };
 
 } // namespace frontend
