@@ -8,7 +8,7 @@ if(WIN32)
 endif()
 add_executable(twib ${SOURCE})
 
-target_link_libraries(twib twib-common)
+target_link_libraries(twib twib-platform twib-common)
 
 include_directories(msgpack11 INTERFACE)
 target_link_libraries(twib msgpack11)

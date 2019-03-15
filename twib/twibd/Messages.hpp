@@ -28,7 +28,8 @@
 #include "BridgeObject.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Response {
  public:
@@ -88,5 +89,6 @@ class Request {
  private:
 };
 
-} // namespace twibd
+} // namesapce daemon
+} // namespace twib
 } // namespace twili

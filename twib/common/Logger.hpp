@@ -23,7 +23,7 @@
 #include<memory>
 #include<ostream>
 
-#include "config.hpp"
+#include "common/config.hpp"
 
 namespace neolib
 {

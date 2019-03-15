@@ -23,7 +23,8 @@
 #include<stdint.h>
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -38,5 +39,6 @@ class BridgeObject {
 	bool valid = true;
 };
 
+} // namespace daemon
 } // namespace twibd
 } // namespace twili

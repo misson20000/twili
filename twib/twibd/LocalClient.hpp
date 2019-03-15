@@ -28,11 +28,12 @@
 #include "Messages.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
-class LocalClient : public twibd::Client {
+class LocalClient : public daemon::Client {
  public:
 	LocalClient(Twibd *twibd);
 
@@ -45,5 +46,6 @@ class LocalClient : public twibd::Client {
 	std::mutex response_map_mutex;
 };
 
+} // namespace daemon
 } // namespace twibd
 } // namespace twili

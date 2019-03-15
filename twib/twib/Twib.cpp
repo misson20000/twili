@@ -18,9 +18,7 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "Twib.hpp"
-
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<iomanip>
 
@@ -30,9 +28,10 @@
 
 #include "CLI/CLI.hpp"
 
-#include "Logger.hpp"
-#include "ResultError.hpp"
-#include "config.hpp"
+#include "common/Logger.hpp"
+#include "common/ResultError.hpp"
+#include "common/config.hpp"
+
 #include "Protocol.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
 #include "interfaces/ITwibDeviceInterface.hpp"

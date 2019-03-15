@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -21,9 +21,10 @@
 #include "SocketMessageConnection.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
-SocketMessageConnection::SocketMessageConnection(platform::Socket &&socket, const EventThreadNotifier &notifier) : member(*this, std::move(socket)), notifier(notifier) {
+SocketMessageConnection::SocketMessageConnection(platform::Socket &&socket, const platform::EventLoop::Notifier &notifier) : member(*this, std::move(socket)), notifier(notifier) {
 }
 
 SocketMessageConnection::~SocketMessageConnection() {
@@ -81,5 +82,6 @@ bool SocketMessageConnection::RequestOutput() {
 	return false;
 }
 
-} // namespace twibc
+} // namespace common
+} // namespace twib
 } // namespace twili

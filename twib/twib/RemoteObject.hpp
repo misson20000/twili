@@ -22,8 +22,9 @@
 
 #include<functional>
 
+#include "common/ResultError.hpp"
+
 #include "err.hpp"
-#include "ResultError.hpp"
 #include "Client.hpp"
 #include "Packing.hpp"
 

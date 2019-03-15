@@ -23,7 +23,7 @@
 #include "Client.hpp"
 
 #include "Buffer.hpp"
-#include "SocketMessageConnection.hpp"
+#include "common/SocketMessageConnection.hpp"
 
 namespace twili {
 namespace twib {
@@ -46,7 +46,7 @@ class SocketClient : public Client {
 	} server_logic;
 	
 	platform::EventLoop event_loop;
-	twibc::SocketMessageConnection connection;
+	common::SocketMessageConnection connection;
 };
 
 } // namespace client

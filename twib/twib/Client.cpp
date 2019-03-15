@@ -22,7 +22,7 @@
 
 #include<random>
 
-#include "Twib.hpp"
+#include "common/Logger.hpp"
 #include "RemoteObject.hpp"
 
 namespace twili {

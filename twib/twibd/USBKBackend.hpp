@@ -37,7 +37,8 @@
 #include "platform/windows/EventLoop.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -215,5 +216,6 @@ class USBKBackend {
 };
 
 } // namespace backend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

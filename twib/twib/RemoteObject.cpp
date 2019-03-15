@@ -23,8 +23,8 @@
 #include<mutex>
 #include<condition_variable>
 
-#include "Logger.hpp"
-#include "ResultError.hpp"
+#include "common/Logger.hpp"
+#include "common/ResultError.hpp"
 
 namespace twili {
 namespace twib {

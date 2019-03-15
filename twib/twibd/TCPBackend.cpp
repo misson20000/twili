@@ -20,12 +20,13 @@
 
 #include "TCPBackend.hpp"
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include "Twibd.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 namespace backend {
 
 TCPBackend::TCPBackend(Twibd &twibd) :
@@ -78,7 +79,7 @@ std::string TCPBackend::Connect(std::string hostname, std::string port) {
 		socket.Connect(res->ai_addr, res->ai_addrlen);
 
 		devices.emplace_back(std::make_shared<Device>(std::move(socket), *this))->Begin();
-		event_loop.GetEventThreadNotifier().Notify();
+		event_loop.GetNotifier().Notify();
 		return "Ok"; 
 	} catch(platform::NetworkError &e) {
 		return e.what();
@@ -96,7 +97,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 
 		devices.emplace_back(std::make_shared<Device>(std::move(socket), *this))->Begin();
 		LogMessage(Info, "connected to %s", inet_ntoa(addr_in->sin_addr));
-		event_loop.GetEventThreadNotifier().Notify();
+		event_loop.GetNotifier().Notify();
 	} else {
 		LogMessage(Info, "not an IPv4 address");
 	}
@@ -104,7 +105,7 @@ void TCPBackend::Connect(sockaddr *addr, socklen_t addr_len) {
 
 TCPBackend::Device::Device(platform::Socket &&socket, TCPBackend &backend) :
 	backend(backend),
-	connection(std::move(socket), backend.event_loop.GetEventThreadNotifier()) {
+	connection(std::move(socket), backend.event_loop.GetNotifier()) {
 }
 
 TCPBackend::Device::~Device() {
@@ -235,7 +236,7 @@ void TCPBackend::ServerLogic::Prepare(platform::EventLoop &loop) {
 	loop.Clear();
 	loop.AddMember(backend.listen_member);
 	for(auto i = backend.devices.begin(); i != backend.devices.end(); ) {
-		twibc::MessageConnection::Request *rq;
+		common::MessageConnection::Request *rq;
 		while((rq = (*i)->connection.Process()) != nullptr) {
 			(*i)->IncomingMessage(rq->mh, rq->payload, rq->object_ids);
 		}
@@ -264,5 +265,6 @@ void TCPBackend::ServerLogic::Prepare(platform::EventLoop &loop) {
 }
 
 } // namespace backend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

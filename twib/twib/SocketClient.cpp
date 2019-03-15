@@ -26,7 +26,7 @@ namespace twili {
 namespace twib {
 namespace client {
 
-SocketClient::SocketClient(platform::Socket &&socket) : server_logic(*this), event_loop(server_logic), connection(std::move(socket), event_loop.GetEventThreadNotifier()) {
+SocketClient::SocketClient(platform::Socket &&socket) : server_logic(*this), event_loop(server_logic), connection(std::move(socket), event_loop.GetNotifier()) {
 	event_loop.Begin();
 }
 
@@ -53,7 +53,7 @@ SocketClient::Logic::Logic(SocketClient &client) : client(client) {
 
 void SocketClient::Logic::Prepare(platform::EventLoop &loop) {
 	loop.Clear();
-	twibc::MessageConnection::Request *rq;
+	common::MessageConnection::Request *rq;
 	while((rq = client.connection.Process()) != nullptr) {
 		client.PostResponse(rq->mh, rq->payload, rq->object_ids);
 	}

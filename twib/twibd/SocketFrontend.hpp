@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<list>
 #include<vector>
@@ -29,14 +29,16 @@
 
 #include<stdint.h>
 
+#include "common/SocketMessageConnection.hpp"
+
 #include "Frontend.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
 #include "Buffer.hpp"
-#include "SocketMessageConnection.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -48,14 +50,14 @@ class SocketFrontend : public Frontend {
 	SocketFrontend(Twibd &twibd, platform::Socket &&socket);
 	~SocketFrontend();
 
-	class Client : public twibd::Client {
+	class Client : public daemon::Client {
 		public:
 		Client(platform::Socket &&socket, SocketFrontend &frontend);
 		~Client();
 
 		virtual void PostResponse(Response &r) override;
 
-		twibc::SocketMessageConnection connection;
+		common::SocketMessageConnection connection;
 		SocketFrontend &frontend;
 		Twibd &twibd;
 	};
@@ -92,5 +94,6 @@ class SocketFrontend : public Frontend {
 };
 
 } // namespace frontend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

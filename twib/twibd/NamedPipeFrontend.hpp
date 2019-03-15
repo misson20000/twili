@@ -40,7 +40,8 @@
 #include "NamedPipeMessageConnection.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -51,7 +52,7 @@ public:
 	NamedPipeFrontend(Twibd &twibd, const char *name);
 	~NamedPipeFrontend();
 
-	class Client : public twibd::Client {
+	class Client : public daemon::Client {
 	public:
 		Client(platform::windows::Pipe &&pipe, NamedPipeFrontend &frontend);
 		~Client();
@@ -95,5 +96,6 @@ private:
 };
 
 } // namespace frontend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

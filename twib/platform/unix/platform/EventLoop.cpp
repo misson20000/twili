@@ -18,11 +18,11 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "EventLoop.hpp"
+#include "platform/EventLoop.hpp"
 
 #include<algorithm>
 
-#include "Logger.hpp"
+#include "common/Logger.hpp"
 
 namespace twili {
 namespace platform {
@@ -41,7 +41,7 @@ void EventLoop::EventThreadNotifier::Notify() const {
 }
 
 EventLoop::EventLoop(Logic &logic) :
-	platform::detail::EventLoopBase<EventLoop, EventLoopFileMember>(logic),
+	platform::common::detail::EventLoopBase<EventLoop, EventLoopFileMember>(logic),
 	notifier(*this) {
 	if(pipe(notification_pipe) < 0) {
 		LogMessage(Fatal, "failed to create pipe for event thread notifications: %s", strerror(errno));
@@ -55,7 +55,7 @@ EventLoop::~EventLoop() {
 	close(notification_pipe[1]);
 }
 
-const twibc::EventThreadNotifier &EventLoop::GetEventThreadNotifier() {
+const EventLoop::Notifier &EventLoop::GetNotifier() {
 	return notifier;
 }
 

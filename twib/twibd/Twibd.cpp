@@ -20,8 +20,8 @@
 
 #include "Twibd.hpp"
 
-#include "config.hpp"
-#include "platform.hpp"
+#include "common/config.hpp"
+#include "platform/platform.hpp"
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -47,7 +47,8 @@
 #include <string>
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 Twibd::Twibd() :
 	local_client(std::make_shared<LocalClient>(this))
@@ -312,8 +313,12 @@ static std::shared_ptr<frontend::NamedPipeFrontend> CreateNamedPipeFrontend(Twib
 }
 #endif
 
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili
+
+using namespace twili;
+using namespace twili::twib;
 
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
@@ -394,41 +399,41 @@ int main(int argc, char *argv[]) {
 		return app.exit(e);
 	}
 
-	twili::log::Level min_log_level = twili::log::Level::Message;
+	log::Level min_log_level = log::Level::Message;
 	if(verbosity >= 1) {
-		min_log_level = twili::log::Level::Info;
+		min_log_level = log::Level::Info;
 	}
 	if(verbosity >= 2) {
-		min_log_level = twili::log::Level::Debug;
+		min_log_level = log::Level::Debug;
 	}
 #if WITH_SYSTEMD == 1
 	if(systemd_mode) {
-		add_log(std::make_shared<twili::log::SystemdLogger>(stderr, min_log_level));
+		add_log(std::make_shared<log::SystemdLogger>(stderr, min_log_level));
 	}
 #endif
 	if(!systemd_mode) {
-		twili::log::init_color();
-		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stdout, min_log_level, twili::log::Level::Error));
-		twili::log::add_log(std::make_shared<twili::log::PrettyFileLogger>(stderr, twili::log::Level::Error));
+		log::init_color();
+		log::add_log(std::make_shared<log::PrettyFileLogger>(stdout, min_log_level, log::Level::Error));
+		log::add_log(std::make_shared<log::PrettyFileLogger>(stderr, log::Level::Error));
 	}
 
 	LogMessage(Message, "starting twibd");
-	twili::twibd::Twibd twibd;
-	std::vector<std::shared_ptr<twili::twibd::frontend::Frontend>> frontends;
+	daemon::Twibd twibd;
+	std::vector<std::shared_ptr<daemon::frontend::Frontend>> frontends;
 	if(!systemd_mode) {
 #if TWIB_TCP_FRONTEND_ENABLED == 1
 		if(tcp_frontend_enabled) {
-			frontends.push_back(twili::twibd::CreateTCPFrontend(twibd, tcp_frontend_port));
+			frontends.push_back(daemon::CreateTCPFrontend(twibd, tcp_frontend_port));
 		}
 #endif
 #if TWIB_UNIX_FRONTEND_ENABLED == 1
 		if(unix_frontend_enabled) {
-			frontends.push_back(twili::twibd::CreateUNIXFrontend(twibd, unix_frontend_path));
+			frontends.push_back(daemon::CreateUNIXFrontend(twibd, unix_frontend_path));
 		}
 #endif
 #if TWIB_NAMED_PIPE_FRONTEND_ENABLED == 1
 		if(named_pipe_frontend_enabled) {
-			frontends.push_back(twili::twibd::CreateNamedPipeFrontend(twibd));
+			frontends.push_back(daemon::CreateNamedPipeFrontend(twibd));
 		}
 #endif
 	}
@@ -442,7 +447,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Info, "got %d sockets from systemd", num_fds);
 			for(int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + num_fds; fd++) {
 				if(sd_is_socket(fd, 0, SOCK_STREAM, 1) == 1) {
-					frontends.push_back(std::make_shared<twili::twibd::frontend::SocketFrontend>(twibd, twili::platform::Socket(fd)));
+					frontends.push_back(std::make_shared<daemon::frontend::SocketFrontend>(twibd, platform::Socket(fd)));
 				} else {
 					LogMessage(Warning, "got an FD from systemd that wasn't a SOCK_STREAM: %d", fd);
 				}

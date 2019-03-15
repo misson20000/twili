@@ -20,17 +20,18 @@
 
 #pragma once
 
-#include "platform.hpp"
-#include "platform/EventLoop.hpp"
+#include "platform/platform.hpp"
+#include "platform/EventLoop.hpp" // from platform
+
 #include "MessageConnection.hpp"
-#include "EventThreadNotifier.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
 class SocketMessageConnection : public MessageConnection {
  public:
-	SocketMessageConnection(platform::Socket &&socket, const EventThreadNotifier &notifier);
+	SocketMessageConnection(platform::Socket &&socket, const platform::EventLoop::Notifier &notifier);
 	virtual ~SocketMessageConnection() override;
 
 	class ConnectionMember : public platform::EventLoop::SocketMember {
@@ -50,8 +51,9 @@ class SocketMessageConnection : public MessageConnection {
 	virtual bool RequestInput() override;
 	virtual bool RequestOutput() override;
  private:
-	const EventThreadNotifier &notifier;
+	const platform::EventLoop::Notifier &notifier;
 };
 
-} // namespace twibc
+} // namespace common
+} // namespace twib
 } // namespace twili

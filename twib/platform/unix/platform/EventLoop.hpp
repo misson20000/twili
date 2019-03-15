@@ -20,8 +20,6 @@
 
 #pragma once
 
-#include "platform.hpp"
-
 #include<list>
 #include<vector>
 #include<thread>
@@ -29,8 +27,8 @@
 
 #include<stdint.h>
 
-#include "platform/unix.hpp"
-#include "platform/EventLoop.hpp"
+#include "platform.hpp"
+#include "platform/common/EventLoop.hpp"
 
 namespace twili {
 namespace platform {
@@ -62,21 +60,22 @@ class EventLoopSocketMember : public EventLoopFileMember {
 	virtual File &GetFile() final override;
 };
 
-class EventLoop : public platform::detail::EventLoopBase<EventLoop, EventLoopFileMember> {
-public:
+class EventLoop :
+		public platform::common::detail::EventLoopBase<EventLoop, EventLoopFileMember> {
+ public:
 	using FileMember = EventLoopFileMember;
 	using SocketMember = EventLoopSocketMember;
 
 	EventLoop(Logic &logic);
 	~EventLoop();
 	
-	virtual const twibc::EventThreadNotifier &GetEventThreadNotifier() override;
+	virtual const Notifier &GetNotifier() override;
 protected:
 	virtual void event_thread_func() override;
 
 	// TODO: use File to RAII this
 	int notification_pipe[2];
-	class EventThreadNotifier : public twibc::EventThreadNotifier {
+	class EventThreadNotifier : public Notifier {
 	public:
 		EventThreadNotifier(EventLoop &loop);
 		virtual void Notify() const override;

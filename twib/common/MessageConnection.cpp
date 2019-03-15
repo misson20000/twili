@@ -21,7 +21,8 @@
 #include "MessageConnection.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
 MessageConnection::MessageConnection() {
 }
@@ -75,5 +76,6 @@ void MessageConnection::SendMessage(const protocol::MessageHeader &mh, const std
 	RequestOutput();
 }
 
-} // namespace twibc
+} // namespace common
+} // namespace twib
 } // namespace twili

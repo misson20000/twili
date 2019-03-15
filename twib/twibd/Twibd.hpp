@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<list>
 #include<thread>
@@ -29,9 +29,10 @@
 #include<map>
 #include<random>
 
-#include "blockingconcurrentqueue.h"
+#include "common/blockingconcurrentqueue.h"
+#include "common/config.hpp"
+#include "common/Logger.hpp"
 
-#include "config.hpp"
 #if TWIBD_TCP_BACKEND_ENABLED
 #include "TCPBackend.hpp"
 #endif
@@ -42,13 +43,13 @@
 #include "USBKBackend.hpp"
 #endif
 
-#include "Logger.hpp"
 #include "Messages.hpp"
 #include "Device.hpp"
 #include "LocalClient.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd {
  public:
@@ -89,5 +90,6 @@ class Twibd {
 	std::random_device rng;
 };
 
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

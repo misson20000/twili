@@ -21,7 +21,8 @@
 #pragma once
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 namespace frontend {
 
 class Frontend {
@@ -29,5 +30,6 @@ class Frontend {
 };
 
 } // namespace frontend
+} // namespace daemon
 } // namespace twibd
 } // namespace twili

@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<thread>
 #include<list>
@@ -36,7 +36,8 @@
 #include "Protocol.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -47,7 +48,7 @@ class USBBackend {
 	USBBackend(Twibd *twibd);
 	~USBBackend();
 	
-	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
+	class Device : public daemon::Device, public std::enable_shared_from_this<Device> {
 	 public:
 		Device(USBBackend *backend, libusb_device_handle *device, uint8_t endp_addrs[4], uint8_t interface_number);
 		~Device();
@@ -150,5 +151,6 @@ class USBBackend {
 };
 
 } // namespace backend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

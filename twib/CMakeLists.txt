@@ -79,24 +79,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-configure_file(
-	"${PROJECT_SOURCE_DIR}/config.hpp.in"
-	"${PROJECT_BINARY_DIR}/config.hpp"
-	)
-
 add_definitions("-DPROJECT_ROOT=\"${PROJECT_SOURCE_DIR}\"") # for logging
 
 include_directories("${PROJECT_BINARY_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/../common/")
 
-set(COMMON_SOURCES Logger.cpp ../common/Buffer.cpp ../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp)
-if(WIN32)
-	set(COMMON_SOURCES ${COMMON_SOURCES} platform/windows.cpp NamedPipeMessageConnection.cpp platform/windows/EventLoop.cpp)
-else()
-	set(COMMON_SOURCES ${COMMON_SOURCES} platform/unix.cpp platform/unix/EventLoop.cpp)
-endif()
-add_library(twib-common ${COMMON_SOURCES})
 add_subdirectory(externals EXCLUDE_FROM_ALL)
+
+add_subdirectory(platform)
+add_subdirectory(common)
 add_subdirectory(twibd)
 add_subdirectory(twib)

@@ -21,8 +21,8 @@
 #include "ITwibProcessMonitor.hpp"
 
 #include "Protocol.hpp"
-#include "Logger.hpp"
-#include "ResultError.hpp"
+#include "common/Logger.hpp"
+#include "common/ResultError.hpp"
 #include "err.hpp"
 
 namespace twili {

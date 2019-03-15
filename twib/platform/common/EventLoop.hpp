@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/common/EventLoop.hpp"
 
 #include<list>
 #include<vector>
@@ -29,65 +29,19 @@
 
 #include<stdint.h>
 
-#include "EventThreadNotifier.hpp"
-
 namespace twili {
 namespace platform {
-
-/*
-class EventLoop {
-public:
-	class Logic {
-	public:
-		virtual void Prepare(EventLoop &loop) = 0;
-	};
-
-	EventLoop(Logic &logic);
-	virtual ~EventLoop();
-
-	class Member {
-		// detail
-	};
-	
-	class EventMember : public Member {
-	 public:
-		Member();
-		~Member();
-
-		virtual bool WantsSignal();
-		virtual void Signal();
-	 protected:
-		virtual EventType &GetEvent() = 0;
-	};
-
-	class SocketMember : public Member {
-	 public:
-		SocketMember();
-		~SocketMember();
-
-		virtual bool WantsRead();
-		virtual bool WantsWrite();
-		virtual void SignalRead();
-		virtual void SignalWrite();
-		virtual void SignalError();
-	 protected:
-		virtual Socket &GetSocket() = 0;
-	};
-	
-	void Begin();
-	void Destroy();
-	void Clear();
-	void AddMember(Member &event);
-
-	const twibc::EventThreadNotifier &GetEventThreadNotifier();
-};
-*/
-
+namespace common {
 namespace detail {
 
 template<typename Self, typename Member>
 class EventLoopBase {
  public:
+	class Notifier {
+	 public:
+		virtual void Notify() const = 0;
+	};
+
 	class Logic {
 	public:
 		virtual void Prepare(Self &loop) = 0;
@@ -106,7 +60,7 @@ class EventLoopBase {
 	void Destroy() {
 		if(event_thread_running) {
 			event_thread_destroy = true;
-			GetEventThreadNotifier().Notify();
+			GetNotifier().Notify();
 			event_thread.join();
 			event_thread_running = false;
 		}
@@ -120,7 +74,7 @@ class EventLoopBase {
 		members.push_back(member);
 	}
 
-	virtual const twibc::EventThreadNotifier &GetEventThreadNotifier() = 0;
+	virtual const Notifier &GetNotifier() = 0;
  protected:
 	std::vector<std::reference_wrapper<Member>> members;
 	Logic &logic;
@@ -134,14 +88,6 @@ class EventLoopBase {
 };
 
 } // namespace detail
+} // namespace common
 } // namespace platform
 } // namespace twili
-
-// include implementations
-#ifdef _WIN32
-// windows
-#include "platform/windows/EventLoop.hpp"
-#else
-// assume something unixy
-#include "platform/unix/EventLoop.hpp"
-#endif

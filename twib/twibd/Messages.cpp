@@ -21,7 +21,8 @@
 #include "Messages.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 Response::Response() {
 }
@@ -82,5 +83,6 @@ WeakRequest Request::Weak() const {
 	return WeakRequest(client ? client->client_id : 0xffffffff, device_id, object_id, command_id, tag, payload);
 }
 
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

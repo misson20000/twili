@@ -27,7 +27,8 @@
 using namespace twili::platform::windows;
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 namespace frontend {
 
 NamedPipeFrontend::NamedPipeFrontend(Twibd &twibd, const char *name) : twibd(twibd), pipe_logic(*this), pending_pipe(*this), event_loop(pipe_logic) {
@@ -167,5 +168,6 @@ Event &NamedPipeFrontend::PendingPipe::GetEvent() {
 }
 
 } // namespace frontend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

@@ -27,7 +27,8 @@
 #include "Messages.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Device {
  public:
@@ -42,5 +43,6 @@ class Device {
 	uint32_t device_id;
 };
 
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

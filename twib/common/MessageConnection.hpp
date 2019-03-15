@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,8 +20,6 @@
 
 #pragma once
 
-#include "platform.hpp"
-
 #include<mutex>
 #include<memory>
 #include<optional>
@@ -31,7 +29,8 @@
 #include "Logger.hpp"
 
 namespace twili {
-namespace twibc {
+namespace twib {
+namespace common {
 
 class MessageConnection {
  public:
@@ -66,5 +65,6 @@ class MessageConnection {
 	bool has_current_payload = false;
 };
 
-}
-}
+} // namespace common
+} // namespace twib
+} // namespace twili

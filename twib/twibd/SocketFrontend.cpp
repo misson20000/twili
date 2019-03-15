@@ -20,7 +20,8 @@
 
 #include "SocketFrontend.hpp"
 
-#include "platform.hpp"
+#include "common/config.hpp"
+#include "platform/platform.hpp"
 
 #include<algorithm>
 #include<iostream>
@@ -29,10 +30,10 @@
 
 #include "Twibd.hpp"
 #include "Protocol.hpp"
-#include "config.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 namespace frontend {
 
 SocketFrontend::SocketFrontend(Twibd &twibd, int address_family, int socktype, struct sockaddr *bind_addr, size_t bind_addrlen) :
@@ -116,7 +117,7 @@ void SocketFrontend::ServerLogic::Prepare(platform::EventLoop &loop) {
 	loop.Clear();
 	loop.AddMember(frontend.server_member);
 	for(auto i = frontend.clients.begin(); i != frontend.clients.end(); ) {
-		twibc::MessageConnection::Request *rq;
+		common::MessageConnection::Request *rq;
 		while((rq = (*i)->connection.Process()) != nullptr) {
 			LogMessage(Debug, "posting request");
 			frontend.twibd.PostRequest(
@@ -146,7 +147,10 @@ void SocketFrontend::ServerLogic::Prepare(platform::EventLoop &loop) {
 	}
 }
 
-SocketFrontend::Client::Client(platform::Socket &&socket, SocketFrontend &frontend) : connection(std::move(socket), frontend.event_loop.GetEventThreadNotifier()), frontend(frontend), twibd(frontend.twibd) {
+SocketFrontend::Client::Client(platform::Socket &&socket, SocketFrontend &frontend) :
+	connection(std::move(socket), frontend.event_loop.GetNotifier()),
+	frontend(frontend),
+	twibd(frontend.twibd) {
 }
 
 SocketFrontend::Client::~Client() {
@@ -173,5 +177,6 @@ void SocketFrontend::Client::PostResponse(Response &r) {
 }
 
 } // namespace frontend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

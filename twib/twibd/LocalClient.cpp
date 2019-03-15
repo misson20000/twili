@@ -23,7 +23,8 @@
 #include "Twibd.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 LocalClient::LocalClient(Twibd *twibd) : twibd(twibd) {
 }
@@ -63,6 +64,6 @@ void LocalClient::PostResponse(Response &r) {
 	promise.set_value(r);
 }
 
-
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

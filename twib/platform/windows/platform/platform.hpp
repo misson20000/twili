@@ -20,6 +20,12 @@
 
 #pragma once
 
+// this needs to be included super early, because
+// windows.h is a load of garbage and includes
+// winsock.h, which is incompatible with winsock2.h,
+// if we don't include winsock2.h first.
+//
+
 #ifdef _WINDOWS_
 #error windows already included
 #endif

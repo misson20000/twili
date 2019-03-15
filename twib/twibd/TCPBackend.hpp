@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "platform.hpp"
+#include "platform/platform.hpp"
 
 #include<thread>
 #include<list>
@@ -28,14 +28,16 @@
 #include<mutex>
 #include<condition_variable>
 
+#include "common/SocketMessageConnection.hpp"
+
 #include "Buffer.hpp"
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
-#include "SocketMessageConnection.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 class Twibd;
 
@@ -49,7 +51,7 @@ class TCPBackend {
 	std::string Connect(std::string hostname, std::string port);
 	void Connect(sockaddr *sockaddr, socklen_t addr_len);
 	
-	class Device : public twibd::Device, public std::enable_shared_from_this<Device> {
+	class Device : public daemon::Device, public std::enable_shared_from_this<Device> {
 	 public:
 		Device(platform::Socket &&socket, TCPBackend &backend);
 		~Device();
@@ -62,7 +64,7 @@ class TCPBackend {
 		virtual std::string GetBridgeType() override;
 		
 		TCPBackend &backend;
-		twibc::SocketMessageConnection connection;
+		common::SocketMessageConnection connection;
 		std::list<WeakRequest> pending_requests;
 		Response response_in;
 		bool ready_flag = false;
@@ -96,5 +98,6 @@ class TCPBackend {
 };
 
 } // namespace backend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

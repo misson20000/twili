@@ -24,7 +24,8 @@
 #include "Messages.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 
 BridgeObject::BridgeObject(Twibd &twibd, uint32_t device_id, uint32_t object_id) :
 	twibd(twibd),
@@ -47,5 +48,6 @@ BridgeObject::~BridgeObject() {
 	}
 }
 
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili

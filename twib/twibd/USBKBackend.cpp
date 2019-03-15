@@ -24,7 +24,8 @@
 #include "Twibd.hpp"
 
 namespace twili {
-namespace twibd {
+namespace twib {
+namespace daemon {
 namespace backend {
 
 USBKBackend::USBKBackend(Twibd &twibd) : twibd(twibd), logic(*this), event_loop(logic) {
@@ -606,5 +607,6 @@ void USBKBackend::Logic::Prepare(platform::windows::EventLoop &loop) {
 }
 
 } // namespace backend
-} // namespace twibd
+} // namespace daemon
+} // namespace twib
 } // namespace twili
