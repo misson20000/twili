@@ -38,7 +38,10 @@
 #include "Protocol.hpp"
 #include "interfaces/ITwibMetaInterface.hpp"
 #include "interfaces/ITwibDeviceInterface.hpp"
+
+#if TWIB_GDB_ENABLED == 1
 #include "GdbStub.hpp"
+#endif
 
 #if TWIB_TCP_FRONTEND_ENABLED == 1 || TWIB_UNIX_FRONTEND_ENABLED == 1
 #include "SocketClient.hpp"
@@ -240,7 +243,9 @@ int main(int argc, char *argv[]) {
 
 	CLI::App *print_debug_info = app.add_subcommand("debug", "Prints debug info");
 
+#if TWIB_GDB_ENABLED == 1
 	CLI::App *gdb = app.add_subcommand("gdb", "Opens an enhanced GDB stub for the device");
+#endif
 
 	CLI::App *launch = app.add_subcommand("launch", "Launches an installed title");
 	std::string launch_title_id;
@@ -260,9 +265,13 @@ int main(int argc, char *argv[]) {
 
 	log::init_color();
 	if(is_verbose) {
+#if TWIB_GDB_ENABLED == 1
 		if(gdb->parsed()) {
 			// for gdb stub, all logging should go to stderr
 			log::add_log(std::make_shared<log::PrettyFileLogger>(stderr, log::Level::Debug, log::Level::Error));
+#else
+		if(false) {
+#endif
 		} else {
 			log::add_log(std::make_shared<log::PrettyFileLogger>(stdout, log::Level::Debug, log::Level::Error));
 		}
@@ -504,12 +513,14 @@ int main(int argc, char *argv[]) {
 
 		printf("0x%lx\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
 	}
-	
+
+#if TWIB_GDB_ENABLED == 1
 	if(gdb->parsed()) {
 		tool::gdb::GdbStub stub(itdi);
 		stub.Run();
 		return 0;
 	}
+#endif
 	
 	return 0;
 }
