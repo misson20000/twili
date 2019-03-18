@@ -116,7 +116,13 @@ usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<trn::service::usb::
 
 void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size) {
 	uint32_t urb_id = ResultCode::AssertOk(endpoint->PostBufferAsync(buffer, size));
-	ResultCode::AssertOk(endpoint->completion_event.WaitSignal(30000000000));
+	trn::Result<std::nullopt_t> r(std::nullopt);
+	while(!(r = endpoint->completion_event.WaitSignal(30000000000))) {
+		// if we time out, just keep waiting since we can't really cancel the transfer
+		if(r.error().code != 0xea01) {
+			ResultCode::AssertOk(r.error().code);
+		}
+	}
 	ResultCode::AssertOk(endpoint->completion_event.ResetSignal());
 	
 	usb_ds_report_t report;
