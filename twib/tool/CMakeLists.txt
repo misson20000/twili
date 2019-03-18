@@ -2,8 +2,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(SOURCE Twib.cpp Client.cpp SocketClient.cpp Messages.cpp RemoteObject.cpp msgpack_show.cpp interfaces/ITwibMetaInterface.cpp interfaces/ITwibDeviceInterface.cpp interfaces/ITwibPipeReader.cpp interfaces/ITwibPipeWriter.cpp interfaces/ITwibProcessMonitor.cpp)
-if(WIN32)
+set(SOURCE Twib.cpp Client.cpp SocketClient.cpp Messages.cpp RemoteObject.cpp msgpack_show.cpp interfaces/ITwibMetaInterface.cpp interfaces/ITwibDeviceInterface.cpp interfaces/ITwibPipeReader.cpp interfaces/ITwibPipeWriter.cpp interfaces/ITwibProcessMonitor.cpp interfaces/ITwibFilesystemAccessor.cpp interfaces/ITwibFileAccessor.cpp)
+
+if(TWIB_NAMED_PIPE_FRONTEND_ENABLED)
 	set(SOURCE ${SOURCE} NamedPipeClient.cpp)
 endif()
 add_executable(twib ${SOURCE})

@@ -119,6 +119,15 @@ uint64_t ITwibDeviceInterface::LaunchUnmonitoredProcess(uint64_t title_id, uint6
 	return pid;
 }
 
+ITwibFilesystemAccessor ITwibDeviceInterface::OpenFilesystemAccessor(std::string fs) {
+	std::optional<ITwibFilesystemAccessor> itfsa;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_FILESYSTEM_ACCESSOR,
+		in<std::string>(fs),
+		out_object<ITwibFilesystemAccessor>(itfsa));
+	return *itfsa;
+}
+
 } // namespace tool
 } // namespace twib
 } // namespace twili

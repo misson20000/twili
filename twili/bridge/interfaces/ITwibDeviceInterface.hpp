@@ -52,6 +52,7 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 	void GetMemoryInfo(bridge::ResponseOpener opener);
 	void PrintDebugInfo(bridge::ResponseOpener opener);
 	void LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage);
+	void OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs);
 
  public:
 	SmartRequestDispatcher<
@@ -68,7 +69,8 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 		SmartCommand<CommandID::OPEN_ACTIVE_DEBUGGER, &ITwibDeviceInterface::OpenActiveDebugger>,
 		SmartCommand<CommandID::GET_MEMORY_INFO, &ITwibDeviceInterface::GetMemoryInfo>,
 		SmartCommand<CommandID::PRINT_DEBUG_INFO, &ITwibDeviceInterface::PrintDebugInfo>,
-		SmartCommand<CommandID::LAUNCH_UNMONITORED_PROCESS, &ITwibDeviceInterface::LaunchUnmonitoredProcess>
+		SmartCommand<CommandID::LAUNCH_UNMONITORED_PROCESS, &ITwibDeviceInterface::LaunchUnmonitoredProcess>,
+		SmartCommand<CommandID::OPEN_FILESYSTEM_ACCESSOR, &ITwibDeviceInterface::OpenFilesystemAccessor>
 		> dispatcher;
 };
 

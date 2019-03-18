@@ -46,7 +46,6 @@
 #include "NamedPipeClient.hpp"
 #endif
 
-
 #include "util.hpp"
 #include "err.hpp"
 
@@ -246,6 +245,18 @@ int main(int argc, char *argv[]) {
 	launch->add_option("title-id", launch_title_id, "Title ID to launch")->required();
 	launch->add_set_ignore_case("storage", launch_storage, {"host", "gamecard", "gc", "nand-system", "system", "nand-user", "user", "sdcard", "sd"}, "Storage for title")->required();
 	launch->add_option("launch-flags", launch_flags, "Flags for launch");
+
+	CLI::App *pull = app.add_subcommand("pull", "Pulls files from device's SD card");
+	std::vector<std::string> pull_from;
+	std::string pull_to;
+	pull->add_option("from", pull_from, "Path(s) to pull from (on device)")->expected(-2);
+	pull->add_option("to", pull_to, "Path to write to (on host)");
+
+	CLI::App *push = app.add_subcommand("push", "Pushes files to device's SD card");
+	std::vector<std::string> push_from;
+	std::string push_to;
+	push->add_option("from", push_from, "Path(s) to read from (on host)")->expected(-2);
+	push->add_option("to", push_to, "Path to write to (on device)");
 	
 	app.require_subcommand(1);
 	
@@ -496,7 +507,154 @@ int main(int argc, char *argv[]) {
 
 		printf("0x%lx\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
 	}
-	
+
+	if(pull->parsed()) {
+		struct stat target_stat;
+		bool is_target_directory = false;
+
+		// stupid hack for stupid command line parser
+		pull_to = pull_from.back();
+		pull_from.pop_back();
+		
+		if(pull_to != "-") {
+			if(stat(pull_to.c_str(), &target_stat) == -1) {
+				if(errno != ENOENT) {
+					LogMessage(Error, "failed to stat '%s': %s", pull_to.c_str(), strerror(errno));
+					return 1;
+				}
+				// if pull_to doesn't exist, assume it's a file to write to.
+			} else {
+				is_target_directory = S_ISDIR(target_stat.st_mode);
+			}
+
+			if(pull_from.size() > 1 && !is_target_directory) {
+				LogMessage(Error, "target '%s' is not a directory", pull_to.c_str());
+				return 1;
+			}
+
+			if(is_target_directory) {
+				if(pull_to.back() != '/') {
+					pull_to.push_back('/');
+				}
+			}
+		}
+
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor("sd");
+		
+		for(std::string &src : pull_from) {
+			std::string dst_path;
+			FILE *dst;
+			if(pull_to == "-") {
+				dst_path = "<stdout>";
+				dst = stdout;
+			} else {
+				if(is_target_directory) {
+					dst_path = pull_to + src;
+				} else {
+					dst_path = pull_to;
+				}
+				dst = fopen(dst_path.c_str(), "wb");
+				if(dst == nullptr) {
+					LogMessage(Error, "failed to open '%s' for writing: %s", dst_path.c_str(), strerror(errno));
+					return 1;
+				}
+			}
+
+			tool::ITwibFileAccessor itfa = itfsa.OpenFile(1, "/" + src);
+
+			size_t total_size = itfa.GetSize();
+			size_t offset = 0;
+			while(offset < total_size) {
+				std::vector<uint8_t> data = itfa.Read(offset, total_size - offset);
+				if(data.size() == 0) {
+					LogMessage(Error, "hit EoF unexpectedly?");
+					return 1;
+				}
+				fwrite(data.data(), 1, data.size(), dst);
+				offset+= data.size();
+			}
+
+			if(dst != stdout) {
+				fclose(dst);
+				fprintf(stderr, "%s -> %s\n", src.c_str(), dst_path.c_str());
+			}
+		}
+	}
+
+	if(push->parsed()) {
+		bool is_target_directory = false;
+
+		// stupid hack for stupid command line parser
+		push_to = push_from.back();
+		push_from.pop_back();
+
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor("sd");
+
+		LogMessage(Debug, "checking if is file");
+		std::optional<bool> is_file_result = itfsa.IsFile(push_to);
+		LogMessage(Debug, "checked if is file");
+		is_target_directory = is_file_result && !(*is_file_result);
+
+		if(push_from.size() > 1 && !is_target_directory) {
+			LogMessage(Error, "target '%s' is not a directory", push_to.c_str());
+			return 1;
+		}
+
+		if(push_to.front() != '/') {
+			push_to.insert(push_to.begin(), '/');
+		}
+		
+		if(is_target_directory) {
+			if(push_to.back() != '/') {
+				push_to.push_back('/');
+			}
+		}
+		
+		for(std::string &src_path : push_from) {
+			std::string dst_path;
+			FILE *src;
+			src = fopen(src_path.c_str(), "rb");
+			if(src == nullptr) {
+				LogMessage(Error, "failed to open '%s' for reading: %s", src_path.c_str(), strerror(errno));
+				return 1;
+			}
+			
+			if(is_target_directory) {
+				dst_path = push_to + basename(src_path.c_str()); // lmao super dangerous don't ever do this
+			} else {
+				dst_path = push_to;
+			}
+
+			fseek(src, 0, SEEK_END);
+			size_t total_size = ftello(src);
+			fseek(src, 0, SEEK_SET);
+
+			LogMessage(Debug, "creating %s", dst_path.c_str());
+			itfsa.CreateFile(0, total_size, dst_path);
+			LogMessage(Debug, "opening %s", dst_path.c_str());
+			tool::ITwibFileAccessor itfa = itfsa.OpenFile(2, dst_path);
+			LogMessage(Debug, "setting size");
+			itfa.SetSize(total_size);
+
+			size_t offset = 0;
+			std::vector<uint8_t> data;
+			while(offset < total_size) {
+				data.resize(std::min(total_size - offset, (size_t) 0x10000));
+				size_t r;
+				if((r = fread(data.data(), 1, data.size(), src)) < data.size()) {
+					LogMessage(Error, "hit EoF unexpectedly? expected 0x%lx, got 0x%lx", data.size(), r);
+					return 1;
+				}
+				
+				itfa.Write(offset, data);
+				offset+= data.size();
+			}
+
+			fclose(src);
+			fprintf(stderr, "%s -> %s\n", src_path.c_str(), dst_path.c_str());
+		}
+	}
+
 	return 0;
 }
 
