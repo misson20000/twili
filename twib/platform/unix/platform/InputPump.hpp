@@ -23,6 +23,9 @@
 #include "platform.hpp"
 #include "platform/EventLoop.hpp"
 
+#include<vector>
+#include<functional>
+
 namespace twili {
 namespace platform {
 namespace unix {
@@ -46,9 +49,12 @@ private:
 	size_t buffer_size;
 	std::function<void(std::vector<uint8_t>&)> cb;
 	std::function<void()> eof_cb;
-}
+};
 
 } // namespace detail
 } // namespace unix
+
+using InputPump = unix::detail::InputPump;
+
 } // namespace platform
 } // namespace twili

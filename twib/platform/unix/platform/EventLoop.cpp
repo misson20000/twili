@@ -55,7 +55,7 @@ EventLoop::~EventLoop() {
 	close(notification_pipe[1]);
 }
 
-const EventLoop::Notifier &EventLoop::GetNotifier() {
+EventLoop::Notifier &EventLoop::GetNotifier() {
 	return notifier;
 }
 

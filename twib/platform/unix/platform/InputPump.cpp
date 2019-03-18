@@ -27,7 +27,7 @@ namespace platform {
 namespace unix {
 namespace detail {
 
-InputPump(
+InputPump::InputPump(
 	size_t buffer_size,
 	std::function<void(std::vector<uint8_t>&)> cb,
 	std::function<void()> eof_cb) :
@@ -57,7 +57,11 @@ void InputPump::SignalRead() {
 	}
 }
 
-File &&InputPump::GetFile() {
+void InputPump::SignalError() {
+	eof_cb();
+}
+
+File &InputPump::GetFile() {
 	return file;
 }
 

@@ -23,6 +23,9 @@
 #include "platform.hpp"
 #include "platform/EventLoop.hpp"
 
+#include<vector>
+#include<functional>
+
 namespace twili {
 namespace platform {
 namespace windows {
