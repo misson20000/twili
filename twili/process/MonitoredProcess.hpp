@@ -76,9 +76,9 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	uint64_t GetTargetEntry(); // needed by HBABIShim
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
 
-	std::shared_ptr<TwibPipe> tp_stdin = std::make_shared<TwibPipe>();
-	std::shared_ptr<TwibPipe> tp_stdout = std::make_shared<TwibPipe>();
-	std::shared_ptr<TwibPipe> tp_stderr = std::make_shared<TwibPipe>();
+	std::shared_ptr<TwibPipe> tp_stdin;
+	std::shared_ptr<TwibPipe> tp_stdout;
+	std::shared_ptr<TwibPipe> tp_stderr;
 	std::list<std::shared_ptr<fs::ProcessFile>> files;
 	
 	std::string argv;

@@ -37,6 +37,8 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
   * [twib list-named-pipes](#twib-list-named-pipes)
   * [twib open-named-pipe](#twib-open-named-pipe)
   * [twib get-memory-info](#twib-get-memory-info)
+  * [twib debug](#twib-debug)
+  * [twib launch](#twib-launch)
 - [Developer Details](#developer-details)
   * [Project Organization](#project-organization)
   * [Title Table](#title-table)
@@ -82,7 +84,7 @@ If you're developing a sysmodule, you can use `twib run` without `-a` to run it 
 
 # Installation
 
-Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère. As of writing, Twili depends on a feature not yet in the latest version of Atmosphère. Running Twili on piracy firmware will make me cry, so don't do it. :cry:
+Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère (v0.8.3+). Running Twili on piracy firmware will make me cry, so don't do it. :cry:
 
 You will also need to install the workstation-side tools, `twib` and `twibd`.
 
@@ -175,6 +177,8 @@ Subcommands:
   list-named-pipes            List named pipes on the device
   open-named-pipe             Open a named pipe on the device
   get-memory-info             Gets memory usage information from the device
+  debug                       Prints debug info
+  launch                      Launches an installed title
 ```
 
 All `twib` commands require a device to be specified, except for `list-devices` and `connect-tcp`. If no device is explicitly specified and there is exactly one device currently connected to Twib, that device will be used. Otherwise, a device must be specified by device ID (obtained from `list-devices`) via the `-d` option or the `TWIB_DEVICE` environment variable.
@@ -298,6 +302,19 @@ Twili Memory: 16 MiB / 38 MiB (42%)
 System Category Limit: 280 MiB / 303 MiB (92%)
 Application Category Limit: 0 MiB / 3285 MiB (0%)
 Applet Category Limit: 82 MiB / 501 MiB (16%)
+```
+
+## twib debug
+
+Requests for Twili to print debug information to its standard output. Twib shouldn't output anything.
+
+## twib launch
+
+Launches a title on the console.
+
+```
+$ twib launch 01006A800016E000 gc
+0x81
 ```
 
 # Developer Details

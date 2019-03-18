@@ -49,6 +49,9 @@ class Twili {
 		std::string hbm_path = "/hbmenu.nro";
 		std::string temp_directory = "/.twili_temp";
 
+		// [pipes]
+		long pipe_buffer_size_limit = 512 * 1024;
+		
 		// [logging]
 		int logging_verbosity = 0;
 		bool enable_usb_log = true;

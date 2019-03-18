@@ -25,25 +25,29 @@
 #include<variant>
 #include<functional>
 
+#include "Buffer.hpp"
+
 namespace twili {
 
 class TwibPipe {
  public:
-	TwibPipe();
+	TwibPipe(size_t buffer_limit);
 	~TwibPipe();
 	
 	// Callback returns how much data was read.
 	// Callback may not call Read or Write.
 	void Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
 	void Write(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
-	void Close();
+	void CloseReader();
+	void CloseWriter();
 
 	void PrintDebugInfo(const char *indent);
-	
-	bool IsClosed();
+
+	bool IsWriterClosed();
  private:
 	struct IdleState {
 	};
+	
 	struct WritePendingState {
 		WritePendingState(uint8_t *data, size_t size, std::function<void(bool eof)> cb);
 
@@ -53,18 +57,26 @@ class TwibPipe {
 		size_t size;
 		std::function<void(bool eof)> cb;
 	};
+	
 	struct ReadPendingState {
 		ReadPendingState(std::function<size_t(uint8_t *data, size_t actual_size)> cb);
 		
 		std::function<size_t(uint8_t *data, size_t actual_size)> cb;
 	};
-	struct ClosedState {
-	};
-
-	using state_variant = std::variant<IdleState, WritePendingState, ReadPendingState, ClosedState>;
+	
+	using state_variant = std::variant<IdleState, WritePendingState, ReadPendingState>;
 	state_variant state;
+	bool hit_eof = false;
 	
 	static const char *StateName(state_variant &v);
+	
+	// Try to flush WPS to buffer. If we flush the whole thing, exit it.
+	bool FlushWritePendingState(WritePendingState &wps);
+	
+	// Exit WPS.
+	void ExitWritePendingState(WritePendingState &wps);
+	
+	util::Buffer buffer;
 };
 
 }
