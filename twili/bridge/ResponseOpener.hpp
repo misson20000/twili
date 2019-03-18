@@ -52,9 +52,9 @@ class ResponseOpener {
 	void RespondError(trn::ResultCode code) const;
 	
 	template<typename T, typename... Args>
-	std::shared_ptr<Object> MakeObject(Args &&... args) const {
+	std::shared_ptr<T> MakeObject(Args &&... args) const {
 		uint32_t object_id = state->ReserveObjectId();
-		std::shared_ptr<Object> obj = std::make_shared<T>(object_id, (std::forward<Args>(args))...);
+		std::shared_ptr<T> obj = std::make_shared<T>(object_id, (std::forward<Args>(args))...);
 		state->InsertObject(std::pair<uint32_t, std::shared_ptr<Object>>(object_id, obj));
 		return obj;
 	}
