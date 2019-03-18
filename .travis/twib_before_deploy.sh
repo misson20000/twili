@@ -1,3 +1,3 @@
 mkdir deploy/
-cp twib/build/twib/twib ./deploy/twib_$PLATFORM
-cp twib/build/twibd/twibd ./deploy/twibd_$PLATFORM
+cp twib/build/tool/twib ./deploy/twib_$PLATFORM
+cp twib/build/daemon/twibd ./deploy/twibd_$PLATFORM

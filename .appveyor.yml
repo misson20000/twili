@@ -26,8 +26,8 @@ build:
   parallel: true
 after_build:
 - cmd: |-
-    copy C:\projects\twili\twib\build\twib\Release\twib.exe C:\projects\twili\twib_win64.exe
-    copy C:\projects\twili\twib\build\twibd\Release\twibd.exe C:\projects\twili\twibd_win64.exe
+    copy C:\projects\twili\twib\build\tool\Release\twib.exe C:\projects\twili\twib_win64.exe
+    copy C:\projects\twili\twib\build\daemon\Release\twibd.exe C:\projects\twili\twibd_win64.exe
 artifacts:
 - path: twib_win64.exe
 - path: twibd_win64.exe
