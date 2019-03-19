@@ -42,6 +42,7 @@
 #include "ITwibPipeReader.hpp"
 #include "ITwibDebugger.hpp"
 #include "ITwibProcessMonitor.hpp"
+#include "ITwibFilesystemAccessor.hpp"
 
 #include "err.hpp"
 
@@ -268,6 +269,20 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 
 void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage) {
 	opener.RespondOk(ResultCode::AssertOk(twili.services.pm_shell.LaunchProcess(flags, tid, storage)));
+}
+
+void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs) {
+	if(fs != "sd") {
+		opener.RespondError(TWILI_ERR_UNKNOWN_FILESYSTEM);
+		return;
+	}
+
+	ifilesystem_t ifs;
+	ResultCode::AssertOk(fsp_srv_init(0));
+	ResultCode::AssertOk(fsp_srv_mount_sd_card(&ifs));
+	fsp_srv_finalize();
+	
+	opener.RespondOk(opener.MakeObject<ITwibFilesystemAccessor>(ifs));
 }
 
 } // namespace bridge

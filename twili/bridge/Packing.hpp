@@ -99,17 +99,17 @@ struct PackingHelper<std::vector<T>, typename std::enable_if<!std::is_pod<T>::va
 };
 
 // specialization for bridge objects
-template<>
-struct PackingHelper<std::shared_ptr<Object>> {
-	static size_t GetSize(std::shared_ptr<Object> &&val) {
+template<typename T>
+struct PackingHelper<std::shared_ptr<T>, typename std::enable_if<std::is_convertible<std::shared_ptr<T>, std::shared_ptr<Object>>::value>::type> {
+	static size_t GetSize(std::shared_ptr<T> &&val) {
 		return sizeof(uint32_t);
 	}
 
-	static uint32_t GetObjectCount(std::shared_ptr<Object> &&val) {
+	static uint32_t GetObjectCount(std::shared_ptr<T> &&val) {
 		return 1;
 	}
 
-	static void Pack(std::shared_ptr<Object> &&val, ResponseWriter &w) {
+	static void Pack(std::shared_ptr<T> &&val, ResponseWriter &w) {
 		w.Write<uint32_t>(w.Object(val));
 	}
 };

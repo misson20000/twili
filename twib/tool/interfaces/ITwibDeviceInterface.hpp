@@ -29,6 +29,7 @@
 #include "ITwibPipeReader.hpp"
 #include "ITwibProcessMonitor.hpp"
 #include "ITwibDebugger.hpp"
+#include "ITwibFilesystemAccessor.hpp"
 
 namespace twili {
 namespace twib {
@@ -60,6 +61,7 @@ class ITwibDeviceInterface {
 	msgpack11::MsgPack GetMemoryInfo();
 	void PrintDebugInfo();
 	uint64_t LaunchUnmonitoredProcess(uint64_t title_id, uint64_t storage_id, uint32_t launch_flags);
+	ITwibFilesystemAccessor OpenFilesystemAccessor(std::string name);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

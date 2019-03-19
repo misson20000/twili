@@ -66,6 +66,7 @@ class ITwibDeviceInterface {
 		GET_MEMORY_INFO = 20,
 		PRINT_DEBUG_INFO = 21,
 		LAUNCH_UNMONITORED_PROCESS = 22,
+		OPEN_FILESYSTEM_ACCESSOR = 23,
 	};
 };
 
@@ -113,6 +114,38 @@ class ITwibProcessMonitor {
 		OPEN_STDOUT = 15,
 		OPEN_STDERR = 16,
 		WAIT_STATE_CHANGE = 17,
+	};
+};
+
+class ITwibFilesystemAccessor {
+ public:
+	enum class Command : uint32_t {
+		CREATE_FILE = 10,
+		DELETE_FILE = 11,
+		CREATE_DIRECTORY = 12,
+		DELETE_DIRECTORY = 13,
+		GET_ENTRY_TYPE = 17,
+		OPEN_FILE = 18,
+		OPEN_DIRECTORY = 19,
+	};
+};
+
+class ITwibFileAccessor {
+ public:
+	enum class Command : uint32_t {
+		READ = 10,
+		WRITE = 11,
+		FLUSH = 12,
+		SET_SIZE = 13,
+		GET_SIZE = 14,
+	};
+};
+
+class ITwibDirectoryAccessor {
+ public:
+	enum class Command : uint32_t {
+		READ = 10,
+		GET_ENTRY_COUNT = 11,
 	};
 };
 
