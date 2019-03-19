@@ -632,7 +632,7 @@ int main(int argc, char *argv[]) {
 			LogMessage(Debug, "creating %s", dst_path.c_str());
 			itfsa.CreateFile(0, total_size, dst_path);
 			LogMessage(Debug, "opening %s", dst_path.c_str());
-			tool::ITwibFileAccessor itfa = itfsa.OpenFile(2, dst_path);
+			tool::ITwibFileAccessor itfa = itfsa.OpenFile(6, dst_path);
 			LogMessage(Debug, "setting size");
 			itfa.SetSize(total_size);
 
