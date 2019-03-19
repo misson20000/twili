@@ -42,13 +42,25 @@ class RemoteObject {
 	Response SendSyncRequest(uint32_t command_id, std::vector<uint8_t> payload = std::vector<uint8_t>());
 
 	template<typename T, typename... Args>
-	void SendSmartSyncRequest(T command_id, Args&&... args) {
+	uint32_t SendSmartSyncRequestWithoutAssert(T command_id, Args&&... args) {
 		util::Buffer input_buffer;
 		(detail::WrappingHelper<Args>::Pack(std::move(args), input_buffer), ...);
-		Response r = SendSyncRequest((uint32_t) command_id, input_buffer.GetData());
+		Response r = SendSyncRequestWithoutAssert((uint32_t) command_id, input_buffer.GetData());
+		if(r.result_code) {
+			return r.result_code;
+		}
 		util::Buffer output_buffer(r.payload);
 		if(!(detail::WrappingHelper<Args>::Unpack(std::move(args), output_buffer, r.objects) && ... && true)) {
 			throw ResultError(TWILI_ERR_PROTOCOL_BAD_RESPONSE);
+		}
+		return 0;
+	}
+
+	template<typename T, typename... Args>
+	void SendSmartSyncRequest(T command_id, Args&&... args) {
+		uint32_t r;
+		if(r = SendSmartSyncRequestWithoutAssert(command_id, std::move(args)...)) {
+			throw ResultError(r);
 		}
 	}
 
