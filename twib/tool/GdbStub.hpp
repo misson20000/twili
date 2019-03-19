@@ -41,12 +41,13 @@ class GdbStub {
 	
 	class Query {
 	 public:
-		Query(GdbStub &stub, std::string field, void (GdbStub::*visitor)(util::Buffer&), bool should_advertise=true);
+		Query(GdbStub &stub, std::string field, void (GdbStub::*visitor)(util::Buffer&), bool should_advertise=true, char separator=':');
 
 		const GdbStub &stub;
 		const std::string field;
 		void (GdbStub::*const visitor)(util::Buffer&);
 		const bool should_advertise;
+		const char separator;
 	};
 
 	class Process;

@@ -41,7 +41,7 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "C", &GdbStub::QueryGetCurrentThread, false));
 	AddGettableQuery(Query(*this, "fThreadInfo", &GdbStub::QueryGetFThreadInfo, false));
 	AddGettableQuery(Query(*this, "sThreadInfo", &GdbStub::QueryGetSThreadInfo, false));
-	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false));
+	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false, ','));
 	AddGettableQuery(Query(*this, "Offsets", &GdbStub::QueryGetOffsets, false));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
@@ -61,11 +61,12 @@ void GdbStub::Run() {
 	}
 }
 
-GdbStub::Query::Query(GdbStub &stub, std::string field, void (GdbStub::*visitor)(util::Buffer&), bool should_advertise) :
+GdbStub::Query::Query(GdbStub &stub, std::string field, void (GdbStub::*visitor)(util::Buffer&), bool should_advertise, char separator) :
 	stub(stub),
 	field(field),
 	visitor(visitor),
-	should_advertise(should_advertise) {
+	should_advertise(should_advertise),
+	separator(separator) {
 }
 
 void GdbStub::AddFeature(std::string feature) {
@@ -126,16 +127,16 @@ void GdbStub::ReadThreadId(util::Buffer &packet, int64_t &pid, int64_t &thread_i
 void GdbStub::HandleGeneralGetQuery(util::Buffer &packet) {
 	std::string field;
 	char ch;
-	while(packet.Read(ch) && ch != ':') {
-		if(field == "ThreadExtraInfo" && ch == ',') {
-			// special case... :/
+	std::unordered_map<std::string, Query>::iterator i = gettable_queries.end();
+	while(packet.Read(ch)) {
+		if(i != gettable_queries.end() && ch == i->second.separator) {
 			break;
 		}
 		field.push_back(ch);
+		i = gettable_queries.find(field);
 	}
 	LogMessage(Debug, "got get query for '%s'", field.c_str());
 
-	auto i = gettable_queries.find(field);
 	if(i != gettable_queries.end()) {
 		std::invoke(i->second.visitor, this, packet);
 	} else {
@@ -147,12 +148,16 @@ void GdbStub::HandleGeneralGetQuery(util::Buffer &packet) {
 void GdbStub::HandleGeneralSetQuery(util::Buffer &packet) {
 	std::string field;
 	char ch;
-	while(packet.Read(ch) && ch != ':') {
+	std::unordered_map<std::string, Query>::iterator i = settable_queries.end();
+	while(packet.Read(ch)) {
+		if(i != settable_queries.end() && ch == i->second.separator) {
+			break;
+		}
 		field.push_back(ch);
+		i = settable_queries.find(field);
 	}
 	LogMessage(Debug, "got set query for '%s'", field.c_str());
 
-	auto i = settable_queries.find(field);
 	if(i != settable_queries.end()) {
 		std::invoke(i->second.visitor, this, packet);
 	} else {
