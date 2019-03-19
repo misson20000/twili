@@ -148,5 +148,21 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 	opener.RespondOk(std::move(addr));
 }
 
+void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
+	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
+
+	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<1>( // LaunchDebugProcess
+				ipc::InRaw<uint64_t>(pid)));
+	} else {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<2>( // LaunchDebugProcess
+				ipc::InRaw<uint64_t>(pid)));
+	}
+	
+	opener.RespondOk();
+}
+
 } // namespace bridge
 } // namespace twili

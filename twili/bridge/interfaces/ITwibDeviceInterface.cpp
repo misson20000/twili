@@ -285,5 +285,89 @@ void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener,
 	opener.RespondOk(opener.MakeObject<ITwibFilesystemAccessor>(ifs));
 }
 
+void ITwibDeviceInterface::WaitToDebugApplication(bridge::ResponseOpener opener) {
+	if(wh_debug_application) {
+		throw ResultError(TWILI_ERR_ALREADY_WAITING);
+	}
+
+	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<5>( // EnableDebugForApplication
+				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_application)));
+	} else {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<6>( // EnableDebugForApplication
+				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_application)));
+	}
+	
+	wh_debug_application = twili.event_waiter.Add(
+		ev_debug_application,
+		[this, opener]() mutable -> bool {
+			uint64_t pid;
+
+			try {
+				if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+					ResultCode::AssertOk(
+						twili.services.pm_dmnt.SendSyncRequest<4>( // GetApplicationProcessId
+							ipc::OutRaw<uint64_t>(pid)));
+				} else {
+					ResultCode::AssertOk(
+						twili.services.pm_dmnt.SendSyncRequest<5>( // GetApplicationProcessId
+							ipc::OutRaw<uint64_t>(pid)));
+				}
+				opener.RespondOk(std::move(pid));
+			} catch(trn::ResultError &e) {
+				opener.RespondError(e.code);
+			}
+			
+			wh_debug_application.reset();
+			return false;
+		});
+}
+
+void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint64_t tid) {
+	if(wh_debug_title) {
+		throw ResultError(TWILI_ERR_ALREADY_WAITING);
+	}
+
+	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<3>( // EnableDebugForTitleId
+				ipc::InRaw<uint64_t>(tid),
+				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_title)));
+	} else {
+		ResultCode::AssertOk(
+			twili.services.pm_dmnt.SendSyncRequest<4>( // EnableDebugForTitleId
+				ipc::InRaw<uint64_t>(tid),
+				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_title)));
+	}
+	
+	wh_debug_title = twili.event_waiter.Add(
+		ev_debug_title,
+		[this, opener, tid]() mutable -> bool {
+			uint64_t pid;
+
+			try {
+				if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+					ResultCode::AssertOk(
+						twili.services.pm_dmnt.SendSyncRequest<2>( // GetTitleProcessId
+							ipc::InRaw<uint64_t>(tid),
+							ipc::OutRaw<uint64_t>(pid)));
+				} else {
+					ResultCode::AssertOk(
+						twili.services.pm_dmnt.SendSyncRequest<3>( // GetTitleProcessId
+							ipc::InRaw<uint64_t>(tid),
+							ipc::OutRaw<uint64_t>(pid)));
+				}
+				opener.RespondOk(std::move(pid));
+			} catch(trn::ResultError &e) {
+				opener.RespondError(e.code);
+			}
+			
+			wh_debug_title.reset();
+			return false;
+		});
+}
+
 } // namespace bridge
 } // namespace twili

@@ -137,6 +137,44 @@ ITwibFilesystemAccessor ITwibDeviceInterface::OpenFilesystemAccessor(std::string
 	return *itfsa;
 }
 
+void ITwibDeviceInterface::AsyncWaitToDebugApplication(std::function<void(uint32_t, uint64_t)> &&cb) {
+	std::shared_ptr<uint64_t> pid_out = std::make_shared<uint64_t>(0);
+	obj->SendSmartRequest(
+		CommandID::WAIT_TO_DEBUG_APPLICATION,
+		[cb{std::move(cb)}, pid_out](uint32_t r) {
+			cb(r, *pid_out);
+		},
+		out<uint64_t>(*pid_out));
+}
+
+void ITwibDeviceInterface::AsyncWaitToDebugTitle(uint64_t tid, std::function<void(uint32_t, uint64_t)> &&cb) {
+	std::shared_ptr<uint64_t> pid_out = std::make_shared<uint64_t>(0);
+	obj->SendSmartRequest(
+		CommandID::WAIT_TO_DEBUG_TITLE,
+		[cb{std::move(cb)}, pid_out](uint32_t r) {
+			cb(r, *pid_out);
+		},
+		in<uint64_t>(tid),
+		out<uint64_t>(*pid_out));
+}
+
+uint64_t ITwibDeviceInterface::WaitToDebugApplication() {
+	uint64_t pid;
+	obj->SendSmartSyncRequest(
+		CommandID::WAIT_TO_DEBUG_APPLICATION,
+		out<uint64_t>(pid));
+	return pid;
+}
+
+uint64_t ITwibDeviceInterface::WaitToDebugTitle(uint64_t tid) {
+	uint64_t pid;
+	obj->SendSmartSyncRequest(
+		CommandID::WAIT_TO_DEBUG_TITLE,
+		in<uint64_t>(tid),
+		out<uint64_t>(pid));
+	return pid;
+}
+
 } // namespace tool
 } // namespace twib
 } // namespace twili

@@ -53,6 +53,8 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 	void PrintDebugInfo(bridge::ResponseOpener opener);
 	void LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage);
 	void OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs);
+	void WaitToDebugApplication(bridge::ResponseOpener opener);
+	void WaitToDebugTitle(bridge::ResponseOpener opener, uint64_t tid);
 
  public:
 	SmartRequestDispatcher<
@@ -70,8 +72,15 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 		SmartCommand<CommandID::GET_MEMORY_INFO, &ITwibDeviceInterface::GetMemoryInfo>,
 		SmartCommand<CommandID::PRINT_DEBUG_INFO, &ITwibDeviceInterface::PrintDebugInfo>,
 		SmartCommand<CommandID::LAUNCH_UNMONITORED_PROCESS, &ITwibDeviceInterface::LaunchUnmonitoredProcess>,
-		SmartCommand<CommandID::OPEN_FILESYSTEM_ACCESSOR, &ITwibDeviceInterface::OpenFilesystemAccessor>
+		SmartCommand<CommandID::OPEN_FILESYSTEM_ACCESSOR, &ITwibDeviceInterface::OpenFilesystemAccessor>,
+		SmartCommand<CommandID::WAIT_TO_DEBUG_APPLICATION, &ITwibDeviceInterface::WaitToDebugApplication>,
+		SmartCommand<CommandID::WAIT_TO_DEBUG_TITLE, &ITwibDeviceInterface::WaitToDebugTitle>
 		> dispatcher;
+
+	trn::KEvent ev_debug_application;
+	trn::KEvent ev_debug_title;
+	std::shared_ptr<trn::WaitHandle> wh_debug_application;
+	std::shared_ptr<trn::WaitHandle> wh_debug_title;
 };
 
 } // namespace bridge

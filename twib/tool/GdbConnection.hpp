@@ -50,10 +50,12 @@ class GdbConnection {
 	static void DecodeWithSeparator(uint64_t &out, char sep, util::Buffer &packet);
 	static void Decode(uint64_t &out, util::Buffer &packet);
 	static void Decode(std::vector<uint8_t> &out, util::Buffer &packet);
+	static void Decode(util::Buffer &out, util::Buffer &packet);
 	static char EncodeHexNybble(uint8_t n);
 	static void Encode(uint64_t n, size_t size, util::Buffer &dest);
 	static void Encode(uint8_t *p, size_t size, util::Buffer &dest);
 	static void Encode(std::string &string, util::Buffer &dest);
+	static void Encode(std::string &&string, util::Buffer &dest);
 	
 	class InputMember : public platform::EventLoop::FileMember {
 	 public:

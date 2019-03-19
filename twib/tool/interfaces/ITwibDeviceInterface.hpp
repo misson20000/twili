@@ -62,6 +62,10 @@ class ITwibDeviceInterface {
 	void PrintDebugInfo();
 	uint64_t LaunchUnmonitoredProcess(uint64_t title_id, uint64_t storage_id, uint32_t launch_flags);
 	ITwibFilesystemAccessor OpenFilesystemAccessor(std::string name);
+	void AsyncWaitToDebugApplication(std::function<void(uint32_t, uint64_t)> &&cb);
+	void AsyncWaitToDebugTitle(uint64_t tid, std::function<void(uint32_t, uint64_t)> &&cb);
+	uint64_t WaitToDebugApplication();
+	uint64_t WaitToDebugTitle(uint64_t tid);
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

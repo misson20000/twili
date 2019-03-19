@@ -47,6 +47,7 @@ class ITwibDebugger {
 	void BreakProcess();
 	void AsyncWait(std::function<void(uint32_t)> &&cb);
 	uint64_t GetTargetEntry();
+	void LaunchDebugProcess();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

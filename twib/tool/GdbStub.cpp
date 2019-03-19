@@ -43,6 +43,7 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "sThreadInfo", &GdbStub::QueryGetSThreadInfo, false));
 	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false, ','));
 	AddGettableQuery(Query(*this, "Offsets", &GdbStub::QueryGetOffsets, false));
+	AddGettableQuery(Query(*this, "Rcmd", &GdbStub::QueryGetRemoteCommand, false, ','));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
 	AddMultiletterHandler("Cont?", &GdbStub::HandleVContQuery);
@@ -376,6 +377,16 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 	
 	r.first->second.IngestEvents(*this);
 
+	if(r.first->second.threads.empty()) {
+		// try to start it with pm:dmnt
+		try {
+			r.first->second.debugger.LaunchDebugProcess();
+		} catch(ResultError &e) {
+			LogMessage(Warning, "attached to process with no threads, and LaunchDebugProcess failed: 0x%lx", e.code);
+		}
+		r.first->second.IngestEvents(*this);
+	}
+	
 	// ok
 	HandleGetStopReason();
 }
@@ -649,6 +660,62 @@ void GdbStub::QueryGetOffsets(util::Buffer &packet) {
 	response.Write("TextSeg=");
 	GdbConnection::Encode(addr, 8, response);
 	connection.Respond(response);
+}
+
+void GdbStub::QueryGetRemoteCommand(util::Buffer &packet) {
+	util::Buffer message;
+	GdbConnection::Decode(message, packet);
+	
+	std::string command;
+	char ch;
+	while(message.Read(ch) && ch != ' ') {
+		command.push_back(ch);
+	}
+
+	std::stringstream response;
+	try {
+		if(command == "help") {
+			response << "Available commands:" << std::endl;
+			response << "  - wait application" << std::endl;
+			response << "  - wait title <title id>" << std::endl;
+		} else if(command == "wait") {
+			std::string wait_for;
+			while(message.Read(ch) && ch != ' ') {
+				wait_for.push_back(ch);
+			}
+			if(wait_for == "application") {
+				if(message.ReadAvailable()) {
+					response << "Syntax error: expected end of input" << std::endl;
+				} else {
+					uint64_t pid = itdi.WaitToDebugApplication();
+					response << "PID: 0x" << std::hex << pid << std::endl;
+				}
+			} else {
+				std::string tid_str;
+				while(message.Read(ch) && ch != ' ') {
+					tid_str.push_back(ch);
+				}
+				if(message.ReadAvailable()) {
+					response << "Syntax error: expected end of input" << std::endl;
+				} else {
+					uint64_t tid = std::stoull(tid_str, 0, 16);
+					uint64_t pid = itdi.WaitToDebugTitle(tid);
+					response << "PID: 0x" << std::hex << pid << std::endl;
+				}
+			}
+		} else {
+			response << "Unknown command '" << command << "'" << std::endl;
+		}
+	} catch(ResultError &e) {
+		response = std::stringstream();
+		response << "Target error: 0x" << std::hex << e.code << std::endl;
+	} catch(std::invalid_argument &e) {
+		response = std::stringstream();
+		response << "Invalid argument." << std::endl;
+	}
+	util::Buffer response_buffer;
+	GdbConnection::Encode(response.str(), response_buffer);
+	connection.Respond(response_buffer);
 }
 
 void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {

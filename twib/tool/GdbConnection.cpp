@@ -249,6 +249,24 @@ void GdbConnection::Decode(std::vector<uint8_t> &out, util::Buffer &packet) {
 	}
 }
 
+void GdbConnection::Decode(util::Buffer &out, util::Buffer &packet) {
+	std::tuple<uint8_t*, size_t> r = out.Reserve(packet.ReadAvailable()/2);
+	uint8_t *dest = std::get<0>(r);
+	while(packet.ReadAvailable()) {
+		uint8_t b = DecodeHexNybble(packet.Read()[0]) << 4;
+		packet.MarkRead(1); // consume
+		if(!packet.ReadAvailable()) {
+			LogMessage(Error, "unexpectedly odd number of nybbles");
+			return;
+		}
+		b|= DecodeHexNybble(packet.Read()[0]);
+		packet.MarkRead(1); // consume
+
+		*(dest++) = b;
+		out.MarkWritten(1);
+	}
+}
+
 char GdbConnection::EncodeHexNybble(uint8_t n) {
 	if(n < 0xa) {
 		return '0' + n;
@@ -284,6 +302,10 @@ void GdbConnection::Encode(uint8_t *p, size_t size, util::Buffer &out_buffer) {
 }
 
 void GdbConnection::Encode(std::string &string, util::Buffer &out_buffer) {
+	Encode((uint8_t*) string.data(), string.size(), out_buffer);
+}
+
+void GdbConnection::Encode(std::string &&string, util::Buffer &out_buffer) {
 	Encode((uint8_t*) string.data(), string.size(), out_buffer);
 }
 

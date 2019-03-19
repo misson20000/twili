@@ -63,6 +63,7 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
 	void GetNsoInfos(bridge::ResponseOpener opener);
 	void WaitEvent(bridge::ResponseOpener opener);
 	void GetTargetEntry(bridge::ResponseOpener opener);
+	void LaunchDebugProcess(bridge::ResponseOpener opener);
 
  public:
 	SmartRequestDispatcher<
@@ -78,7 +79,8 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
 		SmartCommand<CommandID::SET_THREAD_CONTEXT, &ITwibDebugger::SetThreadContext>,
 		SmartCommand<CommandID::GET_NSO_INFOS, &ITwibDebugger::GetNsoInfos>,
 		SmartCommand<CommandID::WAIT_EVENT, &ITwibDebugger::WaitEvent>,
-		SmartCommand<CommandID::GET_TARGET_ENTRY, &ITwibDebugger::GetTargetEntry>
+		SmartCommand<CommandID::GET_TARGET_ENTRY, &ITwibDebugger::GetTargetEntry>,
+		SmartCommand<CommandID::LAUNCH_DEBUG_PROCESS, &ITwibDebugger::LaunchDebugProcess>
 		> dispatcher;
 };
 

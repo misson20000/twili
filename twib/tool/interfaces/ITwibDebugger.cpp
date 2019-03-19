@@ -123,6 +123,11 @@ void ITwibDebugger::AsyncWait(std::function<void(uint32_t)> &&func) {
 		std::move(func));
 }
 
+void ITwibDebugger::LaunchDebugProcess() {
+	obj->SendSmartSyncRequest(
+		CommandID::LAUNCH_DEBUG_PROCESS);
+}
+
 } // namespace tool
 } // namespace twib
 } // namespace twili
