@@ -225,6 +225,7 @@ void GdbStub::HandleReadGeneralRegisters() {
 	if(current_thread == nullptr) {
 		LogMessage(Warning, "attempt to read registers with no selected thread");
 		connection.RespondError(1);
+		return;
 	}
 
 	try {
