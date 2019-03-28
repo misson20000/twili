@@ -36,11 +36,15 @@
 #include<io.h>
 #include<Windows.h>
 
+#include "platform/common/fs.hpp"
+
 #include<stdint.h>
 
 #include<stdexcept>
 
-typedef signed long long ssize_t; // pls
+// pls
+typedef signed long long ssize_t;
+#define _fstat fstat
 
 namespace twili {
 namespace platform {
@@ -64,10 +68,11 @@ public:
 	KObject(const KObject &) = delete;
 	KObject &operator=(const KObject &) = delete;
 
-	KObject(HANDLE handle);
+	KObject(HANDLE handle, bool owned=true);
 	~KObject();
 
 	HANDLE handle;
+	bool owned;
 
 	HANDLE Claim();
 	void Close();
@@ -84,6 +89,9 @@ class Pipe : public KObject {
 public:
 	Pipe(const char *name, uint32_t open_mode, uint32_t pipe_mode, uint32_t max_instances, uint32_t out_buffer_size, uint32_t in_buffer_size, uint32_t default_timeout, SECURITY_ATTRIBUTES *security_attributes);
 	Pipe();
+	Pipe(HANDLE h);
+
+	static Pipe OpenNamed(const char *path);
 
 	Pipe &operator=(HANDLE handle);
 };
@@ -125,9 +133,24 @@ class Socket {
 	SOCKET fd;
 };
 
+class File : public KObject {
+public:
+	File();
+	File(HANDLE handle, bool owned=true);
+	static File OpenForRead(const char *path);
+	static File OpenForClobberingWrite(const char *path);
+	static File BorrowStdin();
+	static File BorrowStdout();
+
+	size_t GetSize();
+	size_t Read(void *buffer, size_t size);
+	size_t Write(const void *buffer, size_t size);
+};
+
 } // namespace windows
 
 using Socket = windows::Socket;
+using File = windows::File;
 using NetworkError = windows::NetworkError;
 
 } // namespace platform

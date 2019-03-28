@@ -147,6 +147,14 @@ void Socket::Connect(const struct sockaddr *address, socklen_t address_len) {
 	}
 }
 
+namespace fs {
+
+bool IsDir(const char *path) {
+	return (GetFileAttributes(path) & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+}
+
 } // namespace unix
 } // namespace platform
 } // namespace twili

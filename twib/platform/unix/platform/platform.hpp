@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "platform/common/fs.hpp"
+
 #include<sys/socket.h>
 #include<sys/select.h>
 #include<sys/un.h>
@@ -93,10 +95,17 @@ class Socket : public File {
 	struct sockaddr_un unix_addr;
 };
 
+namespace fs {
+
+bool IsDir(const char *path);
+
+} // namespace fs
+
 } // namespace unix
 
 using Socket = unix::Socket;
 using NetworkError = unix::NetworkError;
+using fs = unix::fs;
 
 } // namespace platform
 } // namespace twili
