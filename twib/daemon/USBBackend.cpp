@@ -56,7 +56,7 @@ USBBackend::LibusbContext::~LibusbContext() {
 	libusb_exit(ctx);
 }
 
-USBBackend::USBBackend(Daemon &daemon) : daemon(daemon) {
+USBBackend::USBBackend(Daemon &daemon) : daemon(daemon), isl_lock(daemon.initial_scan_lock) {
 	std::thread event_thread(&USBBackend::event_thread_func, this);
 	this->event_thread = std::move(event_thread);
 }
@@ -81,7 +81,8 @@ USBBackend::Device::Device(USBBackend *backend, libusb_device_handle *handle, ui
 	backend(backend), handle(handle),
 	endp_meta_out(endp_addrs[0]), endp_meta_in(endp_addrs[2]),
 	endp_data_out(endp_addrs[1]), endp_data_in(endp_addrs[3]),
-	interface_number(interface_number) {
+	interface_number(interface_number),
+	isl_lock(backend->daemon.initial_scan_lock) {
 	
 	tfer_meta_out = libusb_alloc_transfer(0);
 	tfer_data_out = libusb_alloc_transfer(0);
@@ -115,6 +116,14 @@ void USBBackend::Device::Destroy() {
 	libusb_cancel_transfer(tfer_data_out);
 	libusb_cancel_transfer(tfer_meta_in);
 	libusb_cancel_transfer(tfer_data_in);
+	if(isl_lock) { isl_lock.unlock(); }
+}
+
+void USBBackend::Device::MarkAdded() {
+	if(isl_lock) {
+		isl_lock.unlock();
+	}
+	added_flag = true;
 }
 
 void USBBackend::Device::SendRequest(const Request &&request) {
@@ -474,6 +483,10 @@ void USBBackend::Probe() {
 			}
 		}
 	}
+
+	if(isl_lock) {
+		isl_lock.unlock();
+	}
 }
 
 void USBBackend::QueueAddDevice(libusb_device *device) {
@@ -700,7 +713,7 @@ void USBBackend::event_thread_func() {
 			auto d = *i;
 			if(d->ready_flag && !d->added_flag) {
 				daemon.AddDevice(d);
-				d->added_flag = true;
+				d->MarkAdded();
 			}
 			
 			if(d->deletion_flag) {

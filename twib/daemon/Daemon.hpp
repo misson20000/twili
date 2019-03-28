@@ -28,6 +28,7 @@
 #include<variant>
 #include<map>
 #include<random>
+#include<condition_variable>
 
 #include "common/blockingconcurrentqueue.h"
 #include "common/config.hpp"
@@ -46,6 +47,7 @@
 #include "Messages.hpp"
 #include "Device.hpp"
 #include "LocalClient.hpp"
+#include "InitialScanLock.hpp"
 
 namespace twili {
 namespace twib {
@@ -69,6 +71,8 @@ class Daemon {
 	std::shared_ptr<Client> GetClient(uint32_t client_id);
 
 	std::shared_ptr<LocalClient> local_client;
+
+	InitialScanLock initial_scan_lock;
  private:
 	moodycamel::BlockingConcurrentQueue<std::variant<std::monostate, Request, Response>> dispatch_queue;
 	

@@ -30,7 +30,11 @@ namespace twib {
 namespace daemon {
 namespace backend {
 
-USBKBackend::USBKBackend(Daemon &daemon) : daemon(daemon), logic(*this), event_loop(logic) {
+USBKBackend::USBKBackend(Daemon &daemon) :
+	daemon(daemon),
+	logic(*this),
+	event_loop(logic),
+	isl_lock(daemon.initial_scan_lock) {
 	if(!LibK_Context_Init(nullptr, nullptr)) {
 		LogMessage(Fatal, "Failed to initialize usbK context: %d", GetLastError());
 		exit(1);
@@ -59,6 +63,12 @@ void USBKBackend::Probe() {
 	if(!HotK_Init(&hot_handle, &hot_params)) {
 		LogMessage(Fatal, "Hotplug initialization failed: %d", GetLastError());
 		exit(1);
+	}
+
+	// unfortunately, libusbK PLUG_ALL_ON_INIT looks like it might be asynchronous,
+	// so this doesn't actually do much help...
+	if(isl_lock) {
+		isl_lock.unlock();
 	}
 }
 
@@ -161,7 +171,8 @@ USBKBackend::Device::Device(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle
 	member_meta_out(*this, pool, ep_addrs[0], &Device::MetaOutTransferCompleted),
 	member_meta_in(*this, pool, ep_addrs[1], &Device::MetaInTransferCompleted),
 	member_data_out(*this, pool, ep_addrs[2], &Device::DataOutTransferCompleted),
-	member_data_in(*this, pool, ep_addrs[3], &Device::DataInTransferCompleted) {
+	member_data_in(*this, pool, ep_addrs[3], &Device::DataInTransferCompleted),
+	isl_lock(backend.daemon.initial_scan_lock) {
 	LogMessage(Debug, "Device constructor moved %p to %p", hnd.handle, handle.handle);
 }
 
@@ -185,6 +196,13 @@ void USBKBackend::Device::AddMembers(platform::EventLoop &loop) {
 	loop.AddMember(member_data_out);
 	loop.AddMember(member_meta_in);
 	loop.AddMember(member_meta_out);
+}
+
+void USBKBackend::Device::MarkAdded() {
+	if(isl_lock) {
+		isl_lock.unlock();
+	}
+	added_flag = true;
 }
 
 void USBKBackend::Device::SendRequest(const Request &&request) {
@@ -605,7 +623,7 @@ void USBKBackend::Logic::Prepare(platform::EventLoop &loop) {
 
 		if(d->ready_flag && !d->added_flag) {
 			backend.daemon.AddDevice(d);
-			d->added_flag = true;
+			d->MarkAdded();
 		}
 
 		d->AddMembers(loop);

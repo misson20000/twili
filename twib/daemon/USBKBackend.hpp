@@ -35,6 +35,7 @@
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
+#include "InitialScanLock.hpp"
 
 namespace twili {
 namespace twib {
@@ -99,7 +100,8 @@ class USBKBackend {
 
 		void Begin();
 		void AddMembers(platform::EventLoop &loop);
-
+		void MarkAdded();
+		
 		// thread-agnostic
 		virtual void SendRequest(const Request &&r) override;
 
@@ -152,6 +154,8 @@ class USBKBackend {
 		std::list<WeakRequest> pending_requests;
 		std::vector<uint32_t> object_ids_in;
 
+		std::unique_lock<InitialScanLock> isl_lock;
+		
 		bool transferring_meta;
 		bool transferring_data;
 		size_t data_out_transferred;
@@ -212,6 +216,8 @@ class USBKBackend {
 	std::list<std::shared_ptr<Device>> devices;
 	std::list<std::shared_ptr<StdoutTransferState>> stdout_transfers;
 
+	std::unique_lock<InitialScanLock> isl_lock;
+	
 	platform::EventLoop event_loop;
 };
 

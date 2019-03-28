@@ -226,6 +226,9 @@ Response Daemon::HandleRequest(Request &rq) {
 		switch((protocol::ITwibMetaInterface::Command) rq.command_id) {
 		case protocol::ITwibMetaInterface::Command::LIST_DEVICES: {
 			LogMessage(Debug, "command 0 issued to twibd meta object: LIST_DEVICES");
+			LogMessage(Debug, "waiting for ISL...");
+			initial_scan_lock.wait();
+			LogMessage(Debug, "got ISL");
 			
 			Response r = rq.RespondOk();
 			std::vector<msgpack11::MsgPack> device_packs;
