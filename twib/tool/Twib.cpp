@@ -348,7 +348,7 @@ int main(int argc, char *argv[]) {
 						LogMessage(Debug, "  EoF");
 						return;
 					} else {
-						throw e;
+						return; // there really isn't much we can do with this
 					}
 				}
 			};
@@ -385,9 +385,13 @@ int main(int argc, char *argv[]) {
 		stdout_pump.join();
 		stderr_pump.join();
 		LogMessage(Debug, "output pump threads exited");
-		uint32_t state;
-		while((state = mon.WaitStateChange()) != 5) {
-			LogMessage(Debug, "  state %d change...", state);
+		try {
+			uint32_t state;
+			while((state = mon.WaitStateChange()) != 5) {
+				LogMessage(Debug, "  state %d change...", state);
+			}
+		} catch(ResultError &e) {
+			LogMessage(Error, "got 0x%x waiting for process exit", e.code);
 		}
 		LogMessage(Debug, "  process exited");
 		stdin_loop.Destroy();

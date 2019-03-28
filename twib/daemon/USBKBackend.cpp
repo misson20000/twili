@@ -21,6 +21,8 @@
 #include "USBKBackend.hpp"
 
 #include "common/Logger.hpp"
+#include "err.hpp"
+
 #include "Daemon.hpp"
 
 namespace twili {
@@ -164,6 +166,11 @@ USBKBackend::Device::Device(USBKBackend &backend, KUSB_DRIVER_API Usb, UsbHandle
 }
 
 USBKBackend::Device::~Device() {
+	for(auto r : pending_requests) {
+		if(r.client_id != 0xffffffff) {
+			backend.daemon.PostResponse(r.RespondError(TWILI_ERR_PROTOCOL_TRANSFER_ERROR));
+		}
+	}
 }
 
 void USBKBackend::Device::Begin() {

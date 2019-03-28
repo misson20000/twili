@@ -47,6 +47,8 @@ class Client {
  private:
 	std::map<uint32_t, std::function<void(Response r)>> response_map;
 	std::mutex response_map_mutex;
+	bool failed = false;
+	uint32_t fail_code;
 };
 
 } // namespace client
