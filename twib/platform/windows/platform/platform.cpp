@@ -18,6 +18,9 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+// don't undefine CreateFile
+#define PLATFORM
+
 #include "platform/platform.hpp"
 
 #include<optional>
@@ -32,16 +35,17 @@ KObject::KObject() : handle(INVALID_HANDLE_VALUE) {
 
 }
 
-KObject::KObject(KObject &&other) : handle(other.Claim()) {
+KObject::KObject(KObject &&other) : owned(other.owned), handle(other.Claim()) {
 }
 
 KObject &KObject::operator=(KObject &&other) {
 	Close();
+	owned = other.owned;
 	handle = other.Claim();
 	return *this;
 }
 
-KObject::KObject(HANDLE hnd) : handle(hnd) {
+KObject::KObject(HANDLE hnd, bool owned) : handle(hnd), owned(owned) {
 
 }
 
@@ -52,11 +56,12 @@ KObject::~KObject() {
 HANDLE KObject::Claim() {
 	HANDLE hnd = handle;
 	handle = INVALID_HANDLE_VALUE;
+	owned = false;
 	return hnd;
 }
 
 void KObject::Close() {
-	if(handle != INVALID_HANDLE_VALUE) {
+	if(owned && handle != INVALID_HANDLE_VALUE) {
 		CloseHandle(handle);
 	}
 }
@@ -70,16 +75,29 @@ Event::Event(HANDLE handle) : KObject(handle) {
 Event::Event() : Event(nullptr, false, false, nullptr) {
 }
 
+void Event::Signal() {
+	if(!SetEvent(handle)) {
+		throw NetworkError(GetLastError());
+	}
+}
+
 Pipe::Pipe(const char *name, uint32_t open_mode, uint32_t pipe_mode, uint32_t max_instances, uint32_t out_buffer_size, uint32_t in_buffer_size, uint32_t default_timeout, SECURITY_ATTRIBUTES *security_attributes)
 	: KObject(CreateNamedPipeA(name, open_mode, pipe_mode, max_instances, out_buffer_size, in_buffer_size, default_timeout, security_attributes)) {
 	LogMessage(Debug, "tried to create pipe with name '%s'", name);
 	if(handle == INVALID_HANDLE_VALUE) {
-		LogMessage(Error, "failed to create named pipe: %d", GetLastError());
+		throw NetworkError(GetLastError());
 	}
 }
 
 Pipe::Pipe() {
 
+}
+
+Pipe::Pipe(HANDLE h) : KObject(h) {
+}
+
+Pipe Pipe::OpenNamed(const char *path) {
+	return Pipe(CreateFile(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL));
 }
 
 Pipe &Pipe::operator=(HANDLE phand) {
@@ -92,7 +110,7 @@ Pipe &Pipe::operator=(HANDLE phand) {
 
 NetworkError::NetworkError(int en) : std::runtime_error("Failed to retrieve error string") {
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL, WSAGetLastError(),
+			NULL, en,
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			(LPTSTR) &string, 0, NULL);
 }
@@ -136,8 +154,9 @@ Socket &Socket::operator=(Socket &&other) {
 
 ssize_t Socket::Recv(void *buffer, size_t length, int flags) {
 	DWORD bytes;
+	DWORD flags_storage = flags;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSARecv(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+	if(WSARecv(fd, &buf, 1, &bytes, &flags_storage, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;
@@ -145,8 +164,9 @@ ssize_t Socket::Recv(void *buffer, size_t length, int flags) {
 
 ssize_t Socket::RecvFrom(void *buffer, size_t length, int flags, struct sockaddr *address, socklen_t *address_len) {
 	DWORD bytes;
+	DWORD flags_storage = flags;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSARecvFrom(fd, &buf, 1, &bytes, 0, address, address_len, nullptr, nullptr) != 0) {
+	if(WSARecvFrom(fd, &buf, 1, &bytes, &flags_storage, address, address_len, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;
@@ -155,7 +175,7 @@ ssize_t Socket::RecvFrom(void *buffer, size_t length, int flags, struct sockaddr
 ssize_t Socket::Send(const void *buffer, size_t length, int flags) {
 	DWORD bytes;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSASend(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+	if(WSASend(fd, &buf, 1, &bytes, flags, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;
@@ -194,6 +214,64 @@ void Socket::Connect(const struct sockaddr *address, socklen_t address_len) {
 void Socket::Close() {
 	closesocket(fd);
 	fd = INVALID_SOCKET;
+}
+
+File::File() : KObject() {
+
+}
+
+File::File(HANDLE h, bool owned) : KObject(h, owned) {
+	if(h == INVALID_HANDLE_VALUE) {
+		throw NetworkError(GetLastError());
+	}
+}
+
+File File::OpenForRead(const char *path) {
+	return File(CreateFile(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+}
+
+File File::OpenForClobberingWrite(const char *path) {
+	return File(CreateFile(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL));
+}
+
+File File::BorrowStdin() {
+	return File(GetStdHandle(STD_INPUT_HANDLE), false);
+}
+
+File File::BorrowStdout() {
+	return File(GetStdHandle(STD_OUTPUT_HANDLE), false);
+}
+
+size_t File::GetSize() {
+	LARGE_INTEGER size;
+	if(!GetFileSizeEx(handle, &size)) {
+		throw NetworkError(GetLastError());
+	}
+	return size.QuadPart;
+}
+
+size_t File::Read(void *buffer, size_t size) {
+	DWORD actual;
+	if(!ReadFile(handle, buffer, size, &actual, nullptr)) {
+		throw NetworkError(GetLastError());
+	}
+	return actual;
+}
+
+size_t File::Write(const void *buffer, size_t size) {
+	DWORD actual;
+	if(!WriteFile(handle, buffer, size, &actual, nullptr)) {
+		throw NetworkError(GetLastError());
+	}
+	return actual;
+}
+
+namespace fs {
+
+bool IsDir(const char *path) {
+	return (GetFileAttributes(path) & FILE_ATTRIBUTE_DIRECTORY);
+}
+
 }
 
 } // namespace windows

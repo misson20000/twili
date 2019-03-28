@@ -28,8 +28,7 @@ NamedPipeMessageConnection::NamedPipeMessageConnection(platform::windows::Pipe &
 	input_member(*this),
 	output_member(*this),
 	pipe(std::move(pipe)),
-	notifier(notifier),
-	out_buffer_lock(out_buffer_mutex, std::defer_lock) {
+	notifier(notifier) {
 	if(this->pipe.handle == INVALID_HANDLE_VALUE) {
 		LogMessage(Error, "invalid pipe");
 		exit(1);
@@ -109,7 +108,7 @@ void NamedPipeMessageConnection::OutputMember::Signal() {
 
 	LogMessage(Debug, "wrote 0x%x bytes", bytes_transferred);
 	connection.out_buffer.MarkRead(bytes_transferred);
-	connection.out_buffer_lock.unlock();
+	connection.out_buffer_sema.notify();
 	connection.is_writing = false;
 }
 
@@ -152,19 +151,19 @@ bool NamedPipeMessageConnection::RequestOutput() {
 	LogMessage(Debug, "requesting output");
 	std::lock_guard<std::mutex> guard(state_mutex);
 	if(!is_writing) {
-		out_buffer_lock.lock();
+		out_buffer_sema.wait();
 		LogMessage(Debug, "locked out_buffer_lock");
 		if(out_buffer.ReadAvailable() > 0) {
 			DWORD bytes_written;
 			if(WriteFile(pipe.handle, (void*)out_buffer.Read(), out_buffer.ReadAvailable(), &bytes_written, &output_member.overlap)) {
 				out_buffer.MarkRead(bytes_written);
-				out_buffer_lock.unlock();
+				out_buffer_sema.notify();
 				LogMessage(Debug, "completed synchronously");
 				return true;
 			} else {
 				if(GetLastError() != ERROR_IO_PENDING) {
 					error_flag = true;
-					out_buffer_lock.unlock();
+					out_buffer_sema.notify();
 					LogMessage(Debug, "failed");
 					return false;
 				}
@@ -173,7 +172,7 @@ bool NamedPipeMessageConnection::RequestOutput() {
 				return false;
 			}
 		} else {
-			out_buffer_lock.unlock();
+			out_buffer_sema.notify();
 		}
 	} else {
 		return false;

@@ -6,10 +6,10 @@ set(COMMON_SOURCES)
 set(PLATFORM_INCLUDES)
 
 if(WIN32)
-	set(PLATFORM_SOURCES windows/platform/platform.cpp windows/platform/EventLoop.cpp windows/platform/InputPump.cpp)
+	set(PLATFORM_SOURCES windows/platform/platform.cpp windows/platform/EventLoop.cpp windows/platform/InputPump.cpp windows/platform/fs.cpp)
 	set(PLATFORM_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/windows/")
 else()
-	set(PLATFORM_SOURCES unix/platform/platform.cpp unix/platform/EventLoop.cpp unix/platform/InputPump.cpp)
+	set(PLATFORM_SOURCES unix/platform/platform.cpp unix/platform/EventLoop.cpp unix/platform/InputPump.cpp unix/platform/fs.cpp)
 	set(PLATFORM_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/unix/")
 endif()
 

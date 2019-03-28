@@ -38,7 +38,7 @@ bool SocketMessageConnection::ConnectionMember::WantsRead() {
 }
 
 bool SocketMessageConnection::ConnectionMember::WantsWrite() {
-	std::lock_guard<std::recursive_mutex> lock(connection.out_buffer_mutex); // ReadAvailable() might not be atomic
+	std::lock_guard<Semaphore> lock(connection.out_buffer_sema); // ReadAvailable() might not be atomic
 	return connection.out_buffer.ReadAvailable() > 0;
 }
 
@@ -54,7 +54,7 @@ void SocketMessageConnection::ConnectionMember::SignalRead() {
 
 void SocketMessageConnection::ConnectionMember::SignalWrite() {
 	LogMessage(Debug, "pumping out 0x%lx bytes", connection.out_buffer.ReadAvailable());
-	std::lock_guard<std::recursive_mutex> lock(connection.out_buffer_mutex);
+	std::lock_guard<Semaphore> lock(connection.out_buffer_sema);
 	if(connection.out_buffer.ReadAvailable() > 0) {
 		ssize_t r = socket.Send(connection.out_buffer.Read(), connection.out_buffer.ReadAvailable(), 0);
 		if(r < 0) {

@@ -34,6 +34,7 @@
 #include "Device.hpp"
 #include "Messages.hpp"
 #include "Protocol.hpp"
+#include "InitialScanLock.hpp"
 
 namespace twili {
 namespace twib {
@@ -67,6 +68,7 @@ class USBBackend {
 
 		void Begin();
 		void Destroy();
+		void MarkAdded();
 		
 		// thread-agnostic
 		virtual void SendRequest(const Request &&r) override;
@@ -101,6 +103,8 @@ class USBBackend {
 		std::vector<uint32_t> object_ids_in;
 		std::list<WeakRequest> pending_requests;
 
+		std::unique_lock<InitialScanLock> isl_lock;
+		
 		std::shared_ptr<Device> *SharedPtrForTransfer();
 		void MetaOutTransferCompleted();
 		void DataOutTransferCompleted();
@@ -129,6 +133,8 @@ class USBBackend {
 	LibusbContext ctx;
 	std::list<std::shared_ptr<Device>> devices;
 	std::queue<libusb_device*> devices_to_add;
+	
+	std::unique_lock<InitialScanLock> isl_lock;
 	
 	class StdoutTransferState {
 	 public:

@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,38 +20,30 @@
 
 #pragma once
 
-#include<functional>
 #include<mutex>
-#include<map>
+#include<condition_variable>
 
-#include "Messages.hpp"
-#include "Protocol.hpp"
-#include "Buffer.hpp"
+#include<stdint.h>
 
 namespace twili {
 namespace twib {
-namespace tool {
-namespace client {
+namespace common {
 
-class Client {
- public:
-	virtual ~Client() = default;
-	void SendRequest(Request &&rq, std::function<void(Response)> &&function);
-	
-	bool deletion_flag = false;
-	
- protected:
-	virtual void SendRequestImpl(const Request &rq) = 0;
-	void PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
-	void FailAllRequests(uint32_t code);
- private:
-	std::map<uint32_t, std::function<void(Response r)>> response_map;
-	std::mutex response_map_mutex;
-	bool failed = false;
-	uint32_t fail_code;
+class Semaphore {
+public:
+	Semaphore(size_t count = 0);
+	void notify();
+	void wait();
+
+	// for std::lock_guard
+	void lock();
+	void unlock();
+private:
+	std::mutex mutex;
+	std::condition_variable condition_variable;
+	size_t count = 0;
 };
 
-} // namespace client
-} // namespace tool
+} // namespace common
 } // namespace twib
 } // namespace twili

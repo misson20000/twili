@@ -66,20 +66,26 @@ void Client::PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, ut
 }
 
 void Client::SendRequest(Request &&rq, std::function<void(Response)> &&function) {
-	{
-		std::lock_guard<std::mutex> lock(response_map_mutex);
-		static std::random_device rng;
-		
-		uint32_t tag = rng();
-		rq.tag = tag;
-		
-		response_map[tag] = std::move(function);
+	if(failed) {
+		std::invoke(function, Response(0, 0, fail_code, 0, std::vector<uint8_t>(), std::vector<std::shared_ptr<RemoteObject>>()));
+	} else {
+		{
+			std::lock_guard<std::mutex> lock(response_map_mutex);
+			static std::random_device rng;
+
+			uint32_t tag = rng();
+			rq.tag = tag;
+
+			response_map[tag] = std::move(function);
+		}
+
+		SendRequestImpl(rq);
 	}
-	
-	SendRequestImpl(rq);
 }
 
 void Client::FailAllRequests(uint32_t code) {
+	fail_code = code;
+	failed = true;
 	for(auto i = response_map.begin(); i != response_map.end();) {
 		std::invoke(
 			i->second,

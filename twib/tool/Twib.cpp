@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
 						LogMessage(Debug, "  EoF");
 						return;
 					} else {
-						throw e;
+						return; // there really isn't much we can do with this
 					}
 				}
 			};
@@ -402,9 +402,13 @@ int main(int argc, char *argv[]) {
 		stdout_pump.join();
 		stderr_pump.join();
 		LogMessage(Debug, "output pump threads exited");
-		uint32_t state;
-		while((state = mon.WaitStateChange()) != 5) {
-			LogMessage(Debug, "  state %d change...", state);
+		try {
+			uint32_t state;
+			while((state = mon.WaitStateChange()) != 5) {
+				LogMessage(Debug, "  state %d change...", state);
+			}
+		} catch(ResultError &e) {
+			LogMessage(Error, "got 0x%x waiting for process exit", e.code);
 		}
 		LogMessage(Debug, "  process exited");
 		stdin_loop.Destroy();
@@ -542,15 +546,8 @@ int main(int argc, char *argv[]) {
 		pull_from.pop_back();
 		
 		if(pull_to != "-") {
-			if(stat(pull_to.c_str(), &target_stat) == -1) {
-				if(errno != ENOENT) {
-					LogMessage(Error, "failed to stat '%s': %s", pull_to.c_str(), strerror(errno));
-					return 1;
-				}
-				// if pull_to doesn't exist, assume it's a file to write to.
-			} else {
-				is_target_directory = S_ISDIR(target_stat.st_mode);
-			}
+			std::optional<platform::fs::Stat> target_stat = platform::fs::StatFile(pull_to.c_str());
+			is_target_directory = target_stat && target_stat->is_directory;
 
 			if(pull_from.size() > 1 && !is_target_directory) {
 				LogMessage(Error, "target '%s' is not a directory", pull_to.c_str());
@@ -568,21 +565,17 @@ int main(int argc, char *argv[]) {
 		
 		for(std::string &src : pull_from) {
 			std::string dst_path;
-			FILE *dst;
+			platform::File dst;
 			if(pull_to == "-") {
 				dst_path = "<stdout>";
-				dst = stdout;
+				dst = platform::File::BorrowStdout();
 			} else {
 				if(is_target_directory) {
 					dst_path = pull_to + src;
 				} else {
 					dst_path = pull_to;
 				}
-				dst = fopen(dst_path.c_str(), "wb");
-				if(dst == nullptr) {
-					LogMessage(Error, "failed to open '%s' for writing: %s", dst_path.c_str(), strerror(errno));
-					return 1;
-				}
+				dst = platform::File::OpenForClobberingWrite(dst_path.c_str());
 			}
 
 			tool::ITwibFileAccessor itfa = itfsa.OpenFile(1, "/" + src);
@@ -591,16 +584,14 @@ int main(int argc, char *argv[]) {
 			size_t offset = 0;
 			while(offset < total_size) {
 				std::vector<uint8_t> data = itfa.Read(offset, total_size - offset);
-				if(data.size() == 0) {
-					LogMessage(Error, "hit EoF unexpectedly?");
+				if(data.size() == 0 || dst.Write(data.data(), data.size()) < data.size()) {
+					LogMessage(Error, "hit EoF/IO error unexpectedly?");
 					return 1;
 				}
-				fwrite(data.data(), 1, data.size(), dst);
 				offset+= data.size();
 			}
 
-			if(dst != stdout) {
-				fclose(dst);
+			if(pull_to != "-") {
 				fprintf(stderr, "%s -> %s\n", src.c_str(), dst_path.c_str());
 			}
 		}
@@ -613,6 +604,10 @@ int main(int argc, char *argv[]) {
 		push_to = push_from.back();
 		push_from.pop_back();
 
+		if(push_to.front() != '/') {
+			push_to.insert(push_to.begin(), '/');
+		}
+
 		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor("sd");
 
 		LogMessage(Debug, "checking if is file");
@@ -624,10 +619,6 @@ int main(int argc, char *argv[]) {
 			LogMessage(Error, "target '%s' is not a directory", push_to.c_str());
 			return 1;
 		}
-
-		if(push_to.front() != '/') {
-			push_to.insert(push_to.begin(), '/');
-		}
 		
 		if(is_target_directory) {
 			if(push_to.back() != '/') {
@@ -637,22 +628,15 @@ int main(int argc, char *argv[]) {
 		
 		for(std::string &src_path : push_from) {
 			std::string dst_path;
-			FILE *src;
-			src = fopen(src_path.c_str(), "rb");
-			if(src == nullptr) {
-				LogMessage(Error, "failed to open '%s' for reading: %s", src_path.c_str(), strerror(errno));
-				return 1;
-			}
+			platform::File src = platform::File::OpenForRead(src_path.c_str());
 			
 			if(is_target_directory) {
-				dst_path = push_to + basename(src_path.c_str()); // lmao super dangerous don't ever do this
+				dst_path = push_to + platform::fs::BaseName(src_path.c_str()); // lmao super dangerous don't ever do this
 			} else {
 				dst_path = push_to;
 			}
 
-			fseek(src, 0, SEEK_END);
-			size_t total_size = ftello(src);
-			fseek(src, 0, SEEK_SET);
+			size_t total_size = src.GetSize();
 
 			LogMessage(Debug, "creating %s", dst_path.c_str());
 			itfsa.CreateFile(0, total_size, dst_path);
@@ -666,7 +650,7 @@ int main(int argc, char *argv[]) {
 			while(offset < total_size) {
 				data.resize(std::min(total_size - offset, (size_t) 0x10000));
 				size_t r;
-				if((r = fread(data.data(), 1, data.size(), src)) < data.size()) {
+				if((r = src.Read(data.data(), data.size())) < data.size()) {
 					LogMessage(Error, "hit EoF unexpectedly? expected 0x%lx, got 0x%lx", data.size(), r);
 					return 1;
 				}
@@ -675,7 +659,6 @@ int main(int argc, char *argv[]) {
 				offset+= data.size();
 			}
 
-			fclose(src);
 			fprintf(stderr, "%s -> %s\n", src_path.c_str(), dst_path.c_str());
 		}
 	}
@@ -734,7 +717,7 @@ std::unique_ptr<client::Client> connect_named_pipe(std::string path) {
 	twili::platform::windows::Pipe pipe; 
 	LogMessage(Debug, "connecting to %s...", path.c_str());
 	while(1) {
-		pipe = CreateFile(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+		pipe = platform::windows::Pipe::OpenNamed(path.c_str());
 		if(pipe.handle != INVALID_HANDLE_VALUE) {
 			break;
 		}

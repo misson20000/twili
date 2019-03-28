@@ -128,87 +128,95 @@ void Daemon::RemoveDevice(std::shared_ptr<Device> device) {
 	LogMessage(Info, "removing device %08x", device->device_id);
 }
 
+// voodoo
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 void Daemon::Process() {
 	std::variant<std::monostate, Request, Response> v;
 	LogMessage(Debug, "Process: dequeueing job...");
 	dispatch_queue.wait_dequeue(v);
 	LogMessage(Debug, "Process: dequeued job: %d", v.index());
 
-	if(v.index() == 0) { // monostate, just a signal to wake thread up
-	} else if(v.index() == 1) {
-		Request rq = std::get<Request>(v);
-		LogMessage(Debug, "dispatching request");
-		LogMessage(Debug, "  client id: %08x", rq.client->client_id);
-		LogMessage(Debug, "  device id: %08x", rq.device_id);
-		LogMessage(Debug, "  object id: %08x", rq.object_id);
-		LogMessage(Debug, "  command id: %08x", rq.command_id);
-		LogMessage(Debug, "  tag: %08x", rq.tag);
+	std::visit(overloaded {
+			[&](std::monostate &ms) {
+				// just a wake-up signal
+			},
+			[&](Request &rq) {
+				LogMessage(Debug, "dispatching request");
+				LogMessage(Debug, "  client id: %08x", rq.client->client_id);
+				LogMessage(Debug, "  device id: %08x", rq.device_id);
+				LogMessage(Debug, "  object id: %08x", rq.object_id);
+				LogMessage(Debug, "  command id: %08x", rq.command_id);
+				LogMessage(Debug, "  tag: %08x", rq.tag);
 		
-		if(rq.device_id == 0) {
-			PostResponse(HandleRequest(rq));
-		} else {
-			std::shared_ptr<Device> device;
-			{
-				std::lock_guard<std::mutex> lock(device_map_mutex);
-				auto i = devices.find(rq.device_id);
-				if(i == devices.end()) {
-					PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
-					return;
-				}
-				device = i->second.lock();
-				if(!device || device->deletion_flag) {
-					PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
-					return;
-				}
-			}
-			if(rq.command_id == 0xffffffff) {
-				LogMessage(Debug, "detected close request for 0x%x", rq.object_id);
-				std::shared_ptr<Client> client = rq.client;
-				if(client) {
-					// disown the object that's being closed
-					for(auto i = client->owned_objects.begin(); i != client->owned_objects.end(); ){
-						if((*i)->object_id == rq.object_id) {
-							// need to mark this so that it doesn't send another close request
-							(*i)->valid = false;
-							i = client->owned_objects.erase(i);
-							LogMessage(Debug, "  disowned from client");
-						} else {
-							i++;
+				if(rq.device_id == 0) {
+					PostResponse(HandleRequest(rq));
+				} else {
+					std::shared_ptr<Device> device;
+					{
+						std::lock_guard<std::mutex> lock(device_map_mutex);
+						auto i = devices.find(rq.device_id);
+						if(i == devices.end()) {
+							PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
+							return;
+						}
+						device = i->second.lock();
+						if(!device || device->deletion_flag) {
+							PostResponse(rq.RespondError(TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE));
+							return;
 						}
 					}
-				} else {
-					LogMessage(Warning, "failed to locate client for disownership");
+					if(rq.command_id == 0xffffffff) {
+						LogMessage(Debug, "detected close request for 0x%x", rq.object_id);
+						std::shared_ptr<Client> client = rq.client;
+						if(client) {
+							// disown the object that's being closed
+							for(auto i = client->owned_objects.begin(); i != client->owned_objects.end(); ){
+								if((*i)->object_id == rq.object_id) {
+									// need to mark this so that it doesn't send another close request
+									(*i)->valid = false;
+									i = client->owned_objects.erase(i);
+									LogMessage(Debug, "  disowned from client");
+								} else {
+									i++;
+								}
+							}
+						} else {
+							LogMessage(Warning, "failed to locate client for disownership");
+						}
+					}
+					LogMessage(Debug, "sending request via device");
+					device->SendRequest(std::move(rq));
+					LogMessage(Debug, "sent request via device");
 				}
-			}
-			LogMessage(Debug, "sending request via device");
-			device->SendRequest(std::move(rq));
-			LogMessage(Debug, "sent request via device");
-		}
-	} else if(v.index() == 2) {
-		Response rs = std::get<Response>(v);
-		LogMessage(Debug, "dispatching response");
-		LogMessage(Debug, "  client id: %08x", rs.client_id);
-		LogMessage(Debug, "  object id: %08x", rs.object_id);
-		LogMessage(Debug, "  result code: %08x", rs.result_code);
-		LogMessage(Debug, "  tag: %08x", rs.tag);
-		LogMessage(Debug, "  objects:");
-		for(auto o : rs.objects) {
-			LogMessage(Debug, "    0x%x", o->object_id);
-		}
+			},
+			[&](Response &rs) {
+				LogMessage(Debug, "dispatching response");
+				LogMessage(Debug, "  client id: %08x", rs.client_id);
+				LogMessage(Debug, "  object id: %08x", rs.object_id);
+				LogMessage(Debug, "  result code: %08x", rs.result_code);
+				LogMessage(Debug, "  tag: %08x", rs.tag);
+				LogMessage(Debug, "  objects:");
+				for(auto o : rs.objects) {
+					LogMessage(Debug, "    0x%x", o->object_id);
+				}
 		
-		std::shared_ptr<Client> client = GetClient(rs.client_id);
-		if(!client) {
-			LogMessage(Info, "dropping response for bad client: 0x%x", rs.client_id);
-			return;
-		}
-		// add any objects this response included to the client's
-		// owned object list, to keep the BridgeObject object alive
-		client->owned_objects.insert(
-			client->owned_objects.end(),
-			rs.objects.begin(),
-			rs.objects.end());
-		client->PostResponse(rs);
-	}
+				std::shared_ptr<Client> client = GetClient(rs.client_id);
+				if(!client) {
+					LogMessage(Info, "dropping response for bad client: 0x%x", rs.client_id);
+					return;
+				}
+				// add any objects this response included to the client's
+				// owned object list, to keep the BridgeObject object alive
+				client->owned_objects.insert(
+					client->owned_objects.end(),
+					rs.objects.begin(),
+					rs.objects.end());
+				client->PostResponse(rs);
+			}
+		}, v);
+
 	LogMessage(Debug, "finished process loop");
 }
 
@@ -218,6 +226,9 @@ Response Daemon::HandleRequest(Request &rq) {
 		switch((protocol::ITwibMetaInterface::Command) rq.command_id) {
 		case protocol::ITwibMetaInterface::Command::LIST_DEVICES: {
 			LogMessage(Debug, "command 0 issued to twibd meta object: LIST_DEVICES");
+			LogMessage(Debug, "waiting for ISL...");
+			initial_scan_lock.wait();
+			LogMessage(Debug, "got ISL");
 			
 			Response r = rq.RespondOk();
 			std::vector<msgpack11::MsgPack> device_packs;

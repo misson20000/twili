@@ -18,40 +18,32 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
-
-#include<functional>
-#include<mutex>
-#include<map>
-
-#include "Messages.hpp"
-#include "Protocol.hpp"
-#include "Buffer.hpp"
+#include "InitialScanLock.hpp"
 
 namespace twili {
 namespace twib {
-namespace tool {
-namespace client {
+namespace daemon {
 
-class Client {
- public:
-	virtual ~Client() = default;
-	void SendRequest(Request &&rq, std::function<void(Response)> &&function);
-	
-	bool deletion_flag = false;
-	
- protected:
-	virtual void SendRequestImpl(const Request &rq) = 0;
-	void PostResponse(protocol::MessageHeader &mh, util::Buffer &payload, util::Buffer &object_ids);
-	void FailAllRequests(uint32_t code);
- private:
-	std::map<uint32_t, std::function<void(Response r)>> response_map;
-	std::mutex response_map_mutex;
-	bool failed = false;
-	uint32_t fail_code;
-};
+void InitialScanLock::lock() {
+	std::unique_lock<std::mutex> lock(mutex);
+	counter++;
+}
 
-} // namespace client
-} // namespace tool
+void InitialScanLock::unlock() {
+	std::unique_lock<std::mutex> lock(mutex);
+	counter--;
+	if(counter == 0) {
+		cv.notify_all();
+	}
+}
+
+void InitialScanLock::wait() {
+	std::unique_lock<std::mutex> lock(mutex);
+	while(counter > 0) {
+		cv.wait(lock);
+	}
+}
+
+} // namespace daemon
 } // namespace twib
 } // namespace twili
