@@ -132,3 +132,8 @@ using NetworkError = windows::NetworkError;
 
 } // namespace platform
 } // namespace twili
+
+#ifndef PLATFORM
+#undef CreateFile
+#undef SendMessage
+#endif

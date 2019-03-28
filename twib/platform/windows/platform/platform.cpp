@@ -18,6 +18,9 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+// don't undefine CreateFile
+#define PLATFORM
+
 #include "platform/platform.hpp"
 
 #include<optional>
