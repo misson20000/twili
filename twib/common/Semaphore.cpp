@@ -18,44 +18,38 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+#include "Semaphore.hpp"
 
-#include "platform.hpp"
-#include "platform/EventLoop.hpp"
-
-#include<vector>
-#include<functional>
+#include<mutex>
 
 namespace twili {
-namespace platform {
-namespace windows {
-namespace detail {
+namespace twib {
+namespace common {
 
-class InputPump : public EventLoopNativeMember {
- public:
-	InputPump(
-		size_t buffer_size,
-		std::function<void(std::vector<uint8_t>&)> cb,
-		std::function<void()> eof_cb);
- private:
-	virtual bool WantsSignal() override final;
-	virtual void Signal() override final;
-	virtual HANDLE GetHandle() override final;
-	
-	void Read();
+Semaphore::Semaphore(size_t count) : count(count) {
 
-	bool is_valid = true;
+}
 
-	HANDLE console;
-	std::function<void(std::vector<uint8_t>&)> cb;
-	std::function<void()> eof_cb;
-	std::vector<uint8_t> buffer;
-};
+void Semaphore::notify() {
+	std::lock_guard<std::mutex> lock(mutex);
+	++count;
+	condition_variable.notify_one();
+}
 
-} // namespace detail
-} // namespace windows
+void Semaphore::wait() {
+	std::unique_lock<std::mutex> lock(mutex);
+	condition_variable.wait(lock, [&] { return count > 0; });
+	--count;
+}
 
-using InputPump = windows::detail::InputPump;
+void Semaphore::lock() {
+	wait();
+}
 
-} // namespace platform
+void Semaphore::unlock() {
+	notify();
+}
+
+} // namespace common
+} // namespace twib
 } // namespace twili

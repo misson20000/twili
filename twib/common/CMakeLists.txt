@@ -8,7 +8,7 @@ configure_file(
 	)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-set(SOURCE Logger.cpp ../../common/Buffer.cpp ../../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp)
+set(SOURCE Logger.cpp ../../common/Buffer.cpp ../../common/util.cpp ResultError.cpp MessageConnection.cpp SocketMessageConnection.cpp Semaphore.cpp)
 
 if(TWIB_NAMED_PIPE_FRONTEND_ENABLED)
 	set(SOURCE ${SOURCE} NamedPipeMessageConnection.cpp)

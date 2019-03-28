@@ -39,14 +39,21 @@ namespace detail {
 
 class EventLoop;
 
-class EventLoopEventMember {
+class EventLoopNativeMember {
 	friend class EventLoop;
- protected:
+protected:
 	virtual bool WantsSignal();
 	virtual void Signal();
+	virtual HANDLE GetHandle() = 0;
+private:
+	size_t last_service = 0;
+};
+
+class EventLoopEventMember : public EventLoopNativeMember {
+ protected:
 	virtual Event &GetEvent() = 0;
  private:
-	size_t last_service = 0;
+	virtual HANDLE GetHandle() override final;
 };
 
 class EventLoopSocketMember : public EventLoopEventMember {
@@ -67,8 +74,9 @@ class EventLoopSocketMember : public EventLoopEventMember {
 	platform::windows::Event event;
 };
 
-class EventLoop : public platform::common::detail::EventLoopBase<EventLoop, EventLoopEventMember> {
+class EventLoop : public platform::common::detail::EventLoopBase<EventLoop, EventLoopNativeMember> {
 public:
+	using NativeMember = EventLoopNativeMember;
 	using EventMember = EventLoopEventMember;
 	using SocketMember = EventLoopSocketMember;
 	

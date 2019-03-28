@@ -20,42 +20,30 @@
 
 #pragma once
 
-#include "platform.hpp"
-#include "platform/EventLoop.hpp"
+#include<mutex>
+#include<condition_variable>
 
-#include<vector>
-#include<functional>
+#include<stdint.h>
 
 namespace twili {
-namespace platform {
-namespace windows {
-namespace detail {
+namespace twib {
+namespace common {
 
-class InputPump : public EventLoopNativeMember {
- public:
-	InputPump(
-		size_t buffer_size,
-		std::function<void(std::vector<uint8_t>&)> cb,
-		std::function<void()> eof_cb);
- private:
-	virtual bool WantsSignal() override final;
-	virtual void Signal() override final;
-	virtual HANDLE GetHandle() override final;
-	
-	void Read();
+class Semaphore {
+public:
+	Semaphore(size_t count = 0);
+	void notify();
+	void wait();
 
-	bool is_valid = true;
-
-	HANDLE console;
-	std::function<void(std::vector<uint8_t>&)> cb;
-	std::function<void()> eof_cb;
-	std::vector<uint8_t> buffer;
+	// for std::lock_guard
+	void lock();
+	void unlock();
+private:
+	std::mutex mutex;
+	std::condition_variable condition_variable;
+	size_t count = 0;
 };
 
-} // namespace detail
-} // namespace windows
-
-using InputPump = windows::detail::InputPump;
-
-} // namespace platform
+} // namespace common
+} // namespace twib
 } // namespace twili

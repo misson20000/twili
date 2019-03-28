@@ -92,7 +92,7 @@ Pipe &Pipe::operator=(HANDLE phand) {
 
 NetworkError::NetworkError(int en) : std::runtime_error("Failed to retrieve error string") {
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL, WSAGetLastError(),
+			NULL, en,
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			(LPTSTR) &string, 0, NULL);
 }
@@ -136,8 +136,9 @@ Socket &Socket::operator=(Socket &&other) {
 
 ssize_t Socket::Recv(void *buffer, size_t length, int flags) {
 	DWORD bytes;
+	DWORD flags_storage = flags;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSARecv(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+	if(WSARecv(fd, &buf, 1, &bytes, &flags_storage, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;
@@ -145,8 +146,9 @@ ssize_t Socket::Recv(void *buffer, size_t length, int flags) {
 
 ssize_t Socket::RecvFrom(void *buffer, size_t length, int flags, struct sockaddr *address, socklen_t *address_len) {
 	DWORD bytes;
+	DWORD flags_storage = flags;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSARecvFrom(fd, &buf, 1, &bytes, 0, address, address_len, nullptr, nullptr) != 0) {
+	if(WSARecvFrom(fd, &buf, 1, &bytes, &flags_storage, address, address_len, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;
@@ -155,7 +157,7 @@ ssize_t Socket::RecvFrom(void *buffer, size_t length, int flags, struct sockaddr
 ssize_t Socket::Send(const void *buffer, size_t length, int flags) {
 	DWORD bytes;
 	WSABUF buf = { length, (CHAR*) buffer };
-	if(WSASend(fd, &buf, 1, &bytes, 0, nullptr, nullptr) != 0) {
+	if(WSASend(fd, &buf, 1, &bytes, flags, nullptr, nullptr) != 0) {
 		return -1;
 	}
 	return bytes;

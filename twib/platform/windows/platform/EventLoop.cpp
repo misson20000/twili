@@ -40,7 +40,7 @@ void EventLoop::EventThreadNotifier::Notify() const {
 }
 
 EventLoop::EventLoop(Logic &logic) :
-	platform::common::detail::EventLoopBase<EventLoop, EventLoopEventMember>(logic),
+	platform::common::detail::EventLoopBase<EventLoop, EventLoopNativeMember>(logic),
 	notifier(*this) {
 }
 
@@ -58,21 +58,21 @@ void EventLoop::event_thread_func() {
 
 		std::sort(members.begin(), members.end(), [](auto &a, auto &b) { return a.get().last_service > b.get().last_service; });
 		std::vector<HANDLE> event_handles;
-		std::vector<std::reference_wrapper<EventMember>> event_members;
+		std::vector<std::reference_wrapper<NativeMember>> event_members;
 		for(auto i = members.begin(); i != members.end(); i++) {
-			EventMember &member = i->get();
+			NativeMember &member = i->get();
 			if(member.WantsSignal()) {
-				event_handles.push_back(member.GetEvent().handle);
+				event_handles.push_back(member.GetHandle());
 				event_members.push_back(member);
 			}
 		}
 		// add notification event last since it's the one we're least interested in
 		event_handles.push_back(notification_event.handle);
 		
-		LogMessage(Debug, "waiting on %d handles", event_handles.size());
+		//LogMessage(Debug, "waiting on %d handles", event_handles.size());
 		
 		DWORD r = WaitForMultipleObjects(event_handles.size(), event_handles.data(), false, INFINITE);
-		LogMessage(Debug, "  -> %d", r);
+		//LogMessage(Debug, "  -> %d", r);
 		
 		if(r == WAIT_FAILED || r < WAIT_OBJECT_0 || r - WAIT_OBJECT_0 >= event_handles.size()) {
 			LogMessage(Fatal, "WaitForMultipleObjects failed");
@@ -94,12 +94,17 @@ void EventLoop::event_thread_func() {
 	}
 }
 
-// default implementations for EventMember
-bool EventLoopEventMember::WantsSignal() {
+// default implementations for Native
+bool EventLoopNativeMember::WantsSignal() {
 	return false;
 }
 
-void EventLoopEventMember::Signal() {
+void EventLoopNativeMember::Signal() {
+}
+
+// NativeMember implementation for EventMember
+HANDLE EventLoopEventMember::GetHandle() {
+	return GetEvent().handle;
 }
 
 EventLoopSocketMember::EventLoopSocketMember(Socket &&socket) : socket(std::move(socket)) {
@@ -135,7 +140,7 @@ bool EventLoopSocketMember::WantsSignal() {
 
 void EventLoopSocketMember::Signal() {
 	WSANETWORKEVENTS netevents;
-	if(!WSAEnumNetworkEvents(socket.fd, event.handle, &netevents)) {
+	if(WSAEnumNetworkEvents(socket.fd, event.handle, &netevents) == SOCKET_ERROR) {
 		LogMessage(Fatal, "WSAEnumNetworkEvents failed");
 		throw NetworkError(WSAGetLastError());
 		exit(1);
