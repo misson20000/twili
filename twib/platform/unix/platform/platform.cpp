@@ -20,6 +20,9 @@
 
 #include "platform.hpp"
 
+#include<fcntl.h>
+#include<sys/stat.h>
+
 namespace twili {
 namespace platform {
 namespace unix {
@@ -50,6 +53,30 @@ File::~File() {
 	}
 }
 
+File File::OpenForRead(const char *path) {
+	int fd = open(path, O_RDONLY);
+	if(fd < 0) {
+		throw NetworkError(errno);
+	}
+	return File(fd, true);
+}
+
+File File::OpenForClobberingWrite(const char *path) {
+	int fd = open(path, O_WRONLY | O_CREAT);
+	if(fd < 0) {
+		throw NetworkError(errno);
+	}
+	return File(fd, true);
+}
+
+File File::BorrowStdin() {
+	return File(STDIN_FILENO, false);
+}
+
+File File::BorrowStdout() {
+	return File(STDOUT_FILENO, false);
+}
+
 int File::Claim() {
 	owned = false;
 	return fd;
@@ -60,6 +87,30 @@ void File::Close() {
 		close(fd);
 		owned = false;
 	}
+}
+
+size_t File::GetSize() {
+	struct stat statbuf;
+	if(fstat(fd, &statbuf) != 0) {
+		throw NetworkError(errno);
+	}
+	return statbuf.st_size;
+}
+
+size_t File::Read(void *buf, size_t size) {
+	ssize_t r = read(fd, buf, size);
+	if(r == -1) {
+		throw NetworkError(errno);
+	}
+	return r;
+}
+
+size_t File::Write(const void *buf, size_t size) {
+	ssize_t r = write(fd, buf, size);
+	if(r == -1) {
+		throw NetworkError(errno);
+	}
+	return r;
 }
 
 NetworkError::NetworkError(int en) : std::runtime_error(strerror(en)) {
@@ -145,14 +196,6 @@ void Socket::Connect(const struct sockaddr *address, socklen_t address_len) {
 	if(connect(fd, address, address_len) != 0) {
 		throw NetworkError(errno);
 	}
-}
-
-namespace fs {
-
-bool IsDir(const char *path) {
-	return (GetFileAttributes(path) & FILE_ATTRIBUTE_DIRECTORY);
-}
-
 }
 
 } // namespace unix

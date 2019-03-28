@@ -56,11 +56,20 @@ public:
 	File(int fd, bool owned=true);
 	~File();
 
+	static File OpenForRead(const char *path);
+	static File OpenForClobberingWrite(const char *path);
+	static File BorrowStdin();
+	static File BorrowStdout();
+
 	int fd;
 	bool owned;
 
 	int Claim();
 	void Close();
+
+	size_t GetSize();
+	size_t Read(void *buffer, size_t size);
+	size_t Write(const void *buffer, size_t size);
 };
 
 class NetworkError : public std::runtime_error {
@@ -95,17 +104,11 @@ class Socket : public File {
 	struct sockaddr_un unix_addr;
 };
 
-namespace fs {
-
-bool IsDir(const char *path);
-
-} // namespace fs
-
 } // namespace unix
 
 using Socket = unix::Socket;
+using File = unix::File;
 using NetworkError = unix::NetworkError;
-using fs = unix::fs;
 
 } // namespace platform
 } // namespace twili
