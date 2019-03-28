@@ -23,33 +23,49 @@
 #include "platform.hpp"
 #include "platform/EventLoop.hpp"
 
-#include<vector>
+#include<thread>
+#include<mutex>
+#include<condition_variable>
 #include<functional>
+#include<vector>
+
+#include<stdint.h>
 
 namespace twili {
 namespace platform {
 namespace windows {
 namespace detail {
 
-class InputPump : public EventLoopNativeMember {
+class InputPump : public EventLoopEventMember {
  public:
 	InputPump(
 		size_t buffer_size,
 		std::function<void(std::vector<uint8_t>&)> cb,
 		std::function<void()> eof_cb);
+	~InputPump();
  private:
 	virtual bool WantsSignal() override final;
 	virtual void Signal() override final;
-	virtual HANDLE GetHandle() override final;
+	virtual Event &GetEvent() override final;
 	
-	void Read();
+	void ThreadFunc();
 
 	bool is_valid = true;
 
-	HANDLE console;
+	HANDLE handle;
+
+	Event event;
+
+	size_t buffer_size;
+	std::vector<uint8_t> buffer;
+	bool data_pending = false;
+
 	std::function<void(std::vector<uint8_t>&)> cb;
 	std::function<void()> eof_cb;
-	std::vector<uint8_t> buffer;
+	std::condition_variable cv;
+	std::mutex lock;
+
+	std::thread thread;
 };
 
 } // namespace detail

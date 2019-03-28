@@ -31,9 +31,41 @@ InputPump::InputPump(
 	size_t buffer_size,
 	std::function<void(std::vector<uint8_t>&)> cb,
 	std::function<void()> eof_cb) :
-	console(GetStdHandle(STD_INPUT_HANDLE)),
+	handle(GetStdHandle(STD_INPUT_HANDLE)),
+	buffer_size(buffer_size),
 	cb(cb),
-	eof_cb(eof_cb) {
+	eof_cb(eof_cb),
+	thread([this]() { ThreadFunc(); }) {
+	if(event.handle == INVALID_HANDLE_VALUE) {
+		LogMessage(Error, "invalid event");
+		exit(1);
+	}
+}
+
+InputPump::~InputPump() {
+	is_valid = false;
+	CancelSynchronousIo(thread.native_handle());
+	thread.join();
+}
+
+void InputPump::ThreadFunc() {
+	std::unique_lock<std::mutex> guard(lock);
+	while(is_valid) {
+		buffer.resize(buffer_size);
+
+		DWORD bytes_read;
+		if(!ReadFile(handle, buffer.data(), buffer.size(), &bytes_read, nullptr)) {
+			is_valid = false;
+			event.Signal();
+		} else {
+			buffer.resize(bytes_read);
+			data_pending = true;
+			event.Signal();
+			while(data_pending) {
+				cv.wait(guard);
+			}
+		}
+	}
 }
 
 bool InputPump::WantsSignal() {
@@ -41,38 +73,19 @@ bool InputPump::WantsSignal() {
 }
 
 void InputPump::Signal() {
-	INPUT_RECORD records[16];
-	DWORD num_events;
-	if(!ReadConsoleInput(console, records, 16, &num_events)) {
-		is_valid = false;
-		LogMessage(Warning, "ReadConsoleInput failed: %s", NetErrStr());
-		return;
+	std::unique_lock<std::mutex> guard(lock);
+	if(data_pending) {
+		cb(buffer);
+		data_pending = false;
 	}
-	for(int i = 0; i < num_events; i++) {
-		INPUT_RECORD &event = records[i];
-		if(event.EventType == KEY_EVENT) {
-			KEY_EVENT_RECORD &ker = event.Event.KeyEvent;
-			if(ker.bKeyDown) {
-				DWORD num_written;
-				putc(ker.uChar.AsciiChar, stdout);
-				if(ker.wVirtualKeyCode == VK_BACK) {
-					buffer.pop_back();
-					putc(' ', stdout);
-					putc('\b', stdout);
-				} else if(ker.wVirtualKeyCode == VK_RETURN) {
-					buffer.push_back('\n');
-					cb(buffer);
-					buffer.clear();
-				} else {
-					buffer.push_back(ker.uChar.AsciiChar);
-				}
-			}
-		}
+	if(!is_valid) {
+		eof_cb();
 	}
+	cv.notify_all();
 }
 
-HANDLE InputPump::GetHandle() {
-	return console;
+Event &InputPump::GetEvent() {
+	return event;
 }
 
 } // namespace detail
