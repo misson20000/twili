@@ -15,6 +15,7 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
   * [Supported Firmware Versions](#supported-firmware-versions)
   * [Limitations](#limitations)
   * [Application Development](#application-development)
+  * [Application Debugging](#application-debugging)
 - [Installation](#installation)
   * [Linux](#linux)
     + [Arch Linux](#arch-linux)
@@ -66,7 +67,7 @@ Version | Support
 5.0.1 - 5.1.0 | Expected working
 6.0.0 | Expected working
 6.0.1 | Tested working
-6.1.0 | Expected working
+6.1.0 | Tested working
 6.2.0 | Tested working
 7.0.0 | Expected working
 7.0.1 | Expected working
@@ -85,6 +86,103 @@ If you're developing with libtransistor, Twili integration is automatic. Standar
 If you're developing an application with libnx, try [libtwili](https://github.com/misson20000/twili-libnx) for twib stdio.
 Most libnx applications are applets. If you're developing an applet (interacts with the user), make sure you use `-a` with `twib run` to run it as an applet.
 If you're developing a sysmodule, you can use `twib run` without `-a` to run it as a sysmodule.
+
+## Application Debugging
+
+As of v1.2.0, twib includes a GDB stub.
+
+### Features
+
+- Works with homebrew apps and sysmodules as well as official Nintendo software
+- Breakpoints
+- Continuing from breakpoints and single-stepping (with twili-gdb)
+- Memory viewing (`p` command)
+- Function calling (`p` command with twili-gdb)
+- Multiprocess extensions
+
+### Limitations
+
+- **[twili-gdb](https://github.com/misson20000/twili-gdb) is required for single-stepping.** This is because the Horizon kernel does not implement hardware single-stepping, so I had to implement software single stepping in GDB.
+- **[twili-gdb](https://github.com/misson20000/twili-gdb) is required for function calling.** This is because Horizon executables are marked as shared libraries but have entry point 0x0, which GDB interprets as no entry point.
+- **GDB File I/O and `run` commands are unsupported.** Not yet implemented.
+- **Hardware breakpoints and watchpoints are unsupported.** Not yet implemented.
+- **Windows is unsupported.** Not yet implemented.
+
+### Installing twili-gdb
+
+If you are running Arch Linux, there is [an AUR package](https://aur.archlinux.org/packages/gdb-twili-git/) for twili-gdb. Otherwise, you will need to build it from source. It's a standard autotools build. Make sure to specify `--target=twili`, or, if you prefer longer prefixes, `aarch64-twili-elf` should work too.
+
+```
+$ git clone https://github.com/misson20000/twili-gdb.git
+$ cd twili-gdb
+$ mkdir build
+$ cd build
+$ ../configure --target=twili --enable-targets=twili --prefix=/usr --disable-sim
+$ make
+$ sudo make install
+```
+
+### Using The GDB Stub
+
+Use the gdb stub with `target extended-remote | twib gdb`.
+
+```
+$ twili-gdb
+GNU gdb (GDB) 8.3.50.20190328-git
+Copyright (C) 2019 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "--host=x86_64-pc-linux-gnu --target=twili".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+(gdb) target extended-remote | twib gdb
+Remote debugging using | twib gdb
+(gdb) 
+```
+
+You can attach to an existing process with `attach 0x<pid>`. Use `twib ps` from another terminal to list process IDs. I recommend loading symbol files (via command-line or via `file` command) before attaching processes, since the stub does not provide symbols.
+
+Use `info threads` to list threads, `break` to set breakpoints, `c` to continue, etc.
+
+#### Suspended Start
+
+Many times, you don't want to attach to an existing process, but you want to debug a process from the start. There are two ways to do this.
+
+##### Monitored Process Suspended Start
+
+For monitored processes (`twib run`), you can pass the `-d` (or `--debug-suspend`) option. Twili will block HBABIShim/AppletHost on an IPC call until a debugger is attached. This is usually good enough, but if you need suspended start on an unmonitored process (official processes) or need to debug before AppletHost, there is another way.
+
+##### PM Suspended Start
+
+The GDB stub implements two monitor commands: `wait application` and `wait title 0x<title id>`. These commands will wait for either any application to be launched, or the specified title ID respectively. When the application or title is launched, it will be suspended before any code at all even executes and the PID will be printed in the GDB console. Use the `attach` command to attach to the suspended process.
+
+```
+(gdb) monitor wait application
+PID: 0x8a
+(gdb) attach 0x8a
+```
+
+### Details
+
+#### Base Address Detection
+
+For "monitored processes" (launched from twib), Twili reports the base address to gdb as wherever the user-supplied executable was placed in memory. This is usually what you want, but not that this skips over HBABIShim or AppletHost, which you may see in your backtrace. For non-monitored processes, the base address reported to gdb is wherever the first static code module is. This is usually `rtld` or `main`.
+
+#### Breakpoints
+
+Although Horizon supports hardware breakpoints, I don't use them. Breakpoints are implemented as software breakpoints, which overwrite instructions in the process with trap instructions that trigger exceptions that gdb intercepts. Continuing from one of these requires restoring the original instruction, single stepping the thread one instruction, then restoring the trap instruction.
+
+#### Single Stepping
+
+Horizon does not support single stepping. Single stepping is implemented by predicting the next instruction and placing a breakpoint on it.
 
 # Installation
 
