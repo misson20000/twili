@@ -45,6 +45,7 @@ class ITwibProcessMonitor : public ObjectDispatcherProxy<ITwibProcessMonitor>, p
 	virtual void StateChanged(process::MonitoredProcess::State new_state) override;
  private:
 	void Launch(bridge::ResponseOpener opener);
+	void LaunchSuspended(bridge::ResponseOpener opener);
 	void Terminate(bridge::ResponseOpener opener);
 	void AppendCode(bridge::ResponseOpener opener, InputStream &code);
 	
@@ -61,6 +62,7 @@ class ITwibProcessMonitor : public ObjectDispatcherProxy<ITwibProcessMonitor>, p
 	SmartRequestDispatcher<
 	 ITwibProcessMonitor,
 	 SmartCommand<CommandID::LAUNCH, &ITwibProcessMonitor::Launch>,
+	 SmartCommand<CommandID::LAUNCH_SUSPENDED, &ITwibProcessMonitor::LaunchSuspended>,
 	 SmartCommand<CommandID::TERMINATE, &ITwibProcessMonitor::Terminate>,
 	 SmartCommand<CommandID::APPEND_CODE, &ITwibProcessMonitor::AppendCode>,
 	 SmartCommand<CommandID::OPEN_STDIN, &ITwibProcessMonitor::OpenStdin>,

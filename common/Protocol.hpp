@@ -110,7 +110,7 @@ class ITwibProcessMonitor {
  public:
 	enum class Command : uint32_t {
 		LAUNCH = 10,
-		//RUN = 11, reserved
+		LAUNCH_SUSPENDED = 11,
 		TERMINATE = 12,
 		APPEND_CODE = 13,
 		OPEN_STDIN = 14,

@@ -37,6 +37,7 @@ class ITwibProcessMonitor {
 	using CommandID = protocol::ITwibProcessMonitor::Command;
 	
 	uint64_t Launch();
+	uint64_t LaunchSuspended();
 	void AppendCode(std::vector<uint8_t> code);
 	ITwibPipeWriter OpenStdin();
 	ITwibPipeReader OpenStdout();

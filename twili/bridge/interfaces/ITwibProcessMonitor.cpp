@@ -55,10 +55,25 @@ void ITwibProcessMonitor::StateChanged(process::MonitoredProcess::State new_stat
 }
 
 void ITwibProcessMonitor::Launch(bridge::ResponseOpener opener) {
-	process->twili.monitored_processes.push_back(process);
-	printf("  began monitoring 0x%x\n", process->GetPid());
+	if(process->GetState() == process::MonitoredProcess::State::Created) {
+		process->twili.monitored_processes.push_back(process);
+		printf("  began monitoring 0x%x\n", process->GetPid());
 
-	process->Launch(opener);
+		process->Launch(opener);
+	} else {
+		throw ResultError(TWILI_ERR_INVALID_PROCESS_STATE);
+	}
+}
+
+void ITwibProcessMonitor::LaunchSuspended(bridge::ResponseOpener opener) {
+	if(process->GetState() == process::MonitoredProcess::State::Created) {
+		process->twili.monitored_processes.push_back(process);
+		printf("  began monitoring 0x%x\n", process->GetPid());
+
+		process->LaunchSuspended(opener);
+	} else {
+		throw ResultError(TWILI_ERR_INVALID_PROCESS_STATE);
+	}
 }
 
 void ITwibProcessMonitor::Terminate(bridge::ResponseOpener opener) {

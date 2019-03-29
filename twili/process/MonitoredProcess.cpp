@@ -45,6 +45,11 @@ MonitoredProcess::MonitoredProcess(Twili &twili) :
 
 }
 
+void MonitoredProcess::LaunchSuspended(bridge::ResponseOpener response) {
+	suspended_launch_enabled = true;
+	Launch(response);
+}
+
 uint64_t MonitoredProcess::GetPid() {
 	if(!proc) {
 		return 0;
@@ -83,6 +88,15 @@ void MonitoredProcess::Kill() {
 		return; // already dead
 	}
 	Terminate();
+}
+
+void MonitoredProcess::Continue() {
+	if(state == State::ShimSuspended) {
+		ChangeState(State::Running);
+		suspended_launch_cb(0);
+	} else {
+		suspended_launch_enabled = false;
+	}
 }
 
 void MonitoredProcess::PrintDebugInfo(const char *indent) {
@@ -156,6 +170,16 @@ void MonitoredProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entri
 			0xffffffffffffffff
 		}
 	});
+}
+
+void MonitoredProcess::WaitToStart(std::function<void(trn::ResultCode)> cb) {
+	if(suspended_launch_enabled) {
+		ChangeState(State::ShimSuspended);
+		suspended_launch_cb = cb;
+	} else {
+		ChangeState(State::Running);
+		cb(RESULT_OK);
+	}
 }
 
 void MonitoredProcess::AddMonitor(ProcessMonitor &monitor) {

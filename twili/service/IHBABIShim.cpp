@@ -102,8 +102,7 @@ trn::ResultCode IHBABIShim::SetExitCode(trn::ipc::InRaw<uint32_t> code) {
 }
 
 trn::ResultCode IHBABIShim::WaitToStart(std::function<void(trn::ResultCode)> cb) {
-	process->ChangeState(process::MonitoredProcess::State::Running);
-	cb(RESULT_OK);
+	process->WaitToStart(cb);
 	return RESULT_OK;
 }
 

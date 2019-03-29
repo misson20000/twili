@@ -47,21 +47,24 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	virtual ~MonitoredProcess();
 
 	enum class State {
-		Created, // process has been created, but not yet started
-		Started, // process has been started, but not yet attached
+		Created, // MonitoredProcess has been created, but no kernel process exists yet
+		Started, // process has been created, but not yet attached to twili
 		Attached, // process has been attached and is in HBABIShim
+		ShimSuspended, // process has been suspended in HBABIShim for debug
 		Running, // process has entered target
 		Crashed, // process has crashed
 		Exited // process has exited cleanly
 	};
 	
 	virtual void Launch(bridge::ResponseOpener response) = 0;
+	virtual void LaunchSuspended(bridge::ResponseOpener response);
 	
 	virtual uint64_t GetPid() override;
 	virtual void AddNotes(ELFCrashReport &report) override;
 	virtual void Terminate() override;
 	virtual void Kill(); // terminate cleanly, if possible
-
+	void Continue(); // exit ShimSuspended state
+	
 	virtual void PrintDebugInfo(const char *indent);
 	
 	State GetState();
@@ -75,6 +78,7 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 	std::shared_ptr<trn::KProcess> GetProcess(); // needed by HBABIShim
 	uint64_t GetTargetEntry(); // needed by HBABIShim
 	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries);
+	void WaitToStart(std::function<void(trn::ResultCode)> cb);
 
 	std::shared_ptr<TwibPipe> tp_stdin;
 	std::shared_ptr<TwibPipe> tp_stdout;
@@ -95,6 +99,9 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
  private:
 	State state = State::Created;
 	trn::ResultCode result = RESULT_OK;
+	
+	bool suspended_launch_enabled = false;
+	std::function<void(trn::ResultCode)> suspended_launch_cb;
 	
 	std::list<ProcessMonitor*> monitors;
 };

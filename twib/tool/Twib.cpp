@@ -210,11 +210,13 @@ int main(int argc, char *argv[]) {
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
 	std::string run_file;
-	bool run_applet;
-	run->add_flag("-a,--applet", run_applet, "Run as an applet");
-	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
+	bool run_applet = false;;
+	bool run_suspend = false;
 	bool run_quiet = false;
+	run->add_flag("-a,--applet", run_applet, "Run as an applet");
+	run->add_flag("-d,--debug-suspend", run_suspend, "Suspends for debug");
 	run->add_flag("-q,--quiet", run_quiet, "Suppress any output except from the program being run");
+	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
 	
 	CLI::App *reboot = app.add_subcommand("reboot", "Reboot the device");
 
@@ -344,7 +346,7 @@ int main(int argc, char *argv[]) {
 		
 		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_applet ? "applet" : "managed");
 		mon.AppendCode(*code_opt);
-		uint64_t pid = mon.Launch();
+		uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
 		if(!run_quiet) {
 			printf("PID: 0x%lx\n", pid);
 		}
@@ -404,7 +406,7 @@ int main(int argc, char *argv[]) {
 		LogMessage(Debug, "output pump threads exited");
 		try {
 			uint32_t state;
-			while((state = mon.WaitStateChange()) != 5) {
+			while((state = mon.WaitStateChange()) != 6) {
 				LogMessage(Debug, "  state %d change...", state);
 			}
 		} catch(ResultError &e) {

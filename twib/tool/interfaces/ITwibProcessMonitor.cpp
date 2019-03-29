@@ -40,6 +40,14 @@ uint64_t ITwibProcessMonitor::Launch() {
 	return pid;
 }
 
+uint64_t ITwibProcessMonitor::LaunchSuspended() {
+	uint64_t pid;
+	obj->SendSmartSyncRequest(
+		CommandID::LAUNCH_SUSPENDED,
+		out(pid));
+	return pid;
+}
+
 void ITwibProcessMonitor::AppendCode(std::vector<uint8_t> code) {
 	obj->SendSmartSyncRequest(
 		CommandID::APPEND_CODE,

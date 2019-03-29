@@ -32,7 +32,7 @@ namespace twili {
 namespace bridge {
 
 ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug, std::shared_ptr<process::MonitoredProcess> proc) : ObjectDispatcherProxy(*this, object_id), twili(twili), debug(std::move(debug)), proc(proc), dispatcher(*this) {
-	
+	proc->Continue();
 }
 
 void ITwibDebugger::QueryMemory(bridge::ResponseOpener opener, uint64_t addr) {
