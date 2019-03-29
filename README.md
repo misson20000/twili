@@ -39,6 +39,8 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
   * [twib get-memory-info](#twib-get-memory-info)
   * [twib debug](#twib-debug)
   * [twib launch](#twib-launch)
+  * [twib pull](#twib-pull)
+  * [twib push](#twib-push)
 - [Developer Details](#developer-details)
   * [Project Organization](#project-organization)
   * [Title Table](#title-table)
@@ -64,8 +66,10 @@ Version | Support
 5.0.1 - 5.1.0 | Expected working
 6.0.0 | Expected working
 6.0.1 | Tested working
-6.1.0 | Expected Working
+6.1.0 | Expected working
 6.2.0 | Tested working
+7.0.0 | Expected working
+7.0.1 | Expected working
 
 ## Limitations
 
@@ -164,6 +168,8 @@ Options:
                               Path to the twibd UNIX socket
   -p,--tcp-port UINT (Env:TWIB_TCP_FRONTEND_PORT)
                               Port for the twibd TCP socket
+  -n,--pipe-name TEXT (ENV:TWIB_NAAMED_PIPE_FRONTEND_NAME)
+                              Name for the twibd pipe
 
 Subcommands:
   list-devices                List devices
@@ -179,9 +185,11 @@ Subcommands:
   get-memory-info             Gets memory usage information from the device
   debug                       Prints debug info
   launch                      Launches an installed title
+  pull                        Pulls files from device's SD card
+  push                        Pushes files to device's SD card
 ```
 
-All `twib` commands require a device to be specified, except for `list-devices` and `connect-tcp`. If no device is explicitly specified and there is exactly one device currently connected to Twib, that device will be used. Otherwise, a device must be specified by device ID (obtained from `list-devices`) via the `-d` option or the `TWIB_DEVICE` environment variable.
+All `twib` commands require a device to be specified, except for `list-devices` and `connect-tcp`. If no device is explicitly specified and there is exactly one device currently connected to the daemon, that device will be used. Otherwise, a device must be specified by device ID (obtained from `list-devices`) via the `-d` option or the `TWIB_DEVICE` environment variable.
 
 Detailed help on all subcommands can be obtained by running `twib <subcommand> --help`.
 
@@ -210,7 +218,7 @@ Runs an executable on the target console. If the `-a` flag is not used, the exec
 
 In the future, both managed and applet processes will be able to be launched from ExeFS NSP, NSO, NRO, or ELF.
 
-Twib will stay alive until the process exits. If the application implements Twili stdio, any output from the process will come out of twib and any input given to Twib will be sent to the target process. You can use the `-q` flag to silence the PID output if you are using twib in a shell script.
+Twib will stay alive until the process exits. If the application implements Twili stdio, any output from the process will come out of twib and any input given to Twib will be sent to the target process. You can use the `-q` flag to silence the PID output if you are using twib in a shell script or pipeline.
 
 ```
 $ twib run test_helloworld.nro
@@ -306,15 +314,61 @@ Applet Category Limit: 82 MiB / 501 MiB (16%)
 
 ## twib debug
 
-Requests for Twili to print debug information to its standard output. Twib shouldn't output anything.
+Requests for Twili to print debug information to its standard output. Twib shouldn't output anything. See twibd's logs for output.
 
 ## twib launch
 
-Launches a title on the console.
+Launches a title on the console using pm:shell. Note that this is not sufficient to launch games.
 
 ```
 $ twib launch 01006A800016E000 gc
 0x81
+```
+
+
+### Understood Locations:
+- none
+- host
+- gamecard, gc
+- nand-system, system
+- nand-user, user
+- sdcard, sd
+
+## twib pull
+
+Pulls files from the device's SD card. Multiple files can be pulled if the destination is a directory.
+If the destination is `-`, file contents will be written to standard output.
+
+```
+$ twib pull /path/to/file/on/device1 /another/file/on/device2 /destination/directory/on/host/
+/path/to/file/on/device1 -> /destination/directory/on/host/device1
+/another/file/on/device2 -> /destination/directory/on/host/device2
+```
+
+**NOTE:** If you're running `twib` from a mingw environment, you will need to put two forward slashes in front of device paths to prevent them from being [converted](http://www.mingw.org/wiki/Posix_path_conversion) to Windows paths.
+
+```
+$ twib pull //path/to/file/on/device1 //another/file/on/device2 /destination/directory/on/host/
+/path/to/file/on/device1 -> /destination/directory/on/host/device1
+/another/file/on/device2 -> /destination/directory/on/host/device2
+```
+
+## twib push
+
+Pushes files to device's SD card. Multiple files can be pushed if the destination is a directory.
+
+```
+$ twib push /path/to/file/on/host1 /path/to/another/host/file /destination/directory/on/device/
+/path/to/file/on/host1 -> /destination/directory/on/device/host1
+/path/to/another/host/file -> /destination/directory/on/device/file
+```
+
+**NOTE:** If you're running `twib` from a mingw environment, you will need to put two forward slashes in front of device paths to prevent them from being [converted](http://www.mingw.org/wiki/Posix_path_conversion) to Windows paths.
+
+```
+$ twib push /path/to/file/on/host1 /path/to/another/host/file //destination/directory/on/device/
+/path/to/file/on/host1 -> /destination/directory/on/device/host1
+/path/to/another/host/file -> /destination/directory/on/device/file
 ```
 
 # Developer Details
@@ -326,9 +380,11 @@ $ twib launch 01006A800016E000 gc
 - **hbabi_shim**: Homebrew ABI shim
 - **twib**: PC-side bridge client
   - **cmake**: CMake modules
-  - **externals**: Dependency submodules
-  - **twib**: `twib` command-line tool
-  - **twibd**: `twibd` daemon
+  - **common**: Code common between tool and daemon
+  - **daemon**: `twibd` driver daemon
+  - **externals**: Dependency submodues
+  - **platform**: Platform specific code
+  - **tool**: `twib` command-line tool
 - **twili**: Main `twili` sysmodule
   - **twili/bridge**: Bridge code
     - **twili/bridge/interfaces**: Twib endpoints
