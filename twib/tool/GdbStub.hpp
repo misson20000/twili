@@ -69,6 +69,7 @@ class GdbStub {
 		uint64_t pid;
 		ITwibDebugger debugger;
 		std::map<uint64_t, Thread> threads;
+		std::vector<uint64_t> running_thread_ids;
 		std::shared_ptr<bool> has_events;
 		bool running = false;
 	};
@@ -142,6 +143,9 @@ class GdbStub {
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);
+	void QuerySetThreadEvents(util::Buffer &packet);
+
+	bool thread_events_enabled = false;
 };
 
 } // namespace gdb

@@ -45,6 +45,7 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "Offsets", &GdbStub::QueryGetOffsets, false));
 	AddGettableQuery(Query(*this, "Rcmd", &GdbStub::QueryGetRemoteCommand, false, ','));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
+	AddSettableQuery(Query(*this, "ThreadEvents", &GdbStub::QuerySetThreadEvents));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
 	AddMultiletterHandler("Cont?", &GdbStub::HandleVContQuery);
 	AddMultiletterHandler("Cont", &GdbStub::HandleVCont);
@@ -496,20 +497,21 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			Stop();
 			return;
 		}
-		std::vector<uint64_t> thread_ids;
+
+		proc.running_thread_ids.clear();
 		for(auto &t : p.second) {
 			auto t_i = proc.threads.find(t.first);
 			if(t_i == proc.threads.end()) {
 				LogMessage(Warning, "no such thread: 0x%lx", t.first);
 				continue;
 			}
-			thread_ids.push_back(t.first);
+			proc.running_thread_ids.push_back(t.first);
 		}
 		LogMessage(Debug, "continuing process");
-		for(auto &t : thread_ids) {
+		for(auto &t : proc.running_thread_ids) {
 			LogMessage(Debug, "  tid 0x%lx", t);
 		}
-		proc.debugger.ContinueDebugEvent(7, thread_ids);
+		proc.debugger.ContinueDebugEvent(7, proc.running_thread_ids);
 		proc.running = true;
 	}
 	waiting_for_stop = true;
@@ -724,42 +726,92 @@ void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 	connection.RespondOk();
 }
 
+void GdbStub::QuerySetThreadEvents(util::Buffer &packet) {
+	char c;
+	if(!packet.Read(c)) {
+		connection.RespondError(1);
+		return;
+	}
+	if(c == '0') {
+		thread_events_enabled = false;
+	} else if(c == '1') {
+		thread_events_enabled = true;
+	} else {
+		connection.RespondError(1);
+		return;
+	}
+	connection.RespondOk();
+}
+
 bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 	std::optional<nx::DebugEvent> event;
 
+	bool was_running = running;
+	
+	char style = 'T';
 	int signal = 0;
+	uint64_t thread_id = 0;
+	util::Buffer stop_info;
 	bool stopped = false;
 	
-	while(event = debugger.GetDebugEvent()) {
+	while(!stopped && (event = debugger.GetDebugEvent())) {
 		LogMessage(Debug, "got event: %d", event->event_type);
 
-		stopped = true;
+		running = false;
 		
-		if(event->thread_id) {
-			auto t_i = threads.find(event->thread_id);
-			if(t_i != threads.end()) {
-				stub.current_thread = &t_i->second;
-			}
-		}
+		thread_id = event->thread_id;
 		
 		switch(event->event_type) {
 		case nx::DebugEvent::EventType::AttachProcess: {
 			break; }
 		case nx::DebugEvent::EventType::AttachThread: {
-			uint64_t thread_id = event->attach_thread.thread_id;
+			thread_id = event->attach_thread.thread_id;
 			LogMessage(Debug, "  attaching new thread: 0x%x", thread_id);
+			running_thread_ids.push_back(thread_id); // autocontinue
 			auto r = threads.emplace(thread_id, Thread(*this, thread_id, event->attach_thread.tls_pointer));
-			stub.current_thread = &r.first->second;
+
+			stub.get_thread_info.valid = false;
+			
+			if(stub.thread_events_enabled) {
+				signal = 5;
+				stop_info.Write("create");
+				stopped = true;
+			}
 			break; }
 		case nx::DebugEvent::EventType::ExitProcess: {
 			LogMessage(Warning, "process exited");
+			style = 'W';
+			signal = 0;
+			stopped = true;
 			break; }
 		case nx::DebugEvent::EventType::ExitThread: {
 			LogMessage(Warning, "thread exited");
+
+			auto i = threads.find(thread_id);
+			if(i != threads.end()) {
+				if(stub.current_thread == &i->second) {
+					stub.current_thread = nullptr;
+				}
+				threads.erase(i);
+				running_thread_ids.erase(
+					std::remove(
+						running_thread_ids.begin(),
+						running_thread_ids.end(),
+						thread_id), running_thread_ids.end());
+				stub.get_thread_info.valid = false;
+			} else {
+				LogMessage(Warning, "  no such thread 0x%x", thread_id);
+			}
+			
+			if(stub.thread_events_enabled) {
+				style = 'w';
+				signal = 0;
+				stopped = true;
+			}
 			break; }
 		case nx::DebugEvent::EventType::Exception: {
 			LogMessage(Warning, "hit exception");
-			running = false;
+			stopped = true;
 			switch(event->exception.exception_type) {
 			case nx::DebugEvent::ExceptionType::Trap:
 				LogMessage(Warning, "trap");
@@ -808,9 +860,33 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 
 	if(stopped) {
 		util::Buffer stop_reason;
-		stop_reason.Write('T');
-		GdbConnection::Encode(signal, 1, stop_reason);
+		if(style == 'T') { // signal
+			stop_reason.Write('T');
+			GdbConnection::Encode(signal, 1, stop_reason);
+
+			if(thread_id) {
+				stop_reason.Write("thread:p");
+				GdbConnection::Encode(pid, 0, stop_reason);
+				stop_reason.Write('.');
+				GdbConnection::Encode(thread_id, 0, stop_reason);
+				stop_reason.Write(';');
+			}
+		} else if(style == 'W') { // process exit
+			stop_reason.Write('W');
+			GdbConnection::Encode(signal, 1, stop_reason);
+		} else if(style == 'w') { // thread exit
+			stop_reason.Write('w');
+			GdbConnection::Encode(signal, 1, stop_reason);
+			stop_reason.Write(";p");
+			GdbConnection::Encode(pid, 0, stop_reason);
+			stop_reason.Write('.');
+			GdbConnection::Encode(thread_id, 0, stop_reason);
+		} else {
+			LogMessage(Warning, "invalid stop reason style: '%c'", style);
+			stop_reason.Write("T05");
+		}
 		stub.stop_reason = stop_reason.GetString();
+		LogMessage(Debug, "set stop reason: \"%s\"", stub.stop_reason.c_str());
 	}
 
 	if(!stub.has_async_wait) {
@@ -829,6 +905,12 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 		stub.has_async_wait = true;
 	}
 
+	if(was_running && !running && !stopped) { // if we're not running but we should be...
+		LogMessage(Debug, "got debug events but didn't stop, so continuing...");
+		debugger.ContinueDebugEvent(7, running_thread_ids);
+		running = true;
+	}
+	
 	return stopped;
 }
 
