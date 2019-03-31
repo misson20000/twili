@@ -640,10 +640,26 @@ void GdbStub::QueryGetThreadExtraInfo(util::Buffer &packet) {
 		uint64_t name_addr = *(uint64_t*) name_ptr_u8.data();
 	
 		if(name_addr != 0) {
-			std::vector<uint8_t> name = p.debugger.ReadMemory(name_addr, 0x20);
+			std::vector<uint8_t> name = p.debugger.ReadMemory(name_addr, 0x40);
+			for(size_t i = 0; i < name.size(); i++) {
+				if(name[i] == 0) {
+					break;
+				}
+				extra_info.push_back(name[i]);
+				if(i == name.size()-1) {
+					name_addr+= name.size();
+					name = p.debugger.ReadMemory(name_addr, 0x40);
+					i = 0;
+				}
+			}
 			extra_info = (char*) name.data();
 		}
 	} catch(ResultError &e) {
+		LogMessage(Warning, "caught 0x%x reading thread name", e.code);
+	}
+
+	if(extra_info.empty()) {
+		extra_info = "?";
 	}
 	
 	util::Buffer response;
