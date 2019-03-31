@@ -283,19 +283,31 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 	int64_t pid, thread_id;
 	ReadThreadId(packet, pid, thread_id);
 
-	auto i = attached_processes.find(pid);
-	if(i == attached_processes.end()) {
-		LogMessage(Debug, "no such process with pid 0x%x", pid);
-		connection.RespondError(1);
-		return;
+	Process *proc = nullptr;
+	if(pid == 0) {
+		if(attached_processes.begin() != attached_processes.end()) {
+			proc = &attached_processes.begin()->second;
+		} else {
+			LogMessage(Error, "no attached processes");
+			connection.RespondError(1);
+			return;
+		}
+	} else {
+		auto i = attached_processes.find(pid);
+		if(i == attached_processes.end()) {
+			LogMessage(Error, "no such process with pid 0x%x", pid);
+			connection.RespondError(1);
+			return;
+		}
+		proc = &i->second;
 	}
 
 	if(thread_id == 0) {
 		// pick the first thread
-		current_thread = &i->second.threads.begin()->second;
+		current_thread = &proc->threads.begin()->second;
 	} else {
-		auto j = i->second.threads.find(thread_id);
-		if(j == i->second.threads.end()) {
+		auto j = proc->threads.find(thread_id);
+		if(j == proc->threads.end()) {
 			LogMessage(Debug, "no such thread with tid 0x%x", thread_id);
 			connection.RespondError(1);
 			return;
@@ -304,7 +316,7 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		current_thread = &j->second;
 	}
 	
-	LogMessage(Debug, "selected thread for '%c': pid 0x%lx tid 0x%lx", op, pid, current_thread->thread_id);
+	LogMessage(Debug, "selected thread for '%c': pid 0x%lx tid 0x%lx", op, proc->pid, current_thread->thread_id);
 	connection.RespondOk();
 }
 
