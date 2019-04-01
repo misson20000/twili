@@ -288,7 +288,7 @@ void GdbStub::HandleSetCurrentThread(util::Buffer &packet) {
 		if(attached_processes.begin() != attached_processes.end()) {
 			proc = &attached_processes.begin()->second;
 		} else {
-			LogMessage(Error, "no attached processes");
+			LogMessage(Debug, "no attached processes");
 			connection.RespondError(1);
 			return;
 		}
