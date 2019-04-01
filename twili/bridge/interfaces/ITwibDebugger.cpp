@@ -145,6 +145,31 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 
 	if(proc) {
 		addr = proc->GetTargetEntry();
+	} else {
+		std::vector<uint64_t> candidates;
+		memory_info_t mi;
+		do {
+			mi = std::get<0>(
+				ResultCode::AssertOk(
+					trn::svc::QueryDebugProcessMemory(debug, addr)));
+
+			if(mi.memory_type == 3 && mi.permission == 5) { // CODE_STATIC RX
+				printf("found module base at 0x%lx\n", addr);
+				candidates.push_back((uint64_t) mi.base_addr);
+			}
+			addr = (uint64_t) mi.base_addr + mi.size;
+		} while(addr > (uint64_t) mi.base_addr);
+
+		if(candidates.size() == 0) {
+			printf("no modules found\n");
+			addr = 0;
+		} else if(candidates.size() == 1) { // only main
+			printf("only found one module, assuming main\n");
+			addr = candidates[0];
+		} else { // rtld, main, subsdk[0-9], sdk
+			printf("found %d modules, skipping first (rtld) module and picking second (main)\n", candidates.size());
+			addr = candidates[1]; // main
+		}
 	}
 	
 	opener.RespondOk(std::move(addr));
