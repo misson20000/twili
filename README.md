@@ -22,6 +22,7 @@ The debug bridge aspect aims to provide similar utilities to [ADB](https://devel
     + [Other Linux Distrubutions](#other-linux-distrubutions)
   * [OSX](#osx)
   * [Windows](#windows)
+- [Configuration](#configuration)
 - [Building From Source](#building-from-source)
   * [Twili](#twili-1)
   * [Twib](#twib)
@@ -122,7 +123,7 @@ $ make
 $ sudo make install
 ```
 
-### Using The GDB Stub
+### Using the GDB Stub
 
 Use the gdb stub with `target extended-remote | twib gdb`.
 
@@ -207,6 +208,104 @@ OSX users can download `twib_osx64` and `twibd_osx64` from the [latest release](
 ## Windows
 
 Windows support is experimental and is being improved. Windows users may download `twib_win64.exe` and `twibd_win64.exe` from the [latest release](https://github.com/misson20000/twili/releases/latest). Boot your switch with Twili installed, then install the libusbK-based [driver package](https://github.com/misson20000/twili/tree/master/contrib/windows/driver). Run `twibd_win64.exe`, and leave it running in the background. `twib_win64.exe` should be run from the command prompt.
+
+# Configuration
+
+The Twili sysmodule has a number of different configuration options which can be changed by modifying `sdmc:/twili.ini`. If the file does not exist, it will be generated from the current defaults.
+The default configuration is as follows.
+
+```
+; Twili Configuration File
+[twili]
+service_name = twili
+; paths are relative to root of sd card
+hbmenu_path = /hbmenu.nro
+temp_directory = /.twili_temp
+
+[pipes]
+pipe_buffer_size_limit = 0x80000
+
+[logging]
+verbosity = 0
+enable_usb = true
+
+[usb_bridge]
+enabled = true
+
+[tcp_bridge]
+enabled = true
+port = 15152
+```
+
+## `[twili]`
+
+### `service_name`
+
+Default: `twili`
+
+Controls the name that is used to register the twili service with `sm`.
+Changing this will break a lot of things if you're not careful, but may be useful for development.
+
+### `hbmenu_path`
+
+Default: `/hbmenu.nro`
+
+Contains a path relative to the root of the SD card that should be used to access the homebrew menu NRO.
+
+### `temp_directory`
+
+Default: `/.twili_temp`
+
+Contains a path relative to the root of the SD card that should be used as a temporary directory. This directory will be created if it does not exist, and all files inside it will be deleted on every boot. It is used for storing files sent over `twib run`.
+
+## `[pipes]`
+
+### `pipe_buffer_size_limit`
+
+Default: `0x80000`
+
+Twib pipes (used for standard i/o in `twib run`) will buffer up to a maximum of this amount of data. If more data is written, the write will block until the other end reads out data instead of completing instantly.
+
+This buffering behavior greatly speeds up small writes, since otherwise each write would involve round trip USB transactions. However, it loses the assurance that a write will not return until the data has been delivered to the other end. If this is important, the `pipe_buffer_size_limit` can be set to zero (`0`) to disable buffering and block writes until the data is delivered to the other end and another write is ready.
+
+## `[logging]`
+
+### `verbosity`
+
+Default: 0
+
+Controls verbosity threshold for various log messages for debugging. Higher is more verbose.
+
+- **0:** Default
+- **1:** `USBBridge::RequestReader` shows message headers
+
+### `enable_usb`
+
+Default: `true`
+
+Controls whether the USB serial port endpoints are exposed or not.
+
+## `[usb_bridge]`
+
+### `enabled`
+
+Default: `true`
+
+Controls whether the USB bridge is enabled or not. This can be turned off if it's conflicting with something else that needs USB, or if Nintendo changes the `usb:ds` interface again.
+
+## `[tcp_bridge]`
+
+### `enabled`
+
+Default: `true`
+
+Controls whether the TCP bridge is enabled or not. This can be turned off if you don't want Twili to constantly try to bring up a network connection, or if you're concerned about security.
+
+### `port`
+
+Default: `15152`
+
+Controls which port the TCP bridge listens on.
 
 # Building From Source
 
