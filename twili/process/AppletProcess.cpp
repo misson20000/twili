@@ -98,6 +98,14 @@ void AppletProcess::Kill() {
 		return;
 	}
 
+	if(GetState() == State::Started) {
+		// we're already been added to AppletTracker queue...
+		// just set this flag so AppletTracker can skip over us
+		// when we reach the front of the queue.
+		exit_pending = true;
+		return;
+	}
+	
 	if(GetState() == State::Exited) {
 		return; // nothing to do here
 	}
@@ -129,7 +137,12 @@ void AppletProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries)
 		});
 }
 
-void AppletProcess::PrepareForLaunch() {
+bool AppletProcess::PrepareForLaunch() {
+	if(exit_pending) {
+		ChangeState(State::Exited);
+		return false;
+	}
+	
 	if(files.size() > 1) {
 		throw ResultError(TWILI_ERR_TOO_MANY_MODULES);
 	} else if(files.empty()) {
@@ -148,6 +161,8 @@ void AppletProcess::PrepareForLaunch() {
 	
 	ResultCode::AssertOk(
 		twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
+
+	return true;
 }
 
 trn::KEvent &AppletProcess::GetCommandEvent() {

@@ -46,7 +46,8 @@ class AppletProcess : public MonitoredProcess {
 	virtual void Kill() override;
 	
 	// sets up ExternalContentSource for loader
-	void PrepareForLaunch();
+	// returns false if this process should be skipped in queue
+	bool PrepareForLaunch();
 
 	// used to communicate with host shim
 	trn::KEvent &GetCommandEvent();
@@ -63,6 +64,7 @@ class AppletProcess : public MonitoredProcess {
 	trn::KWEvent command_wevent;
 	std::deque<uint32_t> commands;
 	bool ecs_pending = false;
+	bool exit_pending = false;
 };
 
 } // namespace process

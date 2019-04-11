@@ -79,21 +79,29 @@ bool AppletTracker::ReadyToLaunch() {
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
-	if(queued.size() > 0) {
+	while(queued.size() > 0) {
 		std::shared_ptr<process::AppletProcess> proc = queued.front();
 		created.push_back(proc);
 		queued.pop_front();
 
-		proc->PrepareForLaunch();
-		return proc;
-	} else {
-		// launch hbmenu if there's nothing else to launch
-		printf("launching hbmenu\n");
-		hbmenu = CreateHbmenu();
-		created.push_back(hbmenu);
-		hbmenu->PrepareForLaunch();
-		return hbmenu;
+		// returns true if process wasn't cancelled,
+		// but if it returns false, attempt to dequeue
+		// another process
+		if(proc->PrepareForLaunch()) {
+			return proc;
+		}
 	}
+	
+	// launch hbmenu if there's nothing else to launch
+	printf("launching hbmenu\n");
+	hbmenu = CreateHbmenu();
+	created.push_back(hbmenu);
+	if(!hbmenu->PrepareForLaunch()) {
+		// hbmenu shouldn't be able to be cancelled yet...
+		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
+	}
+	
+	return hbmenu;
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KProcess &&process) {
