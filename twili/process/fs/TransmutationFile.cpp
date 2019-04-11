@@ -47,7 +47,15 @@ size_t TransmutationFile::Read(size_t offset, size_t size, uint8_t *out) {
 			if(seg_size > size) {
 				seg_size = size;
 			}
-			(*i)->Read(seg_off, seg_size, out);
+			size_t actual_read = (*i)->Read(seg_off, seg_size, out);
+			if(actual_read < seg_size) {
+				// if we get a short read, give up
+				printf(
+					"TransmutationFile: short read [(0x%lx, 0x%lx) -> (0x%lx, 0x%lx)]\n",
+					offset, seg_size,
+					seg_off, actual_read);
+				return total_read + actual_read;
+			}
 			offset+= seg_size;
 			out+= seg_size;
 			total_read+= seg_size;
@@ -70,8 +78,8 @@ TransmutationFile::BackedSegment::BackedSegment(std::shared_ptr<ProcessFile> fil
 	file(file), file_offset(file_offset), size(size) {
 }
 
-void TransmutationFile::BackedSegment::Read(size_t offset, size_t size, uint8_t *out) {
-	file->Read(file_offset + offset, size, out);
+size_t TransmutationFile::BackedSegment::Read(size_t offset, size_t size, uint8_t *out) {
+	return file->Read(file_offset + offset, size, out);
 }
 
 size_t TransmutationFile::BackedSegment::Size() {
@@ -81,8 +89,9 @@ size_t TransmutationFile::BackedSegment::Size() {
 TransmutationFile::MemorySegment::MemorySegment(uint8_t *buffer, size_t size) : buffer(buffer), size(size) {
 }
 
-void TransmutationFile::MemorySegment::Read(size_t offset, size_t size, uint8_t *out) {
+size_t TransmutationFile::MemorySegment::Read(size_t offset, size_t size, uint8_t *out) {
 	std::copy_n(buffer + offset, size, out);
+	return size;
 }
 
 size_t TransmutationFile::MemorySegment::Size() {
