@@ -581,9 +581,18 @@ void USBBackend::AddDevice(libusb_device *device) {
 	libusb_device_handle *handle;
 	r = libusb_open(device, &handle);
 	if(r != 0) {
-		LogMessage(Warning, "failed to open device: %s", libusb_error_name(r));
-		libusb_free_config_descriptor(config);
-		return;
+		if(r == LIBUSB_ERROR_ACCESS) {
+			LogMessage(Warning, "ERROR_ACCESS, delaying for 500ms...");
+			usleep(500000); // 500ms
+			r = libusb_open(device, &handle);
+		}
+		if(r != 0) {
+			LogMessage(Warning, "failed to open device: %s", libusb_error_name(r));
+			libusb_free_config_descriptor(config);
+			return;
+		} else {
+			LogMessage(Warning, "  => OK");
+		}
 	}
 	libusb_set_auto_detach_kernel_driver(handle, true);
 	r = libusb_claim_interface(handle, twili_interface->bInterfaceNumber);
@@ -631,8 +640,17 @@ void USBBackend::ProbeStdioInterface(libusb_device *device, const libusb_interfa
 	libusb_device_handle *handle;
 	int r = libusb_open(device, &handle);
 	if(r != 0) {
-		LogMessage(Warning, "failed to open device: %s", libusb_error_name(r));
-		return;
+		if(r == LIBUSB_ERROR_ACCESS) {
+			LogMessage(Warning, "ERROR_ACCESS, delaying for 500ms...");
+			usleep(500000); // 500ms
+			r = libusb_open(device, &handle);
+		}
+		if(r != 0) {
+			LogMessage(Warning, "failed to open device: %s", libusb_error_name(r));
+			return;
+		} else {
+			LogMessage(Warning, "  => OK");
+		}
 	}
 	libusb_set_auto_detach_kernel_driver(handle, true);
 
