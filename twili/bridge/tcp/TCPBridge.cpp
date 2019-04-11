@@ -209,7 +209,7 @@ void TCPBridge::ResetSockets() {
 	if(server_socket.fd == -1) {
 		printf("failed to create socket\n");
 		trn_mutex_unlock(&network_state_mutex);
-		throw std::system_error(bsd_errno, std::generic_category());
+		return;
 	}
 				
 	struct sockaddr_in addr;
@@ -220,19 +220,19 @@ void TCPBridge::ResetSockets() {
 				
 	if(bsd_bind(server_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
 		printf("failed to bind socket\n");
-		throw std::system_error(bsd_errno, std::generic_category());
+		return;
 	}
 				
 	if(bsd_listen(server_socket.fd, 20) < 0) {
 		printf("failed to listen on socket\n");
-		throw std::system_error(bsd_errno, std::generic_category());
+		return;
 	}
 
 	// recreate announce socket
 	announce_socket = {bsd_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)};
 	if(announce_socket.fd == -1) {
 		printf("failed to create announce socket\n");
-		throw std::system_error(bsd_errno, std::generic_category());
+		return;
 	}
 
 	memset(&addr, 0, sizeof(addr));
@@ -241,7 +241,7 @@ void TCPBridge::ResetSockets() {
 	addr.sin_addr = {INADDR_ANY};
 	if(bsd_bind(announce_socket.fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
 		printf("failed to bind announce socket\n");
-		throw std::system_error(bsd_errno, std::generic_category());
+		return;
 	}
 
 	uint8_t group_addr[] = {224, 0, 53, 55};
