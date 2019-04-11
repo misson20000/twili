@@ -82,13 +82,14 @@ void Daemon::AddDevice(std::shared_ptr<Device> device) {
 	LogMessage(Info, "adding device with id %08x", device->device_id);
 	std::weak_ptr<Device> &entry = devices[device->device_id];
 	std::shared_ptr<Device> entry_lock = entry.lock();
+	
 	if(!entry_lock || entry_lock->GetPriority() <= device->GetPriority()) { // don't let tcp devices clobber usb devices
 		entry = device;
-	}
 	
-	LogMessage(Debug, "resetting objects on new device");
-	local_client->SendRequest(
-		Request(nullptr, device->device_id, 0, 0xffffffff, 0)); // we don't care about the response
+		LogMessage(Debug, "resetting objects on new device");
+		local_client->SendRequest(
+			Request(nullptr, device->device_id, 0, 0xffffffff, 0)); // we don't care about the response
+	}
 }
 
 void Daemon::AddClient(std::shared_ptr<Client> client) {
