@@ -103,6 +103,7 @@ class ITwibDebugger {
 		WAIT_EVENT = 20,
 		GET_TARGET_ENTRY = 21,
 		LAUNCH_DEBUG_PROCESS = 22,
+		GET_NRO_INFOS = 24,
 	};
 };
 

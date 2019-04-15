@@ -33,6 +33,7 @@
 
 #include "ipcbind/pm/IShellService.hpp"
 #include "ipcbind/ldr/IDebugMonitorInterface.hpp"
+#include "ipcbind/ro/IDebugMonitorInterface.hpp"
 #include "ipcbind/nifm/IGeneralService.hpp"
 
 #include "FileManager.hpp"
@@ -93,6 +94,7 @@ class Twili {
 		trn::ipc::client::Object pm_dmnt;
 		service::pm::IShellService pm_shell;
 		service::ldr::IDebugMonitorInterface ldr_dmnt;
+		service::ro::IDebugMonitorInterface ro_dmnt;
 		trn::ipc::client::Object ldr_shel;
 		service::nifm::IGeneralService nifm;
 		trn::ipc::client::Object sm_m;

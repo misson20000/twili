@@ -48,6 +48,8 @@ class ITwibDebugger {
 	void AsyncWait(std::function<void(uint32_t)> &&cb);
 	uint64_t GetTargetEntry();
 	void LaunchDebugProcess();
+	std::vector<nx::LoadedModuleInfo> GetNsoInfos();
+	std::vector<nx::LoadedModuleInfo> GetNroInfos();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };

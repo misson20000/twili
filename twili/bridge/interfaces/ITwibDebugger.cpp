@@ -191,5 +191,19 @@ void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
 	opener.RespondOk();
 }
 
+void ITwibDebugger::GetNroInfos(bridge::ResponseOpener opener) {
+	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
+
+	std::vector<service::ro::NroInfo> nro_info;
+
+	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
+		ResultCode::AssertOk(
+			twili.services.ro_dmnt.GetNroInfos(pid));
+	}
+	// TODO: ask SciresM to backport ro:dmnt?
+
+	opener.RespondOk(std::move(nro_info));
+}
+
 } // namespace bridge
 } // namespace twili

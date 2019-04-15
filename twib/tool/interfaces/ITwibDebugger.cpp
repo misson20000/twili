@@ -128,6 +128,22 @@ void ITwibDebugger::LaunchDebugProcess() {
 		CommandID::LAUNCH_DEBUG_PROCESS);
 }
 
+std::vector<nx::LoadedModuleInfo> ITwibDebugger::GetNsoInfos() {
+	std::vector<nx::LoadedModuleInfo> infos;
+	obj->SendSmartSyncRequest(
+		CommandID::GET_NSO_INFOS,
+		out(infos));
+	return infos;
+}
+
+std::vector<nx::LoadedModuleInfo> ITwibDebugger::GetNroInfos() {
+	std::vector<nx::LoadedModuleInfo> infos;
+	obj->SendSmartSyncRequest(
+		CommandID::GET_NRO_INFOS,
+		out(infos));
+	return infos;
+}
+
 } // namespace tool
 } // namespace twib
 } // namespace twili

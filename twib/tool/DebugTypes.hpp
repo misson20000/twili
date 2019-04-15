@@ -115,6 +115,12 @@ struct ThreadContext {
 	};
 };
 
+struct LoadedModuleInfo {
+	uint64_t base_addr;
+	uint64_t size;
+	uint8_t build_id[0x20];
+};
+
 } // namespace nx
 } // namespace tiwb
 } // namespace twili

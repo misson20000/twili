@@ -237,6 +237,12 @@ Twili::Services::Services() {
 		ResultCode::AssertOk(
 			sm.GetService("ldr:dmnt")));
 
+	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
+		ro_dmnt = twili::service::ro::IDebugMonitorInterface(
+			ResultCode::AssertOk(
+				sm.GetService("ro:dmnt")));
+	}
+	
 	printf("acquiring ldr:shel\n");
 	ldr_shel = ResultCode::AssertOk(sm.GetService("ldr:shel"));
 	

@@ -36,7 +36,8 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 		platform::File(STDIN_FILENO, false),
 		platform::File(STDOUT_FILENO, false)),
 	logic(*this),
-	loop(logic) {
+	loop(logic),
+	xfer_libraries(*this, &GdbStub::XferReadLibraries) {
 	AddGettableQuery(Query(*this, "Supported", &GdbStub::QueryGetSupported, false));
 	AddGettableQuery(Query(*this, "C", &GdbStub::QueryGetCurrentThread, false));
 	AddGettableQuery(Query(*this, "fThreadInfo", &GdbStub::QueryGetFThreadInfo, false));
@@ -44,11 +45,13 @@ GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
 	AddGettableQuery(Query(*this, "ThreadExtraInfo", &GdbStub::QueryGetThreadExtraInfo, false, ','));
 	AddGettableQuery(Query(*this, "Offsets", &GdbStub::QueryGetOffsets, false));
 	AddGettableQuery(Query(*this, "Rcmd", &GdbStub::QueryGetRemoteCommand, false, ','));
+	AddGettableQuery(Query(*this, "Xfer", &GdbStub::QueryXfer, false));
 	AddSettableQuery(Query(*this, "StartNoAckMode", &GdbStub::QuerySetStartNoAckMode));
 	AddSettableQuery(Query(*this, "ThreadEvents", &GdbStub::QuerySetThreadEvents));
 	AddMultiletterHandler("Attach", &GdbStub::HandleVAttach);
 	AddMultiletterHandler("Cont?", &GdbStub::HandleVContQuery);
 	AddMultiletterHandler("Cont", &GdbStub::HandleVCont);
+	AddXferObject("libraries", xfer_libraries);
 }
 
 GdbStub::~GdbStub() {
@@ -93,6 +96,16 @@ void GdbStub::AddSettableQuery(Query query) {
 
 void GdbStub::AddMultiletterHandler(std::string name, void (GdbStub::*handler)(util::Buffer&)) {
 	multiletter_handlers.emplace(name, handler);
+}
+
+void GdbStub::AddXferObject(std::string name, XferObject &object) {
+	xfer_objects.emplace(name, object);
+	if(object.AdvertiseRead()) {
+		features.push_back(std::string("qXfer:") + name + ":read+");
+	}
+	if(object.AdvertiseWrite()) {
+		features.push_back(std::string("qXfer:") + name + ":write+");
+	}
 }
 
 void GdbStub::Stop() {
@@ -737,6 +750,50 @@ void GdbStub::QueryGetRemoteCommand(util::Buffer &packet) {
 	connection.Respond(response_buffer);
 }
 
+void GdbStub::QueryXfer(util::Buffer &packet) {
+	std::string object_name;
+	std::string op;
+	
+	char ch;
+	while(packet.Read(ch) && ch != ':') {
+		object_name.push_back(ch);
+	}
+
+	auto i = xfer_objects.find(object_name);
+	if(i == xfer_objects.end()) {
+		connection.RespondEmpty();
+		return;
+	}
+
+	while(packet.Read(ch) && ch != ':') {
+		op.push_back(ch);
+	}
+
+	if(op == "read") {
+		std::string annex;
+		uint64_t offset;
+		uint64_t length;
+		while(packet.Read(ch) && ch != ':') {
+			annex.push_back(ch);
+		}
+		GdbConnection::DecodeWithSeparator(offset, ',', packet);
+		GdbConnection::Decode(length, packet);
+
+		i->second.Read(annex, offset, length);
+	} else if(op == "write") {
+		std::string annex;
+		uint64_t offset;
+		while(packet.Read(ch) && ch != ':') {
+			annex.push_back(ch);
+		}
+		GdbConnection::DecodeWithSeparator(offset, ':', packet);
+
+		i->second.Write(annex, offset, packet);
+	} else {
+		connection.RespondEmpty();
+	}
+}
+
 void GdbStub::QuerySetStartNoAckMode(util::Buffer &packet) {
 	connection.StartNoAckMode();
 	connection.RespondOk();
@@ -930,6 +987,49 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 	return stopped;
 }
 
+std::string GdbStub::Process::BuildLibraryList() {
+	std::stringstream ss;
+	ss << "<library-list>" << std::endl;
+	util::Buffer build_id_buffer;
+	std::vector<nx::LoadedModuleInfo> nsos = debugger.GetNsoInfos();
+	for(size_t i = 0; i < nsos.size(); i++) {
+		// skip main
+		if(nsos.size() == 1) { continue; } // standalone main
+		if(nsos.size() >= 2 && i == 1) { continue; } // rtld, main, subsdks, etc.
+
+		nx::LoadedModuleInfo &info = nsos[i];
+		
+		build_id_buffer.Clear();
+		GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
+		std::string build_id = build_id_buffer.GetString();
+
+		ss << "  <library";
+		ss << " name=\"" << build_id << "\"";
+		ss << " build_id=\"" << build_id << "\"";
+		ss << " type=\"nso\"";
+		ss << ">" << std::endl;
+		ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
+		ss << "  </library>" << std::endl;
+	}
+	/*
+	for(nx::LoadedModuleInfo &info : debugger.GetNroInfos()) {
+		build_id_buffer.Clear();
+		GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
+		std::string build_id = build_id_buffer.GetString();
+
+		ss << "  <library";
+		ss << " name=\"" << build_id << "\"";
+		ss << " build_id=\"" << build_id << "\"";
+		ss << " type=\"nro\"";
+		ss << ">" << std::endl;
+		ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
+		ss << "  </library>" << std::endl;
+		}*/
+	ss << "</library-list>" << std::endl;
+
+	return ss.str();
+}
+
 GdbStub::Thread::Thread(Process &process, uint64_t thread_id, uint64_t tls_addr) : process(process), thread_id(thread_id), tls_addr(tls_addr) {
 }
 
@@ -1020,6 +1120,52 @@ void GdbStub::Logic::Prepare(platform::EventLoop &loop) {
 	}
 	
 	loop.AddMember(stub.connection.in_member);
+}
+
+bool GdbStub::XferObject::AdvertiseRead() {
+	return false;
+}
+
+bool GdbStub::XferObject::AdvertiseWrite() {
+	return false;
+}
+
+GdbStub::ReadOnlyStringXferObject::ReadOnlyStringXferObject(GdbStub &stub, std::string (GdbStub::*generator)()) : stub(stub), generator(generator) {
+}
+
+void GdbStub::ReadOnlyStringXferObject::Read(std::string annex, size_t offset, size_t length) {
+	if(!annex.empty()) {
+		stub.connection.RespondError(0);
+		return;
+	}
+
+	std::string string = std::invoke(generator, stub);
+	
+	util::Buffer response;
+	if(offset + length >= string.size()) {
+		response.Write('l');
+	} else {
+		response.Write('m');
+	}
+
+	response.Write((uint8_t*) string.data() + offset, std::min(string.size() - offset, length));
+	stub.connection.Respond(response);
+}
+
+void GdbStub::ReadOnlyStringXferObject::Write(std::string annex, size_t offst, util::Buffer &data) {
+	stub.connection.RespondError(30); // EROFS
+}
+
+bool GdbStub::ReadOnlyStringXferObject::AdvertiseRead() {
+	return true;
+}
+
+std::string GdbStub::XferReadLibraries() {
+	if(current_thread == nullptr) {
+		return "<library-list></library-list>";
+	} else {
+		return current_thread->process.BuildLibraryList();
+	}
 }
 
 } // namespace gdb

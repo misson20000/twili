@@ -50,6 +50,25 @@ class GdbStub {
 		const char separator;
 	};
 
+	class XferObject {
+	 public:
+		virtual void Read(std::string annex, size_t offset, size_t length) = 0;
+		virtual void Write(std::string annex, size_t offset, util::Buffer &data) = 0;
+		virtual bool AdvertiseRead();
+		virtual bool AdvertiseWrite();
+	};
+
+	class ReadOnlyStringXferObject : public XferObject {
+	 public:
+		ReadOnlyStringXferObject(GdbStub &stub, std::string (GdbStub::*generator)());
+		virtual void Read(std::string annex, size_t offset, size_t length) override;
+		virtual void Write(std::string annex, size_t offset, util::Buffer &data) override;
+		virtual bool AdvertiseRead() override;
+	 private:
+		GdbStub &stub;
+		std::string (GdbStub::*const generator)();
+	};
+
 	class Process;
 	
 	class Thread {
@@ -66,6 +85,7 @@ class GdbStub {
 	 public:
 		Process(uint64_t pid, ITwibDebugger debugger);
 		bool IngestEvents(GdbStub &stub); // returns whether process is stopped
+		std::string BuildLibraryList();
 		uint64_t pid;
 		ITwibDebugger debugger;
 		std::map<uint64_t, Thread> threads;
@@ -81,6 +101,7 @@ class GdbStub {
 	void AddGettableQuery(Query query);
 	void AddSettableQuery(Query query);
 	void AddMultiletterHandler(std::string name, void (GdbStub::*handler)(util::Buffer&));
+	void AddXferObject(std::string name, XferObject &ob);
 	
 	std::string stop_reason = "W00";
 	bool waiting_for_stop = false;
@@ -104,6 +125,7 @@ class GdbStub {
 	std::unordered_map<std::string, Query> gettable_queries;
 	std::unordered_map<std::string, Query> settable_queries;
 	std::unordered_map<std::string, void (GdbStub::*)(util::Buffer&)> multiletter_handlers;
+	std::unordered_map<std::string, XferObject&> xfer_objects;
 
 	struct {
 		bool valid = false;
@@ -140,11 +162,16 @@ class GdbStub {
 	void QueryGetThreadExtraInfo(util::Buffer &packet);
 	void QueryGetOffsets(util::Buffer &packet);
 	void QueryGetRemoteCommand(util::Buffer &packet);
+	void QueryXfer(util::Buffer &packet);
 	
 	// set queries
 	void QuerySetStartNoAckMode(util::Buffer &packet);
 	void QuerySetThreadEvents(util::Buffer &packet);
 
+	// xfer objects
+	std::string XferReadLibraries();
+	ReadOnlyStringXferObject xfer_libraries;
+	
 	bool thread_events_enabled = false;
 };
 
