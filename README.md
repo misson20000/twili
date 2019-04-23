@@ -71,7 +71,8 @@ Version | Support
 6.1.0 | Tested working
 6.2.0 | Tested working
 7.0.0 | Expected working
-7.0.1 | Expected working
+7.0.1 | Tested working
+8.0.0 | Tested working
 
 ## Limitations
 
