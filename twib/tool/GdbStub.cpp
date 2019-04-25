@@ -341,6 +341,7 @@ void GdbStub::HandleReadMemory(util::Buffer &packet) {
 	if(!current_thread) {
 		LogMessage(Warning, "attempted to read without selected thread");
 		connection.RespondError(1);
+		return;
 	}
 
 	LogMessage(Debug, "reading 0x%lx bytes from 0x%lx", size, address);
@@ -363,6 +364,7 @@ void GdbStub::HandleWriteMemory(util::Buffer &packet) {
 	if(!current_thread) {
 		LogMessage(Warning, "attempted to write without selected thread");
 		connection.RespondError(1);
+		return;
 	}
 
 	LogMessage(Debug, "writing 0x%lx bytes to 0x%lx", size, address);
