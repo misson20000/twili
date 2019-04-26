@@ -320,10 +320,10 @@ First, you will need to install libtransistor. Download the [latest release](htt
 
 You will need libusb development headers installed. On Debian-based distros, these are usually in the `libusb-1.0.0-dev` package.
 
-Clone this repo.
+Clone this repo and clone its submodules.
 
 ```
-$ git clone git@github.com:misson20000/twili.git
+$ git clone --recurse-modules git@github.com:misson20000/twili.git
 ```
 
 Change into the `twib/` subdirectory, and make a `build/` directory.
