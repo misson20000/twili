@@ -3,3 +3,4 @@ build/
 /.vs
 /twib/.vs
 /twib/CMakeSettings.json
+.vscode
