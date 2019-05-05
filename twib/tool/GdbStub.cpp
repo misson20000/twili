@@ -402,6 +402,12 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 		return;
 	}
 
+	if(!multi_process && attached_processes.size() > 0) {
+		LogMessage(Error, "Already debugging a process! Make sure multiprocessing is enabled!");
+		connection.RespondError(1);
+		return;
+	}
+
 	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
 	
 	r.first->second.IngestEvents(*this);
@@ -565,6 +571,10 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 		} else {
 			is_first = false;
 		}
+
+		if (feature == "multiprocess+") {
+			multi_process = true;
+		}
 		
 		response.Write(feature);
 	}
@@ -574,9 +584,11 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 
 void GdbStub::QueryGetCurrentThread(util::Buffer &packet) {
 	util::Buffer response;
-	response.Write('p');
-	GdbConnection::Encode(current_thread ? current_thread->process.pid : 0, 0, response);
-	response.Write('.');
+	if (multi_process) {
+		response.Write('p');
+		GdbConnection::Encode(current_thread ? current_thread->process.pid : 0, 0, response);
+		response.Write('.');
+	}
 	GdbConnection::Encode(current_thread ? current_thread->thread_id : 0, 0, response);
 	connection.Respond(response);
 }
@@ -610,9 +622,11 @@ void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 			} else {
 				response.Write('m');
 			}
-			response.Write('p');
-			GdbConnection::Encode(thread.process.pid, 0, response);
-			response.Write('.');
+			if (multi_process) {
+				response.Write('p');
+				GdbConnection::Encode(thread.process.pid, 0, response);
+				response.Write('.');
+			}
 			GdbConnection::Encode(thread.thread_id, 0, response);
 			has_written = true;
 		}

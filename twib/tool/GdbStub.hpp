@@ -106,6 +106,7 @@ class GdbStub {
 	std::string stop_reason = "W00";
 	bool waiting_for_stop = false;
 	bool has_async_wait = false;
+	bool multi_process = false;
 
 	void Stop();
 	
