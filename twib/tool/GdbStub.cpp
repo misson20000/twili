@@ -561,8 +561,14 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 			feature.push_back(ch);
 		}
 
+		if(feature == "multiprocess+") {
+			multiprocess_enabled = true;
+		}
+		
 		LogMessage(Debug, "gdb advertises feature: '%s'", feature.c_str());
 	}
+
+	LogMessage(Debug, "gdb multiprocess: %s", multiprocess_enabled ? "true" : "false");
 
 	bool is_first = true;
 	for(std::string &feature : features) {
@@ -570,10 +576,6 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 			response.Write(';');
 		} else {
 			is_first = false;
-		}
-
-		if(feature == "multiprocess+") {
-			multiprocess_enabled = true;
 		}
 		
 		response.Write(feature);
