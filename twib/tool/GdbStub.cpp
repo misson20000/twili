@@ -402,8 +402,8 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 		return;
 	}
 
-	if(!multi_process && attached_processes.size() > 0) {
-		LogMessage(Error, "Already debugging a process! Make sure multiprocessing is enabled!");
+	if(!multiprocess_enabled && attached_processes.size() > 0) {
+		LogMessage(Error, "Already debugging a process! Make sure multiprocess extensions are enabled!");
 		connection.RespondError(1);
 		return;
 	}
@@ -572,8 +572,8 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 			is_first = false;
 		}
 
-		if (feature == "multiprocess+") {
-			multi_process = true;
+		if(feature == "multiprocess+") {
+			multiprocess_enabled = true;
 		}
 		
 		response.Write(feature);
@@ -584,7 +584,7 @@ void GdbStub::QueryGetSupported(util::Buffer &packet) {
 
 void GdbStub::QueryGetCurrentThread(util::Buffer &packet) {
 	util::Buffer response;
-	if (multi_process) {
+	if(multiprocess_enabled) {
 		response.Write('p');
 		GdbConnection::Encode(current_thread ? current_thread->process.pid : 0, 0, response);
 		response.Write('.');
@@ -622,7 +622,7 @@ void GdbStub::QueryGetSThreadInfo(util::Buffer &packet) {
 			} else {
 				response.Write('m');
 			}
-			if (multi_process) {
+			if(multiprocess_enabled) {
 				response.Write('p');
 				GdbConnection::Encode(thread.process.pid, 0, response);
 				response.Write('.');
