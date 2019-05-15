@@ -62,7 +62,7 @@ File File::OpenForRead(const char *path) {
 }
 
 File File::OpenForClobberingWrite(const char *path) {
-	int fd = open(path, O_WRONLY | O_CREAT);
+	int fd = open(path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	if(fd < 0) {
 		throw NetworkError(errno);
 	}
