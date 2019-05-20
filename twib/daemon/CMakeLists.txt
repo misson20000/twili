@@ -53,14 +53,20 @@ if(WITH_SYSTEMD)
 	include_directories(${SYSTEMD_INCLUDE_DIRS})
 	target_link_libraries(twibd ${SYSTEMD_LIBRARIES})
 
+	set(TWIBD_PATH "${CMAKE_INSTALL_PREFIX}/bin/twibd")
 	configure_file(
 		"${CMAKE_CURRENT_SOURCE_DIR}/twibd.socket"
 		"${CMAKE_CURRENT_BINARY_DIR}/twibd.socket"
 		)
-	
+
+	configure_file(
+		"${CMAKE_CURRENT_SOURCE_DIR}/twibd.service"
+		"${CMAKE_CURRENT_BINARY_DIR}/twibd.service"
+		)
+
 	set(SYSTEMD_CONFIG_DIR "lib/systemd/system")
 	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/twibd.socket DESTINATION ${SYSTEMD_CONFIG_DIR})
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
 endif()
 
 install(TARGETS twibd RUNTIME DESTINATION bin)
