@@ -99,12 +99,12 @@ void USBKBackend::AddDevice(KLST_DEVINFO_HANDLE device_info) {
 
 	DeviceType type = DeviceType::Unknown;
 
-	if(!strcmp(device_info->DeviceInterfaceGUID, "{97BF784F-6433-3877-36EA-76C5314F7F46}")) {
+	if(device_info->Common.MI == 0) {
 		LogMessage(Debug, "  - TransistorUSB serial console identified");
 		type = DeviceType::SerialConsole;
 	}
 
-	if(!strcmp(device_info->DeviceInterfaceGUID, "{67437937-72E1-5CAF-99CA-71FD46545AE2}")) {
+	if(device_info->Common.MI == 1) {
 		LogMessage(Debug, "  - TransistorUSB twili device identified");
 		type = DeviceType::Twili;
 	}
