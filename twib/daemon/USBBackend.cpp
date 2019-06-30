@@ -600,6 +600,7 @@ void USBBackend::AddDevice(libusb_device *device) {
 		LogMessage(Warning, "failed to claim interface: %s", libusb_error_name(r));
 		libusb_close(handle);
 		libusb_free_config_descriptor(config);
+		return;
 	}
 	
 	uint8_t addrs[] = {
