@@ -59,7 +59,7 @@ class RemoteObject {
 	template<typename T, typename... Args>
 	void SendSmartSyncRequest(T command_id, Args&&... args) {
 		uint32_t r;
-		if(r = SendSmartSyncRequestWithoutAssert(command_id, std::move(args)...)) {
+		if((r = SendSmartSyncRequestWithoutAssert(command_id, std::move(args)...))) {
 			throw ResultError(r);
 		}
 	}
