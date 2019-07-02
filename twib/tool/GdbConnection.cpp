@@ -140,12 +140,11 @@ void GdbConnection::RespondEmpty() {
 }
 
 void GdbConnection::RespondError(int no) {
-	util::Buffer ok;
-	ok.Write('E');
-	// this is really bad
-	ok.Write('0');
-	ok.Write('0' + no);
-	Respond(ok);
+	util::Buffer buf;
+	char resp[4];
+	snprintf(resp, sizeof(resp), "E%02x", no & 0xff);
+	buf.Write((const char *)resp);
+	Respond(buf);
 }
 
 void GdbConnection::RespondOk() {
