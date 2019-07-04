@@ -18,6 +18,8 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include<inttypes.h>
+
 #include "ITwibProcessMonitor.hpp"
 
 #include<libtransistor/cpp/nx.hpp>
@@ -57,7 +59,7 @@ void ITwibProcessMonitor::StateChanged(process::MonitoredProcess::State new_stat
 void ITwibProcessMonitor::Launch(bridge::ResponseOpener opener) {
 	if(process->GetState() == process::MonitoredProcess::State::Created) {
 		process->twili.monitored_processes.push_back(process);
-		printf("  began monitoring 0x%x\n", process->GetPid());
+		printf("  began monitoring 0x%" PRIx64"\n", process->GetPid());
 
 		process->Launch(opener);
 	} else {
@@ -68,7 +70,7 @@ void ITwibProcessMonitor::Launch(bridge::ResponseOpener opener) {
 void ITwibProcessMonitor::LaunchSuspended(bridge::ResponseOpener opener) {
 	if(process->GetState() == process::MonitoredProcess::State::Created) {
 		process->twili.monitored_processes.push_back(process);
-		printf("  began monitoring 0x%x\n", process->GetPid());
+		printf("  began monitoring 0x%" PRIx64"\n", process->GetPid());
 
 		process->LaunchSuspended(opener);
 	} else {

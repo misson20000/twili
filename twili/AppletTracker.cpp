@@ -178,8 +178,9 @@ void AppletTracker::PrintDebugInfo() {
 
 	printf("  queued:\n");
 	for(auto proc : queued) {
-		printf("    - %p\n", proc.get());
-		printf("      type: %s\n", typeid(*proc.get()).name());
+		auto ptr = proc.get();
+		printf("    - %p\n", ptr);
+		printf("      type: %s\n", typeid(*ptr).name());
 		printf("      pid: 0x%lx\n", proc->GetPid());
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);
@@ -187,8 +188,9 @@ void AppletTracker::PrintDebugInfo() {
 	}
 	printf("  created:\n");
 	for(auto proc : created) {
-		printf("    - %p\n", proc.get());
-		printf("      type: %s\n", typeid(*proc.get()).name());
+		auto ptr = proc.get();
+		printf("    - %p\n", ptr);
+		printf("      type: %s\n", typeid(*ptr).name());
 		printf("      pid: 0x%lx\n", proc->GetPid());
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);

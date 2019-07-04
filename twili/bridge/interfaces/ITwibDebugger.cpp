@@ -167,7 +167,7 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 			printf("only found one module, assuming main\n");
 			addr = candidates[0];
 		} else { // rtld, main, subsdk[0-9], sdk
-			printf("found %d modules, skipping first (rtld) module and picking second (main)\n", candidates.size());
+			printf("found %zd modules, skipping first (rtld) module and picking second (main)\n", candidates.size());
 			addr = candidates[1]; // main
 		}
 	}

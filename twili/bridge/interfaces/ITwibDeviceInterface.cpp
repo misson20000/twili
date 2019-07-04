@@ -253,8 +253,9 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 	printf("Twili state dump:\n");
 	printf("  monitored process list\n");
 	for(auto proc : twili.monitored_processes) {
-		printf("    - %p\n", proc.get());
-		printf("      type: %s\n", typeid(*proc.get()).name());
+		auto ptr = proc.get();
+		printf("    - %p\n", ptr);
+		printf("      type: %s\n", typeid(*ptr).name());
 		printf("      pid: 0x%lx\n", proc->GetPid());
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);

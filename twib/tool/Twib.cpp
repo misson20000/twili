@@ -24,6 +24,7 @@
 #include<array>
 
 #include<string.h>
+#include<inttypes.h>
 
 #include<msgpack11.hpp>
 
@@ -348,7 +349,7 @@ int main(int argc, char *argv[]) {
 		mon.AppendCode(*code_opt);
 		uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
 		if(!run_quiet) {
-			printf("PID: 0x%lx\n", pid);
+			printf("PID: 0x%" PRIx64"\n", pid);
 		}
 		auto pump_output =
 			[](tool::ITwibPipeReader reader, FILE *stream) {
@@ -486,7 +487,7 @@ int main(int argc, char *argv[]) {
 		uint64_t total_memory_usage     = meminfo["total_memory_usage"    ].uint64_value();
 		const size_t one_mib = 1024 * 1024;
 		printf(
-			"Twili Memory: %ld MiB / %ld MiB (%ld%%)\n",
+			"Twili Memory: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
 			total_memory_usage / one_mib,
 			total_memory_available / one_mib,
 			total_memory_usage * 100 / total_memory_available);
@@ -494,7 +495,7 @@ int main(int argc, char *argv[]) {
 		std::vector<const char*> category_labels = {"System", "Application", "Applet"};
 		for(auto &cat_info : meminfo["limits"].array_items()) {
 			printf(
-				"%s Category Limit: %ld MiB / %ld MiB (%ld%%)\n",
+				"%s Category Limit: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
 				category_labels[cat_info["category"].int_value()],
 				cat_info["current_value"].uint64_value() / one_mib,
 				cat_info["limit_value"].uint64_value() / one_mib,
@@ -528,7 +529,7 @@ int main(int argc, char *argv[]) {
 
 		uint64_t title_id = std::stoull(launch_title_id, nullptr, 16);
 
-		printf("0x%lx\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
+		printf("0x%" PRIx64"\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
 	}
 
 #if TWIB_GDB_ENABLED == 1
