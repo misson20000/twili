@@ -12,6 +12,9 @@
 #include <memory>
 #include <chrono>
 #include <ctime>
+#include <cstdio>
+#include <stdio.h>
+#include <cstdlib>
 
 #if defined(_WIN32)
 // Avoid including windows.h in a header; we only need a handful of
@@ -121,7 +124,8 @@ namespace details
 			Semaphore(int initialCount = 0)
 			{
 				assert(initialCount >= 0);
-				semaphore_create(mach_task_self(), &m_sema, SYNC_POLICY_FIFO, initialCount);
+				kern_return_t rc = semaphore_create(mach_task_self(), &m_sema, SYNC_POLICY_FIFO, initialCount);
+				assert(rc == KERN_SUCCESS);
 			}
 
 			~Semaphore()
@@ -131,7 +135,11 @@ namespace details
 
 			void wait()
 			{
-				semaphore_wait(m_sema);
+				kern_return_t  rc;
+				do {
+					rc = semaphore_wait(m_sema);
+				} while (rc == KERN_ABORTED);
+				assert(rc == KERN_SUCCESS);
 			}
 			
 			bool try_wait()
@@ -148,19 +156,21 @@ namespace details
 				// added in OSX 10.10: https://developer.apple.com/library/prerelease/mac/documentation/General/Reference/APIDiffsMacOSX10_10SeedDiff/modules/Darwin.html
 				kern_return_t rc = semaphore_timedwait(m_sema, ts);
 
-				return rc != KERN_OPERATION_TIMED_OUT && rc != KERN_ABORTED;
+				assert(rc == KERN_SUCCESS || rc == KERN_OPERATION_TIMED_OUT || rc == KERN_ABORTED);
+				return rc == KERN_SUCCESS;
 			}
 
 			void signal()
 			{
-				semaphore_signal(m_sema);
+				kern_return_t rc = semaphore_signal(m_sema);
+				assert(rc == KERN_SUCCESS);
 			}
 
 			void signal(int count)
 			{
 				while (count-- > 0)
 				{
-					semaphore_signal(m_sema);
+					signal();
 				}
 			}
 		};
@@ -755,8 +765,9 @@ public:
 	inline void wait_dequeue(U& item)
 	{
 		sema->wait();
-		while (!inner.try_dequeue(item)) {
-			continue;
+		if (!inner.try_dequeue(item)) {
+			std::fprintf(stderr, "wait_dequeue: failed to dequeue\n");
+			std::abort();
 		}
 	}
 
@@ -773,8 +784,9 @@ public:
 		if (!sema->wait(timeout_usecs)) {
 			return false;
 		}
-		while (!inner.try_dequeue(item)) {
-			continue;
+		if (!inner.try_dequeue(item)) {
+			std::fprintf(stderr, "wait_dequeue_timed: failed to dequeue\n");
+			std::abort();
 		}
 		return true;
 	}
