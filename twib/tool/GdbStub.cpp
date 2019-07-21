@@ -244,8 +244,9 @@ void GdbStub::HandleReadGeneralRegisters() {
 
 	try {
 		util::Buffer response;
-		std::vector<uint64_t> registers = current_thread->GetRegisters();
-		GdbConnection::Encode((uint8_t*) registers.data(), 284, response);
+		ThreadContext tc = current_thread->GetRegisters();
+		GdbConnection::Encode((uint8_t*)&tc.x, 268, response);
+		GdbConnection::Encode((uint8_t*)&tc.fpr, 520, response);
 		std::string str;
 		size_t sz = response.ReadAvailable();
 		response.Read(str, sz);
@@ -264,14 +265,23 @@ void GdbStub::HandleWriteGeneralRegisters(util::Buffer &packet) {
 		connection.RespondError(1);
 	}
 
-	std::vector<uint8_t> registers_binary;
-	GdbConnection::Decode(registers_binary, packet);
+	std::vector<uint8_t> registers;
+	GdbConnection::Decode(registers, packet);
 
-	std::vector<uint64_t> registers(36);
-	memcpy(registers.data(), registers_binary.data(), 284);
+	if(registers.size() < 788) {
+		LogMessage(Warning, "write-registers packet doesn't contain all registers");
+		connection.RespondError(1);
+	}
+
+	ThreadContext tc;
+	// GDB uses the same register order as ThreadContext, but without padding
+	// after psr, and without tpidr at the end.
+	memcpy(&tc.x, registers.data(), 268); // x[0..30], sp, pc, psr
+	memcpy(&tc.fpr, registers.data() + 268, 520); // fpr[0..31], fpcr, fpsr
+	tc._pad = tc.tpidr = 0;
 	
 	try {
-		current_thread->SetRegisters(registers);
+		current_thread->SetRegisters(tc);
 		connection.RespondOk();
 	} catch(ResultError &e) {
 		LogMessage(Debug, "failed to write registers: 0x%x", e.code);
@@ -1051,11 +1061,11 @@ std::string GdbStub::Process::BuildLibraryList() {
 GdbStub::Thread::Thread(Process &process, uint64_t thread_id, uint64_t tls_addr) : process(process), thread_id(thread_id), tls_addr(tls_addr) {
 }
 
-std::vector<uint64_t> GdbStub::Thread::GetRegisters() {
+ThreadContext GdbStub::Thread::GetRegisters() {
 	return process.debugger.GetThreadContext(thread_id);
 }
 
-void GdbStub::Thread::SetRegisters(std::vector<uint64_t> registers) {
+void GdbStub::Thread::SetRegisters(const ThreadContext &registers) {
 	return process.debugger.SetThreadContext(thread_id, registers);
 }
 

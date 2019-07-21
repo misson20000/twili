@@ -31,6 +31,17 @@ namespace twili {
 namespace twib {
 namespace tool {
 
+struct ThreadContext {
+     uint64_t x[31];
+     uint64_t sp, pc;
+     uint32_t psr;
+     uint32_t _pad;
+     uint64_t fpr[32][2];
+     uint32_t fpcr, fpsr;
+     uint64_t tpidr;
+};
+static_assert(sizeof(ThreadContext) == 800, "sizeof(ThreadContext)");
+
 class ITwibDebugger {
  public:
 	ITwibDebugger(std::shared_ptr<RemoteObject> obj);
@@ -41,8 +52,8 @@ class ITwibDebugger {
 	std::vector<uint8_t> ReadMemory(uint64_t addr, uint64_t size);
 	void WriteMemory(uint64_t addr, std::vector<uint8_t> &bytes);
 	std::optional<nx::DebugEvent> GetDebugEvent();
-	std::vector<uint64_t> GetThreadContext(uint64_t thread_id);
-	void SetThreadContext(uint64_t thread_id, std::vector<uint64_t> registeres);
+	ThreadContext GetThreadContext(uint64_t thread_id);
+	void SetThreadContext(uint64_t thread_id, ThreadContext tc);
 	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
 	void BreakProcess();
 	void AsyncWait(std::function<void(uint32_t)> &&cb);

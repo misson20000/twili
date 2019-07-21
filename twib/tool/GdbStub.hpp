@@ -74,8 +74,8 @@ class GdbStub {
 	class Thread {
 	 public:
 		Thread(Process &process, uint64_t thread_id, uint64_t tls_addr);
-		std::vector<uint64_t> GetRegisters();
-		void SetRegisters(std::vector<uint64_t> regs);
+		ThreadContext GetRegisters();
+		void SetRegisters(const ThreadContext &regs);
 		Process &process;
 		uint64_t thread_id = 0;
 		uint64_t tls_addr = 0;
