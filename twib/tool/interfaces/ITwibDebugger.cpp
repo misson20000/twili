@@ -75,26 +75,20 @@ std::optional<nx::DebugEvent> ITwibDebugger::GetDebugEvent() {
 	return event;
 }
 
-std::vector<uint64_t> ITwibDebugger::GetThreadContext(uint64_t thread_id) {
-	struct ThreadContext {
-		uint64_t regs[100];
-	} tc;
+ThreadContext ITwibDebugger::GetThreadContext(uint64_t thread_id) {
+	ThreadContext tc;
 	obj->SendSmartSyncRequest(
 		CommandID::GET_THREAD_CONTEXT,
 		in<uint64_t>(thread_id),
 		out<ThreadContext>(tc));
-	return std::vector<uint64_t>(&tc.regs[0], &tc.regs[100]);
+	return tc;
 }
 
-void ITwibDebugger::SetThreadContext(uint64_t thread_id, std::vector<uint64_t> regs) {
-	struct ThreadContext {
-		uint64_t regs[100];
-	} tc;
-	std::copy(regs.begin(), regs.end(), tc.regs);
+void ITwibDebugger::SetThreadContext(uint64_t thread_id, ThreadContext tc) {
 	obj->SendSmartSyncRequest(
 		CommandID::SET_THREAD_CONTEXT,
 		in<uint64_t>(thread_id),
-		in<uint32_t>(3), // gprs + pc + sp + cpsr
+		in<uint32_t>(15), // gprs + pc + sp + cpsr + fpu + fpcr/fpsr
 		in<ThreadContext>(tc));
 }
 
