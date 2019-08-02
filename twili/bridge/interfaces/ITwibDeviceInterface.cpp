@@ -272,15 +272,24 @@ void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opene
 }
 
 void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs) {
-	if(fs != "sd") {
+	ifilesystem_t ifs;
+	
+	class FspSrvHolder {
+	 public:
+		FspSrvHolder() { ResultCode::AssertOk(fsp_srv_init(0)); }
+		~FspSrvHolder() { fsp_srv_finalize(); }
+	} fsp_srv_holder;
+
+	if(fs == "sd") {
+		ResultCode::AssertOk(fsp_srv_mount_sd_card(&ifs));
+	} else if(fs == "nand_user") {
+		ResultCode::AssertOk(fsp_srv_open_bis_filesystem(&ifs, 30, ""));
+	} else if(fs == "nand_system") {
+		ResultCode::AssertOk(fsp_srv_open_bis_filesystem(&ifs, 31, ""));
+	} else {
 		opener.RespondError(TWILI_ERR_UNKNOWN_FILESYSTEM);
 		return;
 	}
-
-	ifilesystem_t ifs;
-	ResultCode::AssertOk(fsp_srv_init(0));
-	ResultCode::AssertOk(fsp_srv_mount_sd_card(&ifs));
-	fsp_srv_finalize();
 	
 	opener.RespondOk(opener.MakeObject<ITwibFilesystemAccessor>(ifs));
 }

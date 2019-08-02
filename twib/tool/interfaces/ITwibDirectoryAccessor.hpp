@@ -26,29 +26,25 @@
 
 #include "../RemoteObject.hpp"
 
-#include "ITwibFileAccessor.hpp"
-#include "ITwibDirectoryAccessor.hpp"
-
 namespace twili {
 namespace twib {
 namespace tool {
 
-class ITwibFilesystemAccessor {
+class ITwibDirectoryAccessor {
  public:
-	ITwibFilesystemAccessor(std::shared_ptr<RemoteObject> obj);
+	ITwibDirectoryAccessor(std::shared_ptr<RemoteObject> obj);
 
-	using CommandID = protocol::ITwibFilesystemAccessor::Command;
+	using CommandID = protocol::ITwibDirectoryAccessor::Command;
 
-	bool CreateFile(uint32_t mode, size_t size, std::string path); // returns false if the file already existed
-	void DeleteFile(std::string path);
-	bool CreateDirectory(std::string path);
-	void DeleteDirectory(std::string path);
-	void DeleteDirectoryRecursively(std::string path);
-	void RenameFile(std::string src, std::string dst);
-	void RenameDirectory(std::string src, std::string dst);
-	std::optional<bool> IsFile(std::string path);
-	ITwibFileAccessor OpenFile(uint32_t mode, std::string path);
-	ITwibDirectoryAccessor OpenDirectory(std::string path);
+	struct DirectoryEntry {
+		char path[0x301];
+		uint8_t attributes;
+		uint32_t entry_type;
+		uint64_t file_size;
+	};
+	
+	std::vector<DirectoryEntry> Read();
+	uint64_t GetEntryCount();
 	
  private:
 	std::shared_ptr<RemoteObject> obj;

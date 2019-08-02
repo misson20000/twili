@@ -43,6 +43,9 @@ class ITwibFilesystemAccessor : public ObjectDispatcherProxy<ITwibFilesystemAcce
 	void DeleteFile(bridge::ResponseOpener opener, std::string path);
 	void CreateDirectory(bridge::ResponseOpener opener, std::string path);
 	void DeleteDirectory(bridge::ResponseOpener opener, std::string path);
+	void DeleteDirectoryRecursively(bridge::ResponseOpener opener, std::string path);
+	void RenameFile(bridge::ResponseOpener opener, std::string src, std::string dst);
+	void RenameDirectory(bridge::ResponseOpener opener, std::string src, std::string dst);
 	void GetEntryType(bridge::ResponseOpener opener, std::string path);
 	void OpenFile(bridge::ResponseOpener opener, uint32_t mode, std::string path);
 	void OpenDirectory(bridge::ResponseOpener opener, std::string path);
@@ -54,6 +57,9 @@ class ITwibFilesystemAccessor : public ObjectDispatcherProxy<ITwibFilesystemAcce
 		SmartCommand<CommandID::DELETE_FILE, &ITwibFilesystemAccessor::DeleteFile>,
 		SmartCommand<CommandID::CREATE_DIRECTORY, &ITwibFilesystemAccessor::CreateDirectory>,
 		SmartCommand<CommandID::DELETE_DIRECTORY, &ITwibFilesystemAccessor::DeleteDirectory>,
+		SmartCommand<CommandID::DELETE_DIRECTORY_RECURSIVELY, &ITwibFilesystemAccessor::DeleteDirectoryRecursively>,
+		SmartCommand<CommandID::RENAME_FILE, &ITwibFilesystemAccessor::RenameFile>,
+		SmartCommand<CommandID::RENAME_DIRECTORY, &ITwibFilesystemAccessor::RenameDirectory>,
 		SmartCommand<CommandID::GET_ENTRY_TYPE, &ITwibFilesystemAccessor::GetEntryType>,
 		SmartCommand<CommandID::OPEN_FILE, &ITwibFilesystemAccessor::OpenFile>,
 		SmartCommand<CommandID::OPEN_DIRECTORY, &ITwibFilesystemAccessor::OpenDirectory>

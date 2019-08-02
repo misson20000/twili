@@ -70,6 +70,31 @@ void ITwibFilesystemAccessor::DeleteDirectory(bridge::ResponseOpener opener, std
 	opener.RespondOk();
 }
 
+void ITwibFilesystemAccessor::DeleteDirectoryRecursively(bridge::ResponseOpener opener, std::string path) {
+	char path_buffer[0x301];
+	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
+	ResultCode::AssertOk(ifilesystem_delete_directory_recursively(ifs, path_buffer));
+	opener.RespondOk();
+}
+
+void ITwibFilesystemAccessor::RenameFile(bridge::ResponseOpener opener, std::string src, std::string dst) {
+	char src_buffer[0x301];
+	char dst_buffer[0x301];
+	std::strncpy(src_buffer, src.c_str(), sizeof(src_buffer));
+	std::strncpy(dst_buffer, dst.c_str(), sizeof(dst_buffer));
+	ResultCode::AssertOk(ifilesystem_rename_file(ifs, src_buffer, dst_buffer));
+	opener.RespondOk();
+}
+
+void ITwibFilesystemAccessor::RenameDirectory(bridge::ResponseOpener opener, std::string src, std::string dst) {
+	char src_buffer[0x301];
+	char dst_buffer[0x301];
+	std::strncpy(src_buffer, src.c_str(), sizeof(src_buffer));
+	std::strncpy(dst_buffer, dst.c_str(), sizeof(dst_buffer));
+	ResultCode::AssertOk(ifilesystem_rename_directory(ifs, src_buffer, dst_buffer));
+	opener.RespondOk();
+}
+
 void ITwibFilesystemAccessor::GetEntryType(bridge::ResponseOpener opener, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));

@@ -133,6 +133,311 @@ void show(msgpack11::MsgPack const& blob);
 using namespace twili;
 using namespace twili::twib;
 
+class FSCommands {
+ public:
+	FSCommands(CLI::App &app, const char *cmdname, const char *desc, const char *fsname) :
+		app(app),
+		cmdname(cmdname),
+		fsname(fsname) {
+		subcommand = app.add_subcommand(cmdname, desc);
+
+		pull = subcommand->add_subcommand("pull", "Pulls files from device filesystem to host filesystem");
+		pull->add_option("from", pull_from, "Path(s) to pull from (on device)")->expected(-1);
+		pull->add_option("to", pull_to, "Path to write to (on host)");
+
+		push = subcommand->add_subcommand("push", "Pushes files from host filesystem to device filesystem");
+		push->add_option("from", push_from, "Path(s) to read from (on host)")->expected(-1);
+		push->add_option("to", push_to, "Path to write to (on device)");
+
+		ls = subcommand->add_subcommand("ls", "Lists files on device filesystem");
+		ls->add_flag("-l", ls_details, "Show more details");
+		ls->add_option("path", ls_path, "Directory to list files in");
+
+		rm = subcommand->add_subcommand("rm", "Removes a file or directory");
+		rm->add_flag("-r", rm_recursive, "Delete recursively");
+		rm->add_option("path", rm_path, "File or directory to remove")->required();
+
+		mkdir = subcommand->add_subcommand("mkdir", "Creates a directory");
+		mkdir->add_option("path", mkdir_path, "Directory to create")->required();
+
+		mv = subcommand->add_subcommand("mv", "Rename a file or directory");
+		mv->add_option("src", mv_src, "Source path")->required();
+		mv->add_option("dst", mv_dst, "Destination path")->required();
+		
+		subcommand->require_subcommand(1);
+	}
+
+	int Run(tool::ITwibDeviceInterface &itdi) {
+		if(pull->parsed()) {
+			return DoPull(itdi);
+		}
+		if(push->parsed()) {
+			return DoPush(itdi);
+		}
+		if(ls->parsed()) {
+			return DoLs(itdi);
+		}
+		if(rm->parsed()) {
+			return DoRm(itdi);
+		}
+		if(mkdir->parsed()) {
+			return DoMkdir(itdi);
+		}
+		if(mv->parsed()) {
+			return DoMv(itdi);
+		}
+		return 0;
+	}
+
+	int DoPull(tool::ITwibDeviceInterface &itdi) {
+		struct stat target_stat;
+		bool is_target_directory = false;
+
+		// stupid hack for stupid command line parser
+		if(pull_from.size() > 1) {
+			pull_to = pull_from.back();
+			pull_from.pop_back();
+		}
+		
+		if(pull_to != "-") {
+			std::optional<platform::fs::Stat> target_stat = platform::fs::StatFile(pull_to.c_str());
+			is_target_directory = target_stat && target_stat->is_directory;
+
+			if(pull_from.size() > 1 && !is_target_directory) {
+				LogMessage(Error, "target '%s' is not a directory", pull_to.c_str());
+				return 1;
+			}
+
+			if(is_target_directory) {
+				if(pull_to.back() != '/') {
+					pull_to.push_back('/');
+				}
+			}
+		}
+
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+		
+		for(std::string &src : pull_from) {
+			tool::ITwibFileAccessor itfa = itfsa.OpenFile(1, "/" + src);
+			
+			std::string dst_path;
+			platform::File dst;
+			if(pull_to == "-") {
+				dst_path = "<stdout>";
+				dst = platform::File::BorrowStdout();
+			} else {
+				if(is_target_directory) {
+					dst_path = pull_to + src;
+				} else {
+					dst_path = pull_to;
+				}
+				dst = platform::File::OpenForClobberingWrite(dst_path.c_str());
+			}
+
+			size_t total_size = itfa.GetSize();
+			size_t offset = 0;
+			while(offset < total_size) {
+				std::vector<uint8_t> data = itfa.Read(offset, total_size - offset);
+				if(data.size() == 0 || dst.Write(data.data(), data.size()) < data.size()) {
+					LogMessage(Error, "hit EoF/IO error unexpectedly?");
+					return 1;
+				}
+				offset+= data.size();
+			}
+
+			if(pull_to != "-") {
+				fprintf(stderr, "%s -> %s\n", src.c_str(), dst_path.c_str());
+			}
+		}
+		return 0;
+	}
+
+	int DoPush(tool::ITwibDeviceInterface &itdi) {
+		bool is_target_directory = false;
+
+		// stupid hack for stupid command line parser
+		if(push_from.size() > 1) {
+			push_to = push_from.back();
+			push_from.pop_back();
+		}
+
+		if(push_to.front() != '/') {
+			push_to.insert(push_to.begin(), '/');
+		}
+
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+
+		LogMessage(Debug, "checking if is file");
+		std::optional<bool> is_file_result = itfsa.IsFile(push_to);
+		LogMessage(Debug, "checked if is file");
+		is_target_directory = is_file_result && !(*is_file_result);
+
+		if(push_from.size() > 1 && !is_target_directory) {
+			LogMessage(Error, "target '%s' is not a directory", push_to.c_str());
+			return 1;
+		}
+		
+		if(is_target_directory) {
+			if(push_to.back() != '/') {
+				push_to.push_back('/');
+			}
+		}
+		
+		for(std::string &src_path : push_from) {
+			std::string dst_path;
+			platform::File src = platform::File::OpenForRead(src_path.c_str());
+			
+			if(is_target_directory) {
+				dst_path = push_to + platform::fs::BaseName(src_path.c_str()); // lmao super dangerous don't ever do this
+			} else {
+				dst_path = push_to;
+			}
+
+			size_t total_size = src.GetSize();
+
+			LogMessage(Debug, "creating %s", dst_path.c_str());
+			itfsa.CreateFile(0, total_size, dst_path);
+			LogMessage(Debug, "opening %s", dst_path.c_str());
+			tool::ITwibFileAccessor itfa = itfsa.OpenFile(6, dst_path);
+			LogMessage(Debug, "setting size");
+			itfa.SetSize(total_size);
+
+			size_t offset = 0;
+			std::vector<uint8_t> data;
+			while(offset < total_size) {
+				data.resize(std::min(total_size - offset, (size_t) 0x10000));
+				size_t r;
+				if((r = src.Read(data.data(), data.size())) < data.size()) {
+					LogMessage(Error, "hit EoF unexpectedly? expected 0x%lx, got 0x%lx", data.size(), r);
+					return 1;
+				}
+				
+				itfa.Write(offset, data);
+				offset+= data.size();
+			}
+
+			fprintf(stderr, "%s -> %s\n", src_path.c_str(), dst_path.c_str());
+		}
+
+		return 0;
+	}
+
+	int DoLs(tool::ITwibDeviceInterface &itdi) {
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+		tool::ITwibDirectoryAccessor itda = itfsa.OpenDirectory(ls_path);
+
+		uint64_t read = 0;
+		std::vector<tool::ITwibDirectoryAccessor::DirectoryEntry> entries;
+		entries.resize(itda.GetEntryCount());
+
+		while(read < entries.size()) {
+			auto batch = itda.Read();
+			if(read + batch.size() > entries.size()) {
+				LogMessage(Error, "too many entries");
+				return 1;
+			}
+			std::copy(batch.begin(), batch.end(), entries.begin() + read);
+			read+= batch.size();
+		}
+
+		std::sort(entries.begin(), entries.end(), [](auto &a, auto &b) -> bool { return strcmp(a.path, b.path) < 1; });
+		
+		for(auto &e : entries) {
+			if(ls_details) {
+				printf("%s%s %9d  %s\n", e.entry_type == 0 ? "d" : "-", e.attributes & 1 ? "a" : "-", e.file_size, e.path);
+			} else {
+				printf("%s\n", e.path);
+			}
+		}
+
+		return 0;
+	}
+
+	int DoRm(tool::ITwibDeviceInterface &itdi) {
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+		std::optional<bool> is_file_result = itfsa.IsFile(rm_path);
+		if(!is_file_result) {
+			fprintf(stderr, "'%s': No such file or directory\n", rm_path);
+			return 1;
+		}
+
+		if(*is_file_result) {
+			itfsa.DeleteFile(rm_path);
+		} else {
+			if(rm_recursive) {
+				itfsa.DeleteDirectoryRecursively(rm_path);
+			} else {
+				itfsa.DeleteDirectory(rm_path);
+			}
+		}
+		return 0;
+	}
+
+	int DoMkdir(tool::ITwibDeviceInterface &itdi) {
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+		if(!itfsa.CreateDirectory(mkdir_path)) {
+			fprintf(stderr, "'%s': File exists\n", mkdir_path.c_str());
+			return 1;
+		}
+		return 0;
+	}
+
+	int DoMv(tool::ITwibDeviceInterface &itdi) {
+		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
+		std::optional<bool> is_src_file = itfsa.IsFile(mv_src);
+		if(!is_src_file) {
+			fprintf(stderr, "'%s': No such file or directory\n", mv_src.c_str());
+			return 1;
+		}
+		
+		std::optional<bool> is_dst_file = itfsa.IsFile(mv_dst);
+		if(is_dst_file && !*is_dst_file) { // destination is directory and exists
+			if(mv_dst.back() != '/') {
+				mv_dst.push_back('/');
+			}
+			mv_dst+= platform::fs::BaseName(mv_src.c_str()); // append source filename
+		}
+
+		if(*is_src_file) {
+			itfsa.RenameFile(mv_src, mv_dst);
+		} else {
+			itfsa.RenameDirectory(mv_src, mv_dst);
+		}
+		
+		return 0;
+	}
+
+	CLI::App &app;
+	CLI::App *subcommand;
+	
+ private:
+	CLI::App *pull;
+	std::vector<std::string> pull_from;
+	std::string pull_to = ".";
+	
+	CLI::App *push;
+	std::vector<std::string> push_from;
+	std::string push_to = "/";
+
+	CLI::App *ls;
+	bool ls_details;
+	std::string ls_path = "/";
+	
+	CLI::App *rm;
+	bool rm_recursive;
+	std::string rm_path;
+	
+	CLI::App *mkdir;
+	std::string mkdir_path;
+
+	CLI::App *mv;
+	std::string mv_src;
+	std::string mv_dst;
+	
+	const char *cmdname;
+	const char *fsname;
+};
+
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -256,17 +561,9 @@ int main(int argc, char *argv[]) {
 	launch->add_set_ignore_case("storage", launch_storage, {"host", "gamecard", "gc", "nand-system", "system", "nand-user", "user", "sdcard", "sd"}, "Storage for title")->required();
 	launch->add_option("launch-flags", launch_flags, "Flags for launch");
 
-	CLI::App *pull = app.add_subcommand("pull", "Pulls files from device's SD card");
-	std::vector<std::string> pull_from;
-	std::string pull_to;
-	pull->add_option("from", pull_from, "Path(s) to pull from (on device)")->expected(-2);
-	pull->add_option("to", pull_to, "Path to write to (on host)");
-
-	CLI::App *push = app.add_subcommand("push", "Pushes files to device's SD card");
-	std::vector<std::string> push_from;
-	std::string push_to;
-	push->add_option("from", push_from, "Path(s) to read from (on host)")->expected(-2);
-	push->add_option("to", push_to, "Path to write to (on device)");
+	FSCommands sd_commands(app, "sd", "Perform operations on target SD card", "sd");
+	FSCommands nand_user_commands(app, "nu", "Perform operations on target NAND user filesystem", "nand_user");
+	FSCommands nand_system_commands(app, "ns", "Perform operations on target NAND system filesystem", "nand_system");
 	
 	app.require_subcommand(1);
 	
@@ -538,131 +835,17 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 #endif
-	
-	if(pull->parsed()) {
-		struct stat target_stat;
-		bool is_target_directory = false;
 
-		// stupid hack for stupid command line parser
-		pull_to = pull_from.back();
-		pull_from.pop_back();
-		
-		if(pull_to != "-") {
-			std::optional<platform::fs::Stat> target_stat = platform::fs::StatFile(pull_to.c_str());
-			is_target_directory = target_stat && target_stat->is_directory;
-
-			if(pull_from.size() > 1 && !is_target_directory) {
-				LogMessage(Error, "target '%s' is not a directory", pull_to.c_str());
-				return 1;
-			}
-
-			if(is_target_directory) {
-				if(pull_to.back() != '/') {
-					pull_to.push_back('/');
-				}
-			}
-		}
-
-		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor("sd");
-		
-		for(std::string &src : pull_from) {
-			std::string dst_path;
-			platform::File dst;
-			if(pull_to == "-") {
-				dst_path = "<stdout>";
-				dst = platform::File::BorrowStdout();
-			} else {
-				if(is_target_directory) {
-					dst_path = pull_to + src;
-				} else {
-					dst_path = pull_to;
-				}
-				dst = platform::File::OpenForClobberingWrite(dst_path.c_str());
-			}
-
-			tool::ITwibFileAccessor itfa = itfsa.OpenFile(1, "/" + src);
-
-			size_t total_size = itfa.GetSize();
-			size_t offset = 0;
-			while(offset < total_size) {
-				std::vector<uint8_t> data = itfa.Read(offset, total_size - offset);
-				if(data.size() == 0 || dst.Write(data.data(), data.size()) < data.size()) {
-					LogMessage(Error, "hit EoF/IO error unexpectedly?");
-					return 1;
-				}
-				offset+= data.size();
-			}
-
-			if(pull_to != "-") {
-				fprintf(stderr, "%s -> %s\n", src.c_str(), dst_path.c_str());
-			}
-		}
+	if(sd_commands.subcommand->parsed()) {
+		return sd_commands.Run(itdi);
 	}
 
-	if(push->parsed()) {
-		bool is_target_directory = false;
+	if(nand_user_commands.subcommand->parsed()) {
+		return nand_user_commands.Run(itdi);
+	}
 
-		// stupid hack for stupid command line parser
-		push_to = push_from.back();
-		push_from.pop_back();
-
-		if(push_to.front() != '/') {
-			push_to.insert(push_to.begin(), '/');
-		}
-
-		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor("sd");
-
-		LogMessage(Debug, "checking if is file");
-		std::optional<bool> is_file_result = itfsa.IsFile(push_to);
-		LogMessage(Debug, "checked if is file");
-		is_target_directory = is_file_result && !(*is_file_result);
-
-		if(push_from.size() > 1 && !is_target_directory) {
-			LogMessage(Error, "target '%s' is not a directory", push_to.c_str());
-			return 1;
-		}
-		
-		if(is_target_directory) {
-			if(push_to.back() != '/') {
-				push_to.push_back('/');
-			}
-		}
-		
-		for(std::string &src_path : push_from) {
-			std::string dst_path;
-			platform::File src = platform::File::OpenForRead(src_path.c_str());
-			
-			if(is_target_directory) {
-				dst_path = push_to + platform::fs::BaseName(src_path.c_str()); // lmao super dangerous don't ever do this
-			} else {
-				dst_path = push_to;
-			}
-
-			size_t total_size = src.GetSize();
-
-			LogMessage(Debug, "creating %s", dst_path.c_str());
-			itfsa.CreateFile(0, total_size, dst_path);
-			LogMessage(Debug, "opening %s", dst_path.c_str());
-			tool::ITwibFileAccessor itfa = itfsa.OpenFile(6, dst_path);
-			LogMessage(Debug, "setting size");
-			itfa.SetSize(total_size);
-
-			size_t offset = 0;
-			std::vector<uint8_t> data;
-			while(offset < total_size) {
-				data.resize(std::min(total_size - offset, (size_t) 0x10000));
-				size_t r;
-				if((r = src.Read(data.data(), data.size())) < data.size()) {
-					LogMessage(Error, "hit EoF unexpectedly? expected 0x%lx, got 0x%lx", data.size(), r);
-					return 1;
-				}
-				
-				itfa.Write(offset, data);
-				offset+= data.size();
-			}
-
-			fprintf(stderr, "%s -> %s\n", src_path.c_str(), dst_path.c_str());
-		}
+	if(nand_system_commands.subcommand->parsed()) {
+		return nand_system_commands.Run(itdi);
 	}
 
 	return 0;

@@ -32,16 +32,6 @@ ITwibFilesystemAccessor::ITwibFilesystemAccessor(std::shared_ptr<RemoteObject> o
 	
 }
 
-ITwibFileAccessor ITwibFilesystemAccessor::OpenFile(uint32_t mode, std::string path) {
-	std::optional<ITwibFileAccessor> ifa;
-	obj->SendSmartSyncRequest(
-		CommandID::OPEN_FILE,
-		in<uint32_t>(mode),
-		in<std::string>(path),
-		out_object<ITwibFileAccessor>(ifa));
-	return *ifa;
-}
-
 bool ITwibFilesystemAccessor::CreateFile(uint32_t mode, size_t size, std::string path) {
 	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(
 		CommandID::CREATE_FILE,
@@ -58,6 +48,52 @@ bool ITwibFilesystemAccessor::CreateFile(uint32_t mode, size_t size, std::string
 	return true;
 }
 
+void ITwibFilesystemAccessor::DeleteFile(std::string path) {
+	obj->SendSmartSyncRequest(
+		CommandID::DELETE_FILE,
+		in<std::string>(path));
+}
+
+bool ITwibFilesystemAccessor::CreateDirectory(std::string path) {
+	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(
+		CommandID::CREATE_DIRECTORY,
+		in<std::string>(path));
+	if(r == 0x402) {
+		// already exists
+		return false;
+	}
+	if(r != 0) {
+		throw ResultError(r);
+	}
+	return true;
+}
+
+void ITwibFilesystemAccessor::DeleteDirectory(std::string path) {
+	obj->SendSmartSyncRequest(
+		CommandID::DELETE_DIRECTORY,
+		in<std::string>(path));
+}
+
+void ITwibFilesystemAccessor::DeleteDirectoryRecursively(std::string path) {
+	obj->SendSmartSyncRequest(
+		CommandID::DELETE_DIRECTORY_RECURSIVELY,
+		in<std::string>(path));
+}
+
+void ITwibFilesystemAccessor::RenameFile(std::string src, std::string dst) {
+	obj->SendSmartSyncRequest(
+		CommandID::RENAME_FILE,
+		in<std::string>(src),
+		in<std::string>(dst));
+}
+
+void ITwibFilesystemAccessor::RenameDirectory(std::string src, std::string dst) {
+	obj->SendSmartSyncRequest(
+		CommandID::RENAME_DIRECTORY,
+		in<std::string>(src),
+		in<std::string>(dst));
+}
+
 std::optional<bool> ITwibFilesystemAccessor::IsFile(std::string path) {
 	uint32_t entry_type;
 	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(
@@ -72,6 +108,25 @@ std::optional<bool> ITwibFilesystemAccessor::IsFile(std::string path) {
 		throw ResultError(r);
 	}
 	return entry_type > 0;
+}
+
+ITwibFileAccessor ITwibFilesystemAccessor::OpenFile(uint32_t mode, std::string path) {
+	std::optional<ITwibFileAccessor> ifa;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_FILE,
+		in<uint32_t>(mode),
+		in<std::string>(path),
+		out_object<ITwibFileAccessor>(ifa));
+	return *ifa;
+}
+
+ITwibDirectoryAccessor ITwibFilesystemAccessor::OpenDirectory(std::string path) {
+	std::optional<ITwibDirectoryAccessor> ida;
+	obj->SendSmartSyncRequest(
+		CommandID::OPEN_DIRECTORY,
+		in<std::string>(path),
+		out_object<ITwibDirectoryAccessor>(ida));
+	return *ida;
 }
 
 } // namespace tool
