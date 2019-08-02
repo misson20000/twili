@@ -116,9 +116,9 @@ struct ThreadContext {
 };
 
 struct LoadedModuleInfo {
+	uint8_t build_id[0x20];
 	uint64_t base_addr;
 	uint64_t size;
-	uint8_t build_id[0x20];
 };
 
 } // namespace nx

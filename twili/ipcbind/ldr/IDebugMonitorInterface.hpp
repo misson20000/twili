@@ -27,12 +27,12 @@ namespace service {
 namespace ldr {
 
 struct NsoInfo {
-	uint64_t addr;
-	size_t size;
 	union {
 		uint8_t build_id[0x20];
 		uint64_t build_id_64[4];
 	};
+	uint64_t addr;
+	size_t size;
 };
 
 class IDebugMonitorInterface {
