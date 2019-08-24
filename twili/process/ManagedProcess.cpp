@@ -18,6 +18,8 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include<inttypes.h>
+
 #include "ManagedProcess.hpp"
 
 #include "../twili.hpp"
@@ -82,7 +84,7 @@ void ManagedProcess::Launch(bridge::ResponseOpener response) {
 	has_registered_sac = true;
 	printf("  registered sac.\n");
 	
-	printf("created managed process: 0x%x, pid 0x%x\n", proc->handle, GetPid());
+	printf("created managed process: 0x%x, pid 0x%" PRIx64"\n", proc->handle, GetPid());
 	wait = twili.event_waiter.Add(*proc, [this]() {
 			printf("managed process (0x%x) signalled\n", this->proc->handle);
 			this->proc->ResetSignal();

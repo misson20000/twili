@@ -52,7 +52,8 @@ ifndef LIBTRANSISTOR_HOME
 endif
 include $(LIBTRANSISTOR_HOME)/libtransistor.mk
 
-CXX_FLAGS += -Werror-return-type -Og -Itwili_common -Icommon
+CXX_FLAGS += -Werror-return-type -Og -Itwili_common -Icommon -MD
+CC_FLAGS += -MD
 
 build/%.o: %.c
 	mkdir -p $(@D)
@@ -75,6 +76,7 @@ TWILI_DEPS = $(addprefix build/twili/,$(TWILI_OBJECTS)) $(addprefix build/common
 build/twili.nro.so: $(TWILI_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
 	$(LD) $(LD_FLAGS) -o $@ $(TWILI_DEPS) $(LIBTRANSISTOR_NRO_LDFLAGS)
+-include $(addprefix build/twili/,$(TWILI_OBJECTS:.o=.d))
 
 build/twili.nso.so: $(TWILI_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
@@ -89,6 +91,7 @@ build/applet_host.nro.so: $(APPLET_HOST_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANS
 build/applet_host.nso.so: $(APPLET_HOST_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
 	$(LD) $(LD_FLAGS) -o $@ $(APPLET_HOST_DEPS) $(LIBTRANSISTOR_NSO_LDFLAGS)
+-include $(addprefix build/twili_applet_shim/,$(APPLET_HOST_OBJECTS:.o=.d))
 
 # applet control
 APPLET_CONTROL_DEPS = $(addprefix build/twili_applet_shim/,$(APPLET_CONTROL_OBJECTS))
@@ -99,9 +102,11 @@ build/applet_control.nro.so: $(APPLET_CONTROL_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LI
 build/applet_control.nso.so: $(APPLET_CONTROL_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
 	$(LD) $(LD_FLAGS) -o $@ $(APPLET_CONTROL_DEPS) $(LIBTRANSISTOR_NSO_LDFLAGS)
+-include $(addprefix build/twili_applet_shim/,$(APPLET_CONTROL_OBJECTS:.o=.d))
 
 # HBABI shim
 HBABI_SHIM_DEPS = $(addprefix build/hbabi_shim/,$(HBABI_SHIM_OBJECTS))
 build/hbabi_shim.nro.so: $(HBABI_SHIM_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
 	mkdir -p $(@D)
 	$(LD) $(LD_FLAGS) -o $@ $(HBABI_SHIM_DEPS) $(LIBTRANSISTOR_NRO_LDFLAGS)
+-include $(addprefix build/hbabi_shim/,$(HBABI_SHIM_OBJECTS:.o=.d))

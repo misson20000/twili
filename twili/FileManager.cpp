@@ -63,8 +63,8 @@ FileManager::FileManager(Twili &twili) {
 	
 	trn_dirent_t dirent;
 	while((r = dir.ops->next(dir.data, &dirent)) == RESULT_OK) {
-		printf("found %.*s\n", dirent.name_size, dirent.name);
-		snprintf(path, sizeof(path), "%s/%.*s", temp_location.c_str(), dirent.name_size, dirent.name);
+		printf("found %.*s\n", (int)dirent.name_size, dirent.name);
+		snprintf(path, sizeof(path), "%s/%.*s", temp_location.c_str(), (int)dirent.name_size, dirent.name);
 		printf("  unlinking %s\n", path);
 		trn::ResultCode::AssertOk(trn_fs_unlink(path));
 	}
