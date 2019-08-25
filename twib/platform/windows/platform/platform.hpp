@@ -160,5 +160,7 @@ using NetworkError = windows::NetworkError;
 
 #ifndef PLATFORM
 #undef CreateFile
+#undef DeleteFile
+#undef CreateDirectory
 #undef SendMessage
 #endif
