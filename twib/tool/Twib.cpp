@@ -345,7 +345,7 @@ class FSCommands {
 		
 		for(auto &e : entries) {
 			if(ls_details) {
-				printf("%s%s %9d  %s\n", e.entry_type == 0 ? "d" : "-", e.attributes & 1 ? "a" : "-", e.file_size, e.path);
+				printf("%s%s %9" PRIu64"  %s\n", e.entry_type == 0 ? "d" : "-", e.attributes & 1 ? "a" : "-", e.file_size, e.path);
 			} else {
 				printf("%s\n", e.path);
 			}
