@@ -345,7 +345,7 @@ class FSCommands {
 		
 		for(auto &e : entries) {
 			if(ls_details) {
-				printf("%s%s %9d  %s\n", e.entry_type == 0 ? "d" : "-", e.attributes & 1 ? "a" : "-", e.file_size, e.path);
+				printf("%s%s %9" PRIu64"  %s\n", e.entry_type == 0 ? "d" : "-", e.attributes & 1 ? "a" : "-", e.file_size, e.path);
 			} else {
 				printf("%s\n", e.path);
 			}
@@ -358,7 +358,7 @@ class FSCommands {
 		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
 		std::optional<bool> is_file_result = itfsa.IsFile(rm_path);
 		if(!is_file_result) {
-			fprintf(stderr, "'%s': No such file or directory\n", rm_path);
+			fprintf(stderr, "'%s': No such file or directory\n", rm_path.c_str());
 			return 1;
 		}
 
