@@ -358,7 +358,7 @@ class FSCommands {
 		tool::ITwibFilesystemAccessor itfsa = itdi.OpenFilesystemAccessor(fsname);
 		std::optional<bool> is_file_result = itfsa.IsFile(rm_path);
 		if(!is_file_result) {
-			fprintf(stderr, "'%s': No such file or directory\n", rm_path);
+			fprintf(stderr, "'%s': No such file or directory\n", rm_path.c_str());
 			return 1;
 		}
 
