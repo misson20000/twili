@@ -27,7 +27,7 @@
 namespace twili {
 namespace service {
 
-IAppletShim::ControlImpl::ControlImpl(trn::ipc::server::IPCServer *server, AppletTracker &tracker) : IAppletShim(server), tracker(tracker) {
+IAppletShim::ControlImpl::ControlImpl(trn::ipc::server::IPCServer *server, process::AppletTracker &tracker) : IAppletShim(server), tracker(tracker) {
 	tracker.AttachControlProcess();
 }
 

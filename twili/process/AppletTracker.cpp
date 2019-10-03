@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,14 +20,15 @@
 
 #include "AppletTracker.hpp"
 
-#include "twili.hpp"
-#include "process/AppletProcess.hpp"
-#include "process/fs/ActualFile.hpp"
+#include "../twili.hpp"
+#include "AppletProcess.hpp"
+#include "fs/ActualFile.hpp"
 
 #include "err.hpp"
 #include "applet_shim.hpp"
 
 namespace twili {
+namespace process {
 
 AppletTracker::AppletTracker(Twili &twili) :
 	twili(twili),
@@ -81,13 +82,13 @@ bool AppletTracker::ReadyToLaunch() {
 std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
 	while(queued.size() > 0) {
 		std::shared_ptr<process::AppletProcess> proc = queued.front();
-		created.push_back(proc);
 		queued.pop_front();
 
 		// returns true if process wasn't cancelled,
 		// but if it returns false, attempt to dequeue
 		// another process
 		if(proc->PrepareForLaunch()) {
+			created.push_back(proc);
 			return proc;
 		}
 	}
@@ -121,6 +122,10 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 	return proc;
 }
 
+std::shared_ptr<AppletProcess> AppletTracker::CreateProcess() {
+	return std::make_shared<AppletProcess>(*this);
+}
+
 void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process) {
 	if(hbmenu) {
 		// exit out of hbmenu, if it's running, before launching
@@ -133,7 +138,7 @@ void AppletTracker::QueueLaunch(std::shared_ptr<process::AppletProcess> process)
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::CreateHbmenu() {
-	std::shared_ptr<process::AppletProcess> proc = std::make_shared<process::AppletProcess>(twili);
+	std::shared_ptr<process::AppletProcess> proc = CreateProcess();
 	// note: we skip over the Started state through this non-standard launch procedure
 	proc->AppendCode(hbmenu_nro);
 	proc->argv = "sdmc:/hbmenu.nro";
@@ -156,7 +161,7 @@ void AppletTracker::HBLLoad(std::string path, std::string argv) {
 		return;
 	}
 	
-	std::shared_ptr<process::AppletProcess> next_proc = std::make_shared<process::AppletProcess>(twili);
+	std::shared_ptr<process::AppletProcess> next_proc = CreateProcess();
 	next_proc->AppendCode(std::make_shared<process::fs::ActualFile>(file));
 	next_proc->argv = argv;
 	
@@ -223,4 +228,5 @@ void AppletTracker::Monitor::StateChanged(process::MonitoredProcess::State new_s
 	}
 }
 
+} // namespace process
 } // namespace twili

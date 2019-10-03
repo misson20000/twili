@@ -124,7 +124,8 @@ Twili::Twili(const Config &config) :
 			return new twili::service::ITwiliService(this);
 		}),
 	file_manager(*this),
-	applet_tracker(*this) {
+	applet_tracker(*this),
+	shell_tracker(*this) {
 	if(config.enable_usb_bridge) {
 		usb_bridge.emplace(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
 	}
@@ -229,6 +230,8 @@ Twili::ServiceRegistration::~ServiceRegistration() {
 Twili::Services::Services() {
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
 
+	lr = ResultCode::AssertOk(sm.GetService("lr"));
+	
 	pm_dmnt = ResultCode::AssertOk(sm.GetService("pm:dmnt"));
 	
 	pm_shell = twili::service::pm::IShellService(
@@ -247,6 +250,8 @@ Twili::Services::Services() {
 	
 	printf("acquiring ldr:shel\n");
 	ldr_shel = ResultCode::AssertOk(sm.GetService("ldr:shel"));
+
+	ns_dev = ResultCode::AssertOk(sm.GetService("ns:dev"));
 	
 	ipc::client::Object nifm_static = ResultCode::AssertOk(
 		sm.GetService("nifm:s"));

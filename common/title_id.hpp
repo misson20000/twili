@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -21,11 +21,13 @@
 #pragma once
 
 namespace twili {
-namespace applet_shim {
+namespace title_id {
 
-enum class Mode : uint32_t {
-	Control, Host
-};
+static const uint64_t AppletShimTitle = 0x010000000000100d;
 
-} // namespace applet_shim
+static const uint64_t SysmoduleTitle = 0x0100000000006480;
+static const uint64_t ManagedProcessTitle = 0x0100000000006481;
+static const uint64_t ShellProcessDefaultTitle = 0x0100000000006482;
+
+} // namespace title_id
 } // namespace twili

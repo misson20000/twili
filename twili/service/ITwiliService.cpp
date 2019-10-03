@@ -49,6 +49,8 @@ trn::ResultCode ITwiliService::Dispatch(trn::ipc::Message msg, uint32_t request_
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenHBABIShim>::Handle(this, msg);
 	case 4:
 		return trn::ipc::server::RequestHandler<&ITwiliService::OpenAppletShim>::Handle(this, msg);
+	case 5:
+		return trn::ipc::server::RequestHandler<&ITwiliService::OpenShellShim>::Handle(this, msg);
 	case 10:
 		return trn::ipc::server::RequestHandler<&ITwiliService::CreateNamedOutputPipe>::Handle(this, msg);
 	case 999:
@@ -134,6 +136,18 @@ trn::ResultCode ITwiliService::OpenAppletShim(trn::ipc::InPid pid, trn::ipc::InH
 		} else {
 			return r.error().code;
 		}
+	}
+}
+
+trn::ResultCode ITwiliService::OpenShellShim(trn::ipc::InPid pid, trn::ipc::InHandle<trn::KProcess, trn::ipc::copy> process, trn::ipc::OutObject<IHBABIShim> &out) {
+	printf("opening shell shim for pid 0x%lx\n", pid.value);
+	std::shared_ptr<process::MonitoredProcess> p = twili->shell_tracker.AttachHostProcess(std::move(process.object));
+	auto r = server->CreateObject<IHBABIShim>(this, p);
+	if(r) {
+		out.value = r.value();
+		return RESULT_OK;
+	} else {
+		return r.error().code;
 	}
 }
 

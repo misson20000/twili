@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -24,17 +24,28 @@
 
 #include<deque>
 
-#include "process/AppletProcess.hpp"
-#include "process/ProcessMonitor.hpp"
-#include "process/fs/NRONSOTransmutationFile.hpp"
+#include "TrackedProcess.hpp"
+#include "AppletProcess.hpp"
+#include "ProcessMonitor.hpp"
 
 namespace twili {
 
 class Twili;
 
-class AppletTracker {
+namespace process {
+
+/*
+ * AppletTracker is responsible for managing AppletProcess
+ * lifecycles and making sure they're sane and safe with regards
+ * to launching (ECS) and attaching.
+ */
+class AppletTracker : public Tracker<AppletProcess> {
  public:
 	AppletTracker(Twili &twili);
+
+	// Tracker contract
+	virtual std::shared_ptr<AppletProcess> CreateProcess() override;
+	virtual void QueueLaunch(std::shared_ptr<AppletProcess> process) override;
 	
 	// for control process
 	bool HasControlProcess();
@@ -42,43 +53,41 @@ class AppletTracker {
 	void ReleaseControlProcess();
 	const trn::KEvent &GetProcessQueuedEvent();
 	bool ReadyToLaunch();
-	std::shared_ptr<process::AppletProcess> PopQueuedProcess();
+	std::shared_ptr<AppletProcess> PopQueuedProcess();
 	
 	// for host process
-	std::shared_ptr<process::AppletProcess> AttachHostProcess(trn::KProcess &&process);
-
-	// for twili
-	void QueueLaunch(std::shared_ptr<process::AppletProcess> process);
+	std::shared_ptr<AppletProcess> AttachHostProcess(trn::KProcess &&process);
 
 	void HBLLoad(std::string path, std::string argv);
 
 	void PrintDebugInfo();
- private:
+
 	Twili &twili;
-	
+ private:
 	// an applet process has several states:
 	//  - queued
 	//  - created
 	//  - attached
 
-	std::deque<std::shared_ptr<process::AppletProcess>> queued;
-	std::deque<std::shared_ptr<process::AppletProcess>> created;
+	std::deque<std::shared_ptr<AppletProcess>> queued;
+	std::deque<std::shared_ptr<AppletProcess>> created;
 
 	bool has_control_process = false;
 	trn::KEvent process_queued_event;
 	trn::KWEvent process_queued_wevent;
 
-	std::shared_ptr<process::AppletProcess> CreateHbmenu();
-	std::shared_ptr<process::fs::ProcessFile> hbmenu_nro;
-	std::shared_ptr<process::AppletProcess> hbmenu;
+	std::shared_ptr<AppletProcess> CreateHbmenu();
+	std::shared_ptr<fs::ProcessFile> hbmenu_nro;
+	std::shared_ptr<AppletProcess> hbmenu;
 
-	class Monitor : public process::ProcessMonitor {
+	class Monitor : public ProcessMonitor {
 	 public:
 		Monitor(AppletTracker &tracker);
-		virtual void StateChanged(process::MonitoredProcess::State new_state);
+		virtual void StateChanged(MonitoredProcess::State new_state);
 	 private:
 		AppletTracker &tracker;
 	} monitor;
 };
 
+} // namespace process
 } // namespace twili

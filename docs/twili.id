@@ -3,7 +3,8 @@ interface twili::ITwiliService is twili {
 	[1] OpenStdout(pid) -> object<twili::IPipe>;
 	[2] OpenStderr(pid) -> object<twili::IPipe>;
 	[3] OpenHBABIShim(pid) -> object<twili::IHBABIShim>;
-	[4] OpenAppletShim(pid) -> object<twili::IAppletShim>;
+	[4] OpenAppletShim(pid, KHandle<process>) -> object<twili::IAppletShim>;
+	[5] OpenShellShim(pid, KHandle<process>) -> object<twili::IHBABIShim>;
 	
 	[10] CreateNamedOutputPipe(array<uint8_t, 0x6> name) -> object<twili::IPipe>;
 	

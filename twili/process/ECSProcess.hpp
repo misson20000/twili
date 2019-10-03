@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,12 +20,39 @@
 
 #pragma once
 
-namespace twili {
-namespace applet_shim {
+#include<libtransistor/cpp/nx.hpp>
 
-enum class Mode : uint32_t {
-	Control, Host
+#include<memory>
+#include<optional>
+#include<deque>
+
+#include "MonitoredProcess.hpp"
+#include "fs/ProcessFile.hpp"
+#include "fs/ProcessFileSystem.hpp"
+
+namespace twili {
+namespace process {
+
+class ECSProcess : public MonitoredProcess {
+ public:
+	ECSProcess(
+		Twili &twili,
+		const char *rtld,
+		const char *npdm,
+		uint64_t title_id);
+	
+	virtual void ChangeState(MonitoredProcess::State state) override;
+
+	// sets up ExternalContentSource for loader
+	// returns false if this process is no longer requested to launch
+	virtual bool PrepareForLaunch();
+ protected:
+	fs::ProcessFileSystem virtual_exefs;
+
+ private:
+	uint64_t title_id;
+	bool ecs_pending = false;
 };
 
-} // namespace applet_shim
+} // namespace process
 } // namespace twili

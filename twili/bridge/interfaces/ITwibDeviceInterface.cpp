@@ -56,7 +56,9 @@ ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : O
 void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener, std::string type) {
 	std::shared_ptr<process::MonitoredProcess> proc;
 	if(type == "applet") {
-		proc = std::make_shared<process::AppletProcess>(twili);
+		proc = twili.applet_tracker.CreateMonitoredProcess();
+	} else if(type == "shell") {
+		proc = twili.shell_tracker.CreateMonitoredProcess();
 	} else {
 		opener.RespondError(TWILI_ERR_UNRECOGNIZED_MONITORED_PROCESS_TYPE);
 		return;

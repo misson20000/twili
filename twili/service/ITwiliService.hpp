@@ -42,6 +42,7 @@ class ITwiliService : public trn::ipc::server::Object {
 	trn::ResultCode OpenStderr(trn::ipc::InPid pid, trn::ipc::OutObject<IPipe> &out);
 	trn::ResultCode OpenHBABIShim(trn::ipc::InPid pid, trn::ipc::OutObject<IHBABIShim> &out);
 	trn::ResultCode OpenAppletShim(trn::ipc::InPid pid, trn::ipc::InHandle<trn::KProcess, trn::ipc::copy>, trn::ipc::OutObject<IAppletShim> &out);
+	trn::ResultCode OpenShellShim(trn::ipc::InPid pid, trn::ipc::InHandle<trn::KProcess, trn::ipc::copy>, trn::ipc::OutObject<IHBABIShim> &out);
 	trn::ResultCode CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0x5, 0> name_buffer, trn::ipc::OutObject<IPipe> &val);
 	trn::ResultCode Destroy();
 

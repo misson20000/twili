@@ -1,10 +1,11 @@
-TWILI_OBJECTS := twili.o service/ITwiliService.o service/IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process/MonitoredProcess.o ELFCrashReport.o twili.squashfs.o service/IHBABIShim.o msgpack11/msgpack11.o process/Process.o bridge/interfaces/ITwibDeviceInterface.o bridge/interfaces/ITwibPipeReader.o TwibPipe.o bridge/interfaces/ITwibPipeWriter.o bridge/interfaces/ITwibDebugger.o ipcbind/pm/IShellService.o ipcbind/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o ipcbind/nifm/IGeneralService.o ipcbind/nifm/IRequest.o Socket.o Threading.o service/IAppletShim.o service/IAppletShimControlImpl.o service/IAppletShimHostImpl.o AppletTracker.o process/AppletProcess.o process/UnmonitoredProcess.o process_creation.o service/IAppletController.o service/fs/IFileSystem.o service/fs/IFile.o process/fs/ProcessFileSystem.o process/fs/VectorFile.o process/fs/ActualFile.o bridge/interfaces/ITwibProcessMonitor.o process/ProcessMonitor.o process/fs/TransmutationFile.o process/fs/NSOTransmutationFile.o process/fs/NRONSOTransmutationFile.o bridge/RequestHandler.o FileManager.o bridge/interfaces/ITwibFilesystemAccessor.o bridge/interfaces/ITwibFileAccessor.o bridge/interfaces/ITwibDirectoryAccessor.o ipcbind/ro/IDebugMonitorInterface.o
-TWILI_RESOURCES := $(addprefix build/,hbabi_shim.nro applet_host.nso twili_applet_shim/applet_host.npdm applet_control.nso twili_applet_shim/applet_control.npdm)
+TWILI_OBJECTS := twili.o service/ITwiliService.o service/IPipe.o bridge/usb/USBBridge.o bridge/Object.o bridge/ResponseOpener.o bridge/ResponseWriter.o process/MonitoredProcess.o ELFCrashReport.o twili.squashfs.o service/IHBABIShim.o msgpack11/msgpack11.o process/Process.o bridge/interfaces/ITwibDeviceInterface.o bridge/interfaces/ITwibPipeReader.o TwibPipe.o bridge/interfaces/ITwibPipeWriter.o bridge/interfaces/ITwibDebugger.o ipcbind/pm/IShellService.o ipcbind/ldr/IDebugMonitorInterface.o bridge/usb/RequestReader.o bridge/usb/ResponseState.o bridge/tcp/TCPBridge.o bridge/tcp/Connection.o bridge/tcp/ResponseState.o ipcbind/nifm/IGeneralService.o ipcbind/nifm/IRequest.o Socket.o Threading.o service/IAppletShim.o service/IAppletShimControlImpl.o service/IAppletShimHostImpl.o process/AppletTracker.o process/TrackedProcess.o process/ShellTracker.o process/ShellProcess.o process/AppletProcess.o process/UnmonitoredProcess.o process_creation.o service/IAppletController.o service/fs/IFileSystem.o service/fs/IFile.o process/fs/ProcessFileSystem.o process/fs/VectorFile.o process/fs/ActualFile.o bridge/interfaces/ITwibProcessMonitor.o process/ProcessMonitor.o process/fs/TransmutationFile.o process/fs/NSOTransmutationFile.o process/fs/NRONSOTransmutationFile.o bridge/RequestHandler.o FileManager.o bridge/interfaces/ITwibFilesystemAccessor.o bridge/interfaces/ITwibFileAccessor.o bridge/interfaces/ITwibDirectoryAccessor.o ipcbind/ro/IDebugMonitorInterface.o process/ECSProcess.o
+TWILI_RESOURCES := $(addprefix build/,hbabi_shim.nro applet_host.nso twili_applet_shim/applet_host.npdm applet_control.nso twili_applet_shim/applet_control.npdm shell_shim/shell_shim.npdm shell_shim.nso)
 COMMON_OBJECTS := Buffer.o util.o
 
 APPLET_HOST_OBJECTS := applet_host.o applet_common.o
 APPLET_CONTROL_OBJECTS := applet_control.o applet_common.o
 HBABI_SHIM_OBJECTS := hbabi_shim.o
+SHELL_SHIM_OBJECTS := shell_shim.o
 
 BUILD_PFS0 := build_pfs0
 
@@ -110,3 +111,10 @@ build/hbabi_shim.nro.so: $(HBABI_SHIM_DEPS) $(LIBTRANSITOR_NRO_LIB) $(LIBTRANSIS
 	mkdir -p $(@D)
 	$(LD) $(LD_FLAGS) -o $@ $(HBABI_SHIM_DEPS) $(LIBTRANSISTOR_NRO_LDFLAGS)
 -include $(addprefix build/hbabi_shim/,$(HBABI_SHIM_OBJECTS:.o=.d))
+
+# Shell shim
+SHELL_SHIM_DEPS = $(addprefix build/shell_shim/,$(SHELL_SHIM_OBJECTS))
+build/shell_shim.nso.so: $(SHELL_SHIM_DEPS) $(LIBTRANSITOR_NSO_LIB) $(LIBTRANSISTOR_COMMON_LIBS)
+	mkdir -p $(@D)
+	$(LD) $(LD_FLAGS) -o $@ $(SHELL_SHIM_DEPS) $(LIBTRANSISTOR_NSO_LDFLAGS)
+-include $(addprefix build/shell_shim/,$(SHELL_SHIM_OBJECTS:.o=.d))

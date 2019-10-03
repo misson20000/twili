@@ -26,7 +26,7 @@
 
 #include "applet_shim.hpp"
 
-#include "../AppletTracker.hpp"
+#include "../process/AppletTracker.hpp"
 
 namespace twili {
 namespace service {
@@ -55,7 +55,7 @@ class IAppletShim : public trn::ipc::server::Object {
 
 class IAppletShim::ControlImpl : public IAppletShim {
  public:
-	ControlImpl(trn::ipc::server::IPCServer *server, AppletTracker &tracker);
+	ControlImpl(trn::ipc::server::IPCServer *server, process::AppletTracker &tracker);
 	virtual ~ControlImpl();
 
 	virtual trn::ResultCode GetMode(trn::ipc::OutRaw<applet_shim::Mode> mode);
@@ -64,7 +64,7 @@ class IAppletShim::ControlImpl : public IAppletShim {
 	virtual trn::ResultCode GetCommand(trn::ipc::OutRaw<uint32_t> cmd);
 	virtual trn::ResultCode PopApplet(trn::ipc::OutObject<IAppletController> &controller);
  private:
-	AppletTracker &tracker;
+	process::AppletTracker &tracker;
 };
 
 class IAppletShim::HostImpl : public IAppletShim {

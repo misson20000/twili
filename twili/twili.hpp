@@ -25,8 +25,9 @@
 
 #include<list>
 
-#include "AppletTracker.hpp"
 #include "process/MonitoredProcess.hpp"
+#include "process/AppletTracker.hpp"
+#include "process/ShellTracker.hpp"
 
 #include "bridge/usb/USBBridge.hpp"
 #include "bridge/tcp/TCPBridge.hpp"
@@ -91,16 +92,19 @@ class Twili {
 	 public:
 		Services();
 
+		trn::ipc::client::Object lr;
 		trn::ipc::client::Object pm_dmnt;
 		service::pm::IShellService pm_shell;
 		service::ldr::IDebugMonitorInterface ldr_dmnt;
 		service::ro::IDebugMonitorInterface ro_dmnt;
 		trn::ipc::client::Object ldr_shel;
+		trn::ipc::client::Object ns_dev;
 		service::nifm::IGeneralService nifm;
 	} services;
 
 	FileManager file_manager;
-	AppletTracker applet_tracker;
+	process::AppletTracker applet_tracker;
+	process::ShellTracker shell_tracker;
 	
 	std::optional<bridge::usb::USBBridge> usb_bridge;
 	std::optional<bridge::tcp::TCPBridge> tcp_bridge;

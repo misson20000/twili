@@ -516,10 +516,12 @@ int main(int argc, char *argv[]) {
 	
 	CLI::App *run = app.add_subcommand("run", "Run an executable");
 	std::string run_file;
-	bool run_applet = false;;
+	bool run_applet = false;
+	bool run_shell = false;
 	bool run_suspend = false;
 	bool run_quiet = false;
 	run->add_flag("-a,--applet", run_applet, "Run as an applet");
+	run->add_flag("-s,--shell", run_shell, "Run as a shell program");
 	run->add_flag("-d,--debug-suspend", run_suspend, "Suspends for debug");
 	run->add_flag("-q,--quiet", run_quiet, "Suppress any output except from the program being run");
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
@@ -647,7 +649,7 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 		
-		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess("applet");
+		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_shell ? "shell" : (run_applet ? "applet" : "managed"));
 		mon.AppendCode(*code_opt);
 		uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
 		if(!run_quiet) {

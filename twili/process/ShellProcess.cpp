@@ -18,43 +18,38 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+#include "AppletProcess.hpp"
 
-#include<libtransistor/cpp/nx.hpp>
+#include "../twili.hpp"
+#include "fs/ActualFile.hpp"
+#include "fs/VectorFile.hpp"
 
-#include<memory>
-#include<optional>
-#include<deque>
+#include "err.hpp"
+#include "title_id.hpp"
 
-#include "TrackedProcess.hpp"
+using namespace trn;
 
 namespace twili {
 namespace process {
 
-class AppletTracker;
+ShellProcess::ShellProcess(ShellTracker &tracker) :
+	TrackedProcess<ShellProcess>(
+		tracker.twili,
+		tracker,
+		"/squash/shell_shim.nso",
+		"/squash/shell_shim.npdm",
+		title_id::ShellProcessDefaultTitle) {
+}
 
-class AppletProcess : public TrackedProcess<AppletProcess> {
- public:
-	AppletProcess(AppletTracker &tracker);
+void ShellProcess::KillImpl() {
+	// no assert so we don't die if this fails
+	twili.services.ns_dev.SendSyncRequest<1>( // TerminateProcess
+		trn::ipc::InRaw<uint64_t>(GetPid()));
+}
 
-	virtual void ChangeState(State state) override;
-	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
-
-	// used to communicate with host shim
-	trn::KEvent &GetCommandEvent();
-	std::optional<uint32_t> PopCommand();
-	
- protected:
-	virtual void KillImpl() override;
-	
- private:
-	std::shared_ptr<trn::WaitHandle> kill_timeout;
-
-	void PushCommand(uint32_t command);
-	trn::KEvent command_event;
-	trn::KWEvent command_wevent;
-	std::deque<uint32_t> commands;
-};
+void ShellProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries) {
+	MonitoredProcess::AddHBABIEntries(entries);
+}
 
 } // namespace process
 } // namespace twili

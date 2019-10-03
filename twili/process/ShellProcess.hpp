@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,12 +20,19 @@
 
 #pragma once
 
-namespace twili {
-namespace applet_shim {
+#include "TrackedProcess.hpp"
 
-enum class Mode : uint32_t {
-	Control, Host
+namespace twili {
+namespace process {
+
+class ShellTracker;
+
+class ShellProcess : public TrackedProcess<ShellProcess> {
+ public:
+	ShellProcess(ShellTracker &tracker);
+	virtual void KillImpl() override;
+	virtual void AddHBABIEntries(std::vector<loader_config_entry_t> &entries) override;
 };
 
-} // namespace applet_shim
+} // namespace process
 } // namespace twili

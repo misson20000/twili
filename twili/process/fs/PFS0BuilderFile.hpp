@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,12 +20,40 @@
 
 #pragma once
 
-namespace twili {
-namespace applet_shim {
+#include<stdlib.h>
+#include<stdint.h>
 
-enum class Mode : uint32_t {
-	Control, Host
+#include "ProcessFile.hpp"
+
+#include<string>
+#include<vector>
+
+namespace twili {
+namespace process {
+namespace fs {
+
+class PFS0BuilderFile : public ProcessFile {
+ public:
+	PFS0BuilderFile();
+
+	void Append(std::string name, std::shared_ptr<ProcessFile> file);
+	virtual size_t Read(size_t offset, size_t size, uint8_t *out) override;
+	virtual size_t GetSize() override;
+ private:
+	size_t string_table_size = 0;
+	size_t file_image_size = 0;
+	
+	struct Entry {
+		std::string name;
+		std::shared_ptr<ProcessFile> file;
+
+		size_t string_table_offset;
+		size_t file_image_offset;
+	};
+	
+	std::vector<Entry> entries;
 };
 
-} // namespace applet_shim
+} // namespace fs
+} // namespace process
 } // namespace twili
