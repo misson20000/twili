@@ -22,8 +22,6 @@
 
 #include<libtransistor/cpp/waiter.hpp>
 #include<libtransistor/thread.h>
-#include<libtransistor/condvar.h>
-#include<libtransistor/mutex.h>
 
 #include<list>
 #include<memory>
@@ -34,6 +32,7 @@
 #include "../RequestHandler.hpp"
 
 #include "../../ipcbind/nifm/IRequest.hpp"
+#include "../../Threading.hpp"
 #include "../../Socket.hpp"
 
 namespace twili {
@@ -74,12 +73,12 @@ class TCPBridge {
 	void ResetSockets();
 	service::nifm::IRequest::State network_state = service::nifm::IRequest::State::Error;
 	trn::KEvent network_state_event;
-	trn_mutex_t network_state_mutex = TRN_MUTEX_STATIC_INITIALIZER;
-	trn_condvar_t network_state_condvar = TRN_CONDVAR_STATIC_INITIALIZER;
+	thread::Mutex network_state_mutex;
+	thread::Condvar network_state_condvar;
 	std::shared_ptr<trn::WaitHandle> network_state_wh;
 
-	trn_mutex_t request_processing_mutex = TRN_MUTEX_STATIC_INITIALIZER;
-	trn_condvar_t request_processing_condvar = TRN_CONDVAR_STATIC_INITIALIZER;
+	thread::Mutex request_processing_mutex;
+	thread::Condvar request_processing_condvar;
 	std::shared_ptr<trn::WaitHandle> request_processing_signal_wh;
 	std::shared_ptr<Connection> request_processing_connection;
 };

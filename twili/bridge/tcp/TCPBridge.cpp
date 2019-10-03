@@ -27,7 +27,6 @@
 #include<system_error>
 
 #include "../../twili.hpp"
-#include "../../MutexShim.hpp"
 
 namespace twili {
 namespace bridge {
@@ -52,8 +51,7 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			printf("received network state event notification\n");
 			network_state_event.ResetSignal();
 
-			util::MutexShim mutex_shim(network_state_mutex);
-			std::unique_lock<util::MutexShim> lock(mutex_shim);
+			std::unique_lock<thread::Mutex> lock(network_state_mutex);
 			
 			network_state = network.GetRequestState();
 			printf("network state changed: %d\n", network_state);
@@ -62,8 +60,8 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 				announce_socket.Close();
 				server_socket.Close();
 			}
-			
-			trn_condvar_signal(&network_state_condvar, -1);
+
+			network_state_condvar.Signal(-1);
 			return true;
 		});
 
@@ -73,8 +71,7 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 
 	request_processing_signal_wh = twili.event_waiter.AddSignal(
 		[this]() {
-			util::MutexShim shim(request_processing_mutex); // I/O thread can't mess with us now
-			std::unique_lock<util::MutexShim> lock(shim);
+			std::unique_lock<thread::Mutex> lock(request_processing_mutex);
 
 			request_processing_signal_wh->ResetSignal();
 			try {
@@ -84,8 +81,8 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 				request_processing_connection->deletion_flag = true;
 			}
 			request_processing_connection.reset();
-			
-			trn_condvar_signal(&request_processing_condvar, -1); // resume I/O thread after we unlock
+
+			request_processing_condvar.Signal(-1); // resume I/O thread after we unlock
 
 			return true;
 		});
@@ -102,8 +99,7 @@ void TCPBridge::SocketThread() {
 	while(!thread_destroy) {
 		{ // scope for lock
 			// wait for network connection
-			util::MutexShim mutex_shim(network_state_mutex);
-			std::unique_lock<util::MutexShim> lock(mutex_shim);
+			std::unique_lock<thread::Mutex> lock(network_state_mutex);
 			if(network_state != service::nifm::IRequest::State::Connected) {
 				printf("network is down\n");
 				connections.clear(); // kill all our connections
@@ -111,7 +107,7 @@ void TCPBridge::SocketThread() {
 				// wait for network to come back up
 				printf("waiting for network to come up\n");
 				while(network_state != service::nifm::IRequest::State::Connected && !thread_destroy) {
-					trn_condvar_wait(&network_state_condvar, &network_state_mutex, -1);
+					network_state_condvar.Wait(network_state_mutex, -1);
 				}
 				if(thread_destroy) {
 					break;
@@ -208,7 +204,7 @@ void TCPBridge::ResetSockets() {
 	server_socket = {bsd_socket(AF_INET, SOCK_STREAM, 0)};
 	if(server_socket.fd == -1) {
 		printf("failed to create socket\n");
-		trn_mutex_unlock(&network_state_mutex);
+		network_state_mutex.unlock(); // TODO: why did I put this here?
 		return;
 	}
 				
@@ -256,7 +252,7 @@ TCPBridge::~TCPBridge() {
 	printf("destroying TCPBridge\n");
 	thread_destroy = true;
 	server_socket.Close();
-	trn_condvar_signal(&network_state_condvar, -1);
+	network_state_condvar.Signal(-1);
 	printf("waiting for socket thread to die\n");
 	trn_thread_join(&thread, -1);
 	printf("socket thread joined\n");

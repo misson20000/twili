@@ -24,7 +24,7 @@
 
 #include<mutex>
 
-#include "../../MutexShim.hpp"
+#include "../../Threading.hpp"
 #include "../Object.hpp"
 
 #include "err.hpp"
@@ -88,15 +88,14 @@ void TCPBridge::Connection::Process() {
 }
 
 void TCPBridge::Connection::Synchronize(Task task) {
-	util::MutexShim shim(bridge.request_processing_mutex);
-	std::unique_lock<util::MutexShim> lock(shim);
+	std::unique_lock<thread::Mutex> lock(bridge.request_processing_mutex);
 	
 	this->pending_task = task;
 	// request that the main thread service us
 	bridge.request_processing_connection = shared_from_this();
 	bridge.request_processing_signal_wh->Signal();
 	while(this->pending_task != Task::Idle) {
-		trn_condvar_wait(&bridge.request_processing_condvar, &bridge.request_processing_mutex, -1);
+		bridge.request_processing_condvar.Wait(bridge.request_processing_mutex, -1);
 	}
 }
 
