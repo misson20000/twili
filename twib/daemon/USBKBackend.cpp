@@ -182,6 +182,7 @@ USBKBackend::Device::~Device() {
 			backend.daemon.PostResponse(r.RespondError(TWILI_ERR_PROTOCOL_TRANSFER_ERROR));
 		}
 	}
+	if(isl_lock) { isl_lock.unlock(); }
 }
 
 void USBKBackend::Device::Begin() {
@@ -230,6 +231,7 @@ void USBKBackend::Device::SendRequest(const Request &&request) {
 
 void USBKBackend::Device::Kill() {
 	deletion_flag = true;
+	if(isl_lock) { isl_lock.unlock(); }
 	state_cv.notify_all();
 }
 

@@ -96,6 +96,7 @@ USBBackend::Device::~Device() {
 			backend->daemon.PostResponse(r.RespondError(TWILI_ERR_PROTOCOL_TRANSFER_ERROR));
 		}
 	}
+	Destroy();
 	libusb_free_transfer(tfer_meta_out);
 	libusb_free_transfer(tfer_data_out);
 	libusb_free_transfer(tfer_meta_in);
@@ -173,6 +174,7 @@ std::string USBBackend::Device::GetBridgeType() {
 
 void USBBackend::Device::Kill() {
 	deletion_flag = true;
+	if(isl_lock) { isl_lock.unlock(); }
 	state_cv.notify_all();
 }
 
