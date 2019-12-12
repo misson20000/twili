@@ -40,11 +40,11 @@ class Buffer {
 
 	// Tries to reserve at least `size` bytes, returns a tuple
 	// of the write head pointer and a size of how many bytes
-	// can be written. call MarkWritten to mark how many
-	// bytes were actually read.
+	// can be written. Call MarkWritten to mark how many
+	// bytes were actually written.
 	// If the buffer is unlimited, this will always return at
 	// least `size` bytes. Otherwise, it may return less.
-	std::tuple<uint8_t*, size_t> Reserve(size_t size);
+	std::tuple<uint8_t*, size_t> Reserve(size_t hint);
 	void MarkWritten(size_t size);
 
 	// Write functions true on success, only failing if buffer is limited.
