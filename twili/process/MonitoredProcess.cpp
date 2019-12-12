@@ -115,7 +115,11 @@ MonitoredProcess::State MonitoredProcess::GetState() {
 }
 
 trn::ResultCode MonitoredProcess::GetResult() {
-	return result;
+	if(result.code != 0) {
+		return result;
+	} else {
+		return TWILI_ERR_UNSPECIFIED;
+	}
 }
 
 void MonitoredProcess::AppendCode(std::shared_ptr<fs::ProcessFile> file) {
