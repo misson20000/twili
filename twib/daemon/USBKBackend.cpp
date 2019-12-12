@@ -207,9 +207,10 @@ void USBKBackend::Device::MarkAdded() {
 
 void USBKBackend::Device::SendRequest(const Request &&request) {
 	std::unique_lock<std::mutex> lock(state_mutex);
-	while(state != State::AVAILABLE) {
+	while(state != State::AVAILABLE && !deletion_flag) {
 		state_cv.wait(lock);
 	}
+	if(deletion_flag) { return; }
 	state = State::BUSY;
 
 	mhdr.client_id = request.client ? request.client->client_id : 0xffffffff;
@@ -225,6 +226,11 @@ void USBKBackend::Device::SendRequest(const Request &&request) {
 	member_meta_out.Submit((uint8_t*)&mhdr, sizeof(mhdr));
 	transferring_data = false;
 	transferring_meta = true;
+}
+
+void USBKBackend::Device::Kill() {
+	deletion_flag = true;
+	state_cv.notify_all();
 }
 
 void USBKBackend::Device::MetaOutTransferCompleted(size_t size) {
@@ -305,7 +311,7 @@ void USBKBackend::Device::DataInTransferCompleted(size_t size) {
 	} else {
 		if(size != object_ids_in.size() * sizeof(uint32_t)) {
 			LogMessage(Error, "bad object ids in size");
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 		DispatchResponse();
@@ -339,7 +345,7 @@ void USBKBackend::Device::Identified(Response &r) {
 	LogMessage(Debug, "payload size: 0x%x", r.payload.size());
 	if(r.result_code != 0) {
 		LogMessage(Warning, "device identification error: 0x%x", r.result_code);
-		deletion_flag = true;
+		Kill();
 		return;
 	}
 	std::string err;
@@ -410,7 +416,7 @@ void USBKBackend::Device::TransferMember::Submit(uint8_t *buffer, size_t size) {
 		int err = GetLastError();
 		if(err != ERROR_IO_PENDING) {
 			LogMessage(Debug, "submit failed: %d", GetLastError());
-			device.deletion_flag = true;
+			device.Kill();
 		} else {
 			is_active = true;
 		}
@@ -429,7 +435,7 @@ void USBKBackend::Device::TransferMember::Signal() {
 		std::invoke(callback, device, (size_t) actual_length);
 	} else {
 		LogMessage(Debug, "a transfer member signalled failure");
-		device.deletion_flag = true;
+		device.Kill();
 	}
 }
 

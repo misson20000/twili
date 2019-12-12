@@ -104,7 +104,8 @@ class USBBackend {
 		std::list<WeakRequest> pending_requests;
 
 		std::unique_lock<InitialScanLock> isl_lock;
-		
+
+		void Kill();
 		std::shared_ptr<Device> *SharedPtrForTransfer();
 		void MetaOutTransferCompleted();
 		void DataOutTransferCompleted();

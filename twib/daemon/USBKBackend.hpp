@@ -162,6 +162,8 @@ class USBKBackend {
 		size_t data_in_transferred;
 		bool read_in_objects;
 
+		void Kill();
+		
 		void MetaOutTransferCompleted(size_t size);
 		void MetaInTransferCompleted(size_t size);
 		void DataOutTransferCompleted(size_t size);

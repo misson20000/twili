@@ -125,8 +125,11 @@ void Daemon::RemoveClient(std::shared_ptr<Client> client) {
 
 void Daemon::RemoveDevice(std::shared_ptr<Device> device) {
 	std::lock_guard<std::mutex> lock(device_map_mutex);
-	devices.erase(devices.find(device->device_id));
 	LogMessage(Info, "removing device %08x", device->device_id);
+	auto i = devices.find(device->device_id);
+	if(i != devices.end()) {
+		devices.erase(i);
+	}
 }
 
 // voodoo
@@ -233,14 +236,17 @@ Response Daemon::HandleRequest(Request &rq) {
 			
 			Response r = rq.RespondOk();
 			std::vector<msgpack11::MsgPack> device_packs;
-			for(auto i = devices.begin(); i != devices.end(); i++) {
-				auto device = i->second.lock();
-				device_packs.push_back(
-					msgpack11::MsgPack::object {
-						{"device_id", device->device_id},
-						{"bridge_type", device->GetBridgeType()},
-						{"identification", device->identification}
-					});
+			{
+				std::lock_guard<std::mutex> lock(device_map_mutex);
+				for(auto i = devices.begin(); i != devices.end(); i++) {
+					auto device = i->second.lock();
+					device_packs.push_back(
+						msgpack11::MsgPack::object {
+							{"device_id", device->device_id},
+								{"bridge_type", device->GetBridgeType()},
+									{"identification", device->identification}
+						});
+				}
 			}
 
 			util::Buffer response_payload;

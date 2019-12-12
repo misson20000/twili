@@ -128,9 +128,10 @@ void USBBackend::Device::MarkAdded() {
 
 void USBBackend::Device::SendRequest(const Request &&request) {
 	std::unique_lock<std::mutex> lock(state_mutex);
-	while(state != State::AVAILABLE) {
+	while(state != State::AVAILABLE && !deletion_flag) {
 		state_cv.wait(lock);
 	}
+	if(deletion_flag) { return; }
 	state = State::BUSY;
 	
 	/*
@@ -157,7 +158,7 @@ void USBBackend::Device::SendRequest(const Request &&request) {
 	int r = libusb_submit_transfer(tfer_meta_out);
 	if(r != 0) {
 		LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-		deletion_flag = true;
+		Kill();
 		return;
 	}
 }
@@ -168,6 +169,11 @@ int USBBackend::Device::GetPriority() {
 
 std::string USBBackend::Device::GetBridgeType() {
 	return "usb";
+}
+
+void USBBackend::Device::Kill() {
+	deletion_flag = true;
+	state_cv.notify_all();
 }
 
 std::shared_ptr<USBBackend::Device> *USBBackend::Device::SharedPtrForTransfer() {
@@ -185,7 +191,7 @@ void USBBackend::Device::MetaOutTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_out);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 	}
@@ -213,7 +219,7 @@ void USBBackend::Device::DataOutTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_out);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 		return;
@@ -254,7 +260,7 @@ void USBBackend::Device::MetaInTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 	} else if(mhdr_in.object_count > 0) {
@@ -262,7 +268,7 @@ void USBBackend::Device::MetaInTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 	} else {
@@ -284,7 +290,7 @@ void USBBackend::Device::DataInTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 		return;
@@ -295,7 +301,7 @@ void USBBackend::Device::DataInTransferCompleted() {
 		int r = libusb_submit_transfer(tfer_data_in);
 		if(r != 0) {
 			LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-			deletion_flag = true;
+			Kill();
 			return;
 		}
 	} else {
@@ -306,7 +312,7 @@ void USBBackend::Device::DataInTransferCompleted() {
 void USBBackend::Device::ObjectInTransferCompleted() {
 	if(tfer_data_in->actual_length != mhdr_in.object_count * sizeof(uint32_t)) {
 		LogMessage(Debug, "invalid object ID transfer\n");
-		deletion_flag = true;
+		Kill();
 		return;
 	}
 
@@ -340,7 +346,7 @@ void USBBackend::Device::Identified(Response &r) {
 	LogMessage(Debug, "payload size: 0x%x", r.payload.size());
 	if(r.result_code != 0) {
 		LogMessage(Warning, "device identification error: 0x%x", r.result_code);
-		deletion_flag = true;
+		Kill();
 		return;
 	}
 	std::string err;
@@ -363,14 +369,14 @@ void USBBackend::Device::ResubmitMetaInTransfer() {
 	int r = libusb_submit_transfer(tfer_meta_in);
 	if(r != 0) {
 		LogMessage(Debug, "transfer failed: %s", libusb_error_name(r));
-		deletion_flag = true;
+		Kill();
 	}
 }
 
 bool USBBackend::Device::CheckTransfer(libusb_transfer *tfer) {
 	if(tfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		LogMessage(Debug, "transfer failed (status = %d)", tfer->status);
-		deletion_flag = true;
+		Kill();
 		return true;
 	} else {
 		return false;
