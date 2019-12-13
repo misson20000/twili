@@ -38,6 +38,20 @@ class GdbStub {
 	~GdbStub();
 	
 	void Run();
+
+	inline static uint64_t ShiftPid(uint64_t pid) {
+		if(pid == 0) {
+			return 512;
+		}
+		return pid;
+	}
+	
+	inline static uint64_t UnshiftPid(uint64_t pid) {
+		if(pid == 512) {
+			return 0;
+		}
+		return pid;
+	}
 	
 	class Query {
 	 public:

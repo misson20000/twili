@@ -186,6 +186,10 @@ Although Horizon supports hardware breakpoints, I don't use them. Breakpoints ar
 
 Horizon does not support single stepping. Single stepping is implemented by predicting the next instruction and placing a breakpoint on it.
 
+#### Debugging PID 0
+
+On lower firmware versions, process IDs begin at 0. This causes assertion failures in GDB if you try to attach to process 0, so the stub will automatically translate PID 512 into process 0.
+
 # Installation
 
 Download the [latest release](https://github.com/misson20000/twili/releases/latest) of `twili.zip` and extract it to the root of your microSD card, letting the `atmosphere` directory merge with any existing directory tree. The only CFW that I officially support is Atmosphère (v0.8.3+). Running Twili on piracy firmware will make me cry, so don't do it. :cry:

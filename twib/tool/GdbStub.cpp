@@ -418,7 +418,7 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 		return;
 	}
 
-	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(pid)));
+	auto r = attached_processes.emplace(pid, Process(pid, itdi.OpenActiveDebugger(UnshiftPid(pid))));
 	
 	r.first->second.IngestEvents(*this);
 
@@ -1058,7 +1058,7 @@ std::string GdbStub::Process::BuildLibraryList() {
 			ss << ">" << std::endl;
 			ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
 			ss << "  </library>" << std::endl;
-			}*/
+		}
 	} catch(ResultError &e) {
 		LogMessage(Warning, "caught 0x%x reading NRO list", e.code);
 	}
