@@ -55,6 +55,25 @@ struct PackingHelper<std::vector<T>, typename std::enable_if<std::is_pod<T>::val
 	}
 };
 
+// specialization for Buffers
+template<>
+struct PackingHelper<util::Buffer> {
+	static size_t GetSize(util::Buffer &&buf) {
+		return sizeof(uint64_t) + buf.ReadAvailable();
+	}
+
+	static uint32_t GetObjectCount(util::Buffer &&buf) {
+		return 0;
+	}
+	
+	static void Pack(util::Buffer &&buf, ResponseWriter &w) {
+		size_t sz = buf.ReadAvailable();
+		w.Write<uint64_t>(sz);
+		w.Write(buf.Read(), sz);
+		buf.MarkRead(sz);
+	}
+};
+
 // specialization for strings
 template<>
 struct PackingHelper<std::string> {
