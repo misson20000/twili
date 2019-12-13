@@ -57,7 +57,7 @@ class Twili {
 		
 		// [logging]
 		int logging_verbosity = 0;
-		bool enable_usb_log = true;
+		bool enable_usb_log = false;
 
 		// [usb_bridge]
 		bool enable_usb_bridge = true;
