@@ -171,6 +171,7 @@ Twili::Config::Config() {
 		if(reader.ParseError() != 0) {
 			state = State::Error;
 			error_line = reader.ParseError();
+			fclose(f);
 			return;
 		}
 
@@ -189,6 +190,7 @@ Twili::Config::Config() {
 		tcp_bridge_port = reader.GetInteger("tcp_bridge", "port", tcp_bridge_port);
 
 		state = State::Loaded;
+		fclose(f);
 	}
 }
 
