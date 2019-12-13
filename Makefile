@@ -9,17 +9,17 @@ HBABI_SHIM_OBJECTS := hbabi_shim.o
 BUILD_PFS0 := build_pfs0
 
 ATMOSPHERE_DIR := build/atmosphere
-ATMOSPHERE_TWILI_TITLE_ID := 0100000000006480
-ATMOSPHERE_TWILI_TITLE_DIR := $(ATMOSPHERE_DIR)/titles/$(ATMOSPHERE_TWILI_TITLE_ID)
-ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_TITLE_DIR)/,exefs.nsp flags/boot2.flag)
+ATMOSPHERE_TWILI_PROGRAM_ID := 0100000000006480
+ATMOSPHERE_TWILI_CONTENTS_DIR := $(ATMOSPHERE_DIR)/contents/$(ATMOSPHERE_TWILI_PROGRAM_ID)
+ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_CONTENTS_DIR)/,exefs.nsp flags/boot2.flag)
 
 all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS) build/atmosphere/hbl.nsp
 
-$(ATMOSPHERE_TWILI_TITLE_DIR)/exefs.nsp: build/twili/exefs/main build/twili/exefs/main.npdm
+$(ATMOSPHERE_TWILI_CONTENTS_DIR)/exefs.nsp: build/twili/exefs/main build/twili/exefs/main.npdm
 	mkdir -p $(@D)
 	$(BUILD_PFS0) build/twili/exefs/ $@
 
-$(ATMOSPHERE_TWILI_TITLE_DIR)/flags/boot2.flag:
+$(ATMOSPHERE_TWILI_CONTENTS_DIR)/flags/boot2.flag:
 	mkdir -p $(@D)
 	touch $@
 
