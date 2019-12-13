@@ -184,7 +184,11 @@ void ShellTracker::TryToLaunch() {
 		twili.services.lr.SendSyncRequest<0>( // OpenLocationResolver
 			ipc::InRaw<uint8_t>(storage_id),
 			ipc::OutObject(ilr)));
-	char path[] = "@Sdcard://doesntexist.nsp";
+
+	// This path points to an empty nsp. It just needs to exist to make
+	// loader happy...
+	char path[] = "@Sdcard://atmosphere/contents/0100000000006482/exefs.nsp";
+	
 	ResultCode::AssertOk(
 		ilr.SendSyncRequest<1>( // RedirectProgramPath
 			ipc::InRaw<uint64_t>(title_id::ShellProcessDefaultTitle),

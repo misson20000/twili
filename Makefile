@@ -14,7 +14,11 @@ ATMOSPHERE_TWILI_PROGRAM_ID := 0100000000006480
 ATMOSPHERE_TWILI_CONTENTS_DIR := $(ATMOSPHERE_DIR)/contents/$(ATMOSPHERE_TWILI_PROGRAM_ID)
 ATMOSPHERE_TWILI_TARGETS := $(addprefix $(ATMOSPHERE_TWILI_CONTENTS_DIR)/,exefs.nsp flags/boot2.flag)
 
-all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS) build/atmosphere/hbl.nsp
+ATMOSPHERE_TWILI_SHELL_PROGRAM_ID := 0100000000006482
+ATMOSPHERE_TWILI_SHELL_CONTENTS_DIR := $(ATMOSPHERE_DIR)/contents/$(ATMOSPHERE_TWILI_SHELL_PROGRAM_ID)
+ATMOSPHERE_TWILI_SHELL_TARGETS := $(ATMOSPHERE_TWILI_SHELL_CONTENTS_DIR)/exefs.nsp
+
+all: build/twili.nro build/twili.nso $(ATMOSPHERE_TWILI_TARGETS) $(ATMOSPHERE_TWILI_SHELL_TARGETS) build/atmosphere/hbl.nsp
 
 $(ATMOSPHERE_TWILI_CONTENTS_DIR)/exefs.nsp: build/twili/exefs/main build/twili/exefs/main.npdm
 	mkdir -p $(@D)
@@ -23,6 +27,11 @@ $(ATMOSPHERE_TWILI_CONTENTS_DIR)/exefs.nsp: build/twili/exefs/main build/twili/e
 $(ATMOSPHERE_TWILI_CONTENTS_DIR)/flags/boot2.flag:
 	mkdir -p $(@D)
 	touch $@
+
+$(ATMOSPHERE_TWILI_SHELL_CONTENTS_DIR)/exefs.nsp:
+	mkdir -p $(@D)
+	mkdir -p $(@D) build/twili_shell/exefs/ # yes, this is supposed to be empty
+	$(BUILD_PFS0) build/twili_shell/exefs/ $@
 
 $(ATMOSPHERE_DIR)/hbl.nsp: build/applet_control/exefs/main build/applet_control/exefs/main.npdm
 	mkdir -p $(@D)
