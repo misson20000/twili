@@ -253,8 +253,6 @@ Twili::Services::Services() {
 		nifm_static.SendSyncRequest<4>( // CreateGeneralService
 			ipc::OutObject(nifm)));
 
-	sm_m = ResultCode::AssertOk(sm.GetService("sm:m"));
-
 	printf("acquired services\n");
 }
 

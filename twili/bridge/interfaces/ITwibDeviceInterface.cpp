@@ -35,7 +35,6 @@
 #include "../../msgpack11/msgpack11.hpp"
 
 #include "../../twili.hpp"
-#include "../../process/ManagedProcess.hpp"
 #include "../../process/UnmonitoredProcess.hpp"
 #include "../../ELFCrashReport.hpp"
 
@@ -56,9 +55,7 @@ ITwibDeviceInterface::ITwibDeviceInterface(uint32_t device_id, Twili &twili) : O
 
 void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener, std::string type) {
 	std::shared_ptr<process::MonitoredProcess> proc;
-	if(type == "managed") {
-		proc = std::make_shared<process::ManagedProcess>(twili);
-	} else if(type == "applet") {
+	if(type == "applet") {
 		proc = std::make_shared<process::AppletProcess>(twili);
 	} else {
 		opener.RespondError(TWILI_ERR_UNRECOGNIZED_MONITORED_PROCESS_TYPE);

@@ -641,8 +641,13 @@ int main(int argc, char *argv[]) {
 			LogMessage(Fatal, "could not read file");
 			return 1;
 		}
+
+		if(!run_applet) {
+			LogMessage(Fatal, "Managed process has been removed.");
+			return 1;
+		}
 		
-		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_applet ? "applet" : "managed");
+		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess("applet");
 		mon.AppendCode(*code_opt);
 		uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
 		if(!run_quiet) {

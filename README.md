@@ -412,9 +412,13 @@ $ twib connect-tcp 10.0.0.218
 
 ## twib run
 
-Runs an executable on the target console. If the `-a` flag is not used, the executable will be run in a "managed" sysmodule process that is invisible to the rest of the system. The executable format for managed processes is NRO. If the `-a` flag is used, the process will be launched as a library applet instead. If you want to run a typical homebrew application, you will need to use the `-a` flag. The executable format for applet processes is also NRO.
+Runs an NRO executable on the target console.
 
-In the future, both managed and applet processes will be able to be launched from ExeFS NSP, NSO, NRO, or ELF.
+If the `-a` flag is used, the executable will be run in applet mode. These are called AppletProcess internally and are managed by AppletTracker. If the homebrew menu is open already, it will be closed and the applet started. Otherwise, you will have to open the homebrew menu first and the applet will be automatically launched. Only one such applet can be run at a time, so they will be queued instead.
+
+If the `-a` flag is not used, the executable will be run as a background process managed via `pm:shell`. These are called ShellProcess internally and are managed by ShellTracker.
+
+In the future, both shell and applet processes will be able to be launched from ExeFS NSP, NSO, NRO, or ELF.
 
 Twib will stay alive until the process exits. If the application implements Twili stdio, any output from the process will come out of twib and any input given to Twib will be sent to the target process. You can use the `-q` flag to silence the PID output if you are using twib in a shell script or pipeline.
 
