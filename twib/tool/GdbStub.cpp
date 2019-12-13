@@ -1019,40 +1019,50 @@ std::string GdbStub::Process::BuildLibraryList() {
 	std::stringstream ss;
 	ss << "<library-list>" << std::endl;
 	util::Buffer build_id_buffer;
-	std::vector<nx::LoadedModuleInfo> nsos = debugger.GetNsoInfos();
-	for(size_t i = 0; i < nsos.size(); i++) {
-		// skip main
-		if(nsos.size() == 1) { continue; } // standalone main
-		if(nsos.size() >= 2 && i == 1) { continue; } // rtld, main, subsdks, etc.
 
-		nx::LoadedModuleInfo &info = nsos[i];
+	try {
+		std::vector<nx::LoadedModuleInfo> nsos = debugger.GetNsoInfos();
+		for(size_t i = 0; i < nsos.size(); i++) {
+			// skip main
+			if(nsos.size() == 1) { continue; } // standalone main
+			if(nsos.size() >= 2 && i == 1) { continue; } // rtld, main, subsdks, etc.
+			
+			nx::LoadedModuleInfo &info = nsos[i];
 		
-		build_id_buffer.Clear();
-		GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
-		std::string build_id = build_id_buffer.GetString();
+			build_id_buffer.Clear();
+			GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
+			std::string build_id = build_id_buffer.GetString();
 
-		ss << "  <library";
-		ss << " name=\"" << build_id << "\"";
-		ss << " build_id=\"" << build_id << "\"";
-		ss << " type=\"nso\"";
-		ss << ">" << std::endl;
-		ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
-		ss << "  </library>" << std::endl;
+			ss << "  <library";
+			ss << " name=\"" << build_id << "\"";
+			ss << " build_id=\"" << build_id << "\"";
+			ss << " type=\"nso\"";
+			ss << ">" << std::endl;
+			ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
+			ss << "  </library>" << std::endl;
+			}
+	} catch(ResultError &e) {
+		LogMessage(Warning, "caught 0x%x reading NSO list", e.code);
 	}
-	/*
-	for(nx::LoadedModuleInfo &info : debugger.GetNroInfos()) {
-		build_id_buffer.Clear();
-		GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
-		std::string build_id = build_id_buffer.GetString();
+	
+	try {
+		for(nx::LoadedModuleInfo &info : debugger.GetNroInfos()) {
+			build_id_buffer.Clear();
+			GdbConnection::Encode(info.build_id, sizeof(info.build_id), build_id_buffer);
+			std::string build_id = build_id_buffer.GetString();
 
-		ss << "  <library";
-		ss << " name=\"" << build_id << "\"";
-		ss << " build_id=\"" << build_id << "\"";
-		ss << " type=\"nro\"";
-		ss << ">" << std::endl;
-		ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
-		ss << "  </library>" << std::endl;
-		}*/
+			ss << "  <library";
+			ss << " name=\"" << build_id << "\"";
+			ss << " build_id=\"" << build_id << "\"";
+			ss << " type=\"nro\"";
+			ss << ">" << std::endl;
+			ss << "    <segment address=\"0x" << std::hex << info.base_addr << "\" />" << std::endl;
+			ss << "  </library>" << std::endl;
+			}*/
+	} catch(ResultError &e) {
+		LogMessage(Warning, "caught 0x%x reading NRO list", e.code);
+	}
+	
 	ss << "</library-list>" << std::endl;
 
 	return ss.str();

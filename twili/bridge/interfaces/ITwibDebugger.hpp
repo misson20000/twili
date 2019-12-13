@@ -27,6 +27,8 @@
 #include "../ResponseOpener.hpp"
 #include "../RequestHandler.hpp"
 
+#include<deque>
+
 namespace twili {
 
 class Twili;
@@ -42,14 +44,19 @@ namespace bridge {
 class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
  public:
 	ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug, std::shared_ptr<process::MonitoredProcess> proc);
+	~ITwibDebugger();
 
 	using CommandID = protocol::ITwibDebugger::Command;
-	
+
+	uint64_t title_id = 0;
  private:
 	Twili &twili;
 	trn::KDebug debug;
 	std::shared_ptr<trn::WaitHandle> wait_handle;
 	std::shared_ptr<process::MonitoredProcess> proc;
+	std::deque<debug_event_info_t> event_queue;
+
+	void PumpEvents();
 	
 	void QueryMemory(bridge::ResponseOpener opener, uint64_t address);
 	void ReadMemory(bridge::ResponseOpener opener, uint64_t address, uint64_t size);

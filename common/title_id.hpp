@@ -23,6 +23,9 @@
 namespace twili {
 namespace title_id {
 
+static const uint64_t LoaderTitle = 0x0100000000000001;
+static const uint64_t RoTitle = 0x0100000000000037;
+
 static const uint64_t AppletShimTitle = 0x010000000000100d;
 
 static const uint64_t SysmoduleTitle = 0x0100000000006480;

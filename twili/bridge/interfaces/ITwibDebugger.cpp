@@ -23,6 +23,7 @@
 #include<libtransistor/cpp/svc.hpp>
 
 #include "err.hpp"
+#include "title_id.hpp"
 #include "../../twili.hpp"
 #include "../../process/MonitoredProcess.hpp"
 
@@ -34,6 +35,44 @@ namespace bridge {
 ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&debug, std::shared_ptr<process::MonitoredProcess> proc) : ObjectDispatcherProxy(*this, object_id), twili(twili), debug(std::move(debug)), proc(proc), dispatcher(*this) {
 	if(proc) {
 		proc->Continue();
+	}
+	
+	PumpEvents();
+
+	if(title_id != 0) {
+		auto r = twili.debugging_titles.insert(title_id);
+		if(!r.second) {
+			throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+		}
+	} else {
+		throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+	}
+}
+
+ITwibDebugger::~ITwibDebugger() {
+	if(title_id != 0) {
+		twili.debugging_titles.erase(title_id);
+	}
+}
+
+void ITwibDebugger::PumpEvents() {
+	auto r = trn::svc::GetDebugEvent(debug);
+	while(r) {
+		debug_event_info_t e = *r;
+		event_queue.push_back(e);
+
+		if(e.event_type == DEBUG_EVENT_ATTACH_PROCESS) {
+			if(title_id != 0) {
+				throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+			}
+			title_id = e.attach_process.title_id;
+		}
+		
+		r = trn::svc::GetDebugEvent(debug);
+	}
+	
+	if(r.error().code != 0x8c01) {
+		throw r.error();
 	}
 }
 
@@ -80,10 +119,14 @@ void ITwibDebugger::ListThreads(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::GetDebugEvent(bridge::ResponseOpener opener) {
-	debug_event_info_t event = ResultCode::AssertOk(
-		trn::svc::GetDebugEvent(debug));
-
-	opener.RespondOk(std::move(event));
+	PumpEvents();
+	
+	if(event_queue.empty()) {
+		throw ResultError(0x8c01);
+	} else {
+		opener.RespondOk(std::move(event_queue.front()));
+		event_queue.pop_front();
+	}
 }
 
 void ITwibDebugger::GetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id) {
@@ -116,6 +159,10 @@ void ITwibDebugger::SetThreadContext(bridge::ResponseOpener opener, uint64_t thr
 }
 
 void ITwibDebugger::GetNsoInfos(bridge::ResponseOpener opener) {
+	if(twili.debugging_titles.find(title_id::LoaderTitle) != twili.debugging_titles.end()) {
+		throw ResultError(TWILI_ERR_SYSMODULE_BEING_DEBUGGED);
+	}
+	
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 	
 	std::vector<service::ldr::NsoInfo> nso_info = ResultCode::AssertOk(
@@ -192,6 +239,10 @@ void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::GetNroInfos(bridge::ResponseOpener opener) {
+	if(twili.debugging_titles.find(title_id::RoTitle) != twili.debugging_titles.end()) {
+		throw ResultError(TWILI_ERR_SYSMODULE_BEING_DEBUGGED);
+	}
+
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 
 	std::vector<service::ro::NroInfo> nro_info;

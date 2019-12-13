@@ -24,6 +24,7 @@
 #include<libtransistor/cpp/ipcserver.hpp>
 
 #include<list>
+#include<set>
 
 #include "process/MonitoredProcess.hpp"
 #include "process/AppletTracker.hpp"
@@ -114,6 +115,7 @@ class Twili {
 	std::shared_ptr<process::Process> FindProcess(uint64_t pid);
 	
 	std::map<std::string, std::shared_ptr<TwibPipe>> named_pipes;
+	std::set<uint64_t> debugging_titles;
 };
 
 } // namespace twili
