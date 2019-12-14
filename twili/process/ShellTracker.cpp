@@ -48,12 +48,12 @@ ShellTracker::ShellTracker(Twili &twili) :
 		[this]() {
 			std::unique_lock<thread::Mutex> lock(queue_mutex);
 			shell_event.ResetSignal();
-			uint64_t evt;
+			uint32_t evt;
 			uint64_t pid;
 			Result<std::nullopt_t> r = std::nullopt;
 			while(
 				(r = this->twili.services.ns_dev.SendSyncRequest<5>( // GetShellEventInfo
-					ipc::OutRaw<uint64_t>(evt),
+					ipc::OutRaw<uint32_t>(evt),
 					ipc::OutRaw<uint64_t>(pid)))) {
 				auto i = tracking.find(pid);
 				if(evt == 1) { // exit
@@ -76,7 +76,7 @@ ShellTracker::ShellTracker(Twili &twili) :
 					printf("Unknown ns:dev shell event for 0x%lx: %d\n", pid, evt);
 				}
 			}
-			if(r.error().code != 0x610) { // no events left
+			if(r.error().code != 0x610 && r.error().code != 0x4e4) { // no events left
 				ResultCode::AssertOk(std::move(r));
 			}
 			return true;

@@ -43,7 +43,7 @@ Result<std::vector<NroInfo>> IDebugMonitorInterface::GetNroInfos(uint64_t pid) {
 		r = object.SendSyncRequest<0>( // GetNroInfos
 			trn::ipc::InRaw<uint64_t>(pid),
 			trn::ipc::OutRaw<uint32_t>(num_nro_infos),
-			trn::ipc::Buffer<NroInfo, 0xA>(nro_info.data(), nro_info.size() * sizeof(NroInfo)));
+			trn::ipc::Buffer<NroInfo, 0x6>(nro_info.data(), nro_info.size() * sizeof(NroInfo)));
 	} while(r && num_nro_infos > nro_info.size());
 	nro_info.resize(num_nro_infos);
 	
