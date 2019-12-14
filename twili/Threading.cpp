@@ -20,6 +20,8 @@
 
 #include "Threading.hpp"
 
+#include "twili.hpp"
+
 namespace twili {
 namespace thread {
 
@@ -101,8 +103,12 @@ void EventThread::ThreadEntryShim(void *arg) {
 }
 
 void EventThread::ThreadFunc() {
-	while(!exit_requested) {
-		ResultCode::AssertOk(event_waiter.Wait(3000000000));
+	try {
+		while(!exit_requested) {
+			ResultCode::AssertOk(event_waiter.Wait(3000000000));
+		}
+	} catch(ResultError &e) {
+		twili::Abort(e);
 	}
 }
 

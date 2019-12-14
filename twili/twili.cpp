@@ -58,20 +58,17 @@ int main() {
 		twili::Twili::Config config;
 
 		if(config.enable_usb_log) {
-			if(usb_serial_init() == RESULT_OK) {
-				// set up serial console
-				int usb_fd = usb_serial_open_fd();
-				if(usb_fd < 0) {
-					throw trn::ResultError(-usb_fd);
-				}
-				dup2(usb_fd, STDOUT_FILENO);
-				dup2(usb_fd, STDERR_FILENO);
-				dup2(usb_fd, STDIN_FILENO);
-				dbg_set_file(fd_file_get(usb_fd));
-				printf("brought up USB serial\n");
-			} else {
-				// ignore
+			ResultCode::AssertOk(usb_serial_init());
+			// set up serial console
+			int usb_fd = usb_serial_open_fd();
+			if(usb_fd < 0) {
+				throw trn::ResultError(-usb_fd);
 			}
+			dup2(usb_fd, STDOUT_FILENO);
+			dup2(usb_fd, STDERR_FILENO);
+			dup2(usb_fd, STDIN_FILENO);
+			dbg_set_file(fd_file_get(usb_fd));
+			printf("brought up USB serial\n");
 		}
 
 		switch(config.state) {
@@ -105,14 +102,62 @@ int main() {
 		printf("done\n");
 	} catch(trn::ResultError &e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
-		fatal_init();
-		fatal_transition_to_fatal_error(e.code.code, 0);
+		twili::Abort(e);
 	}
 	
 	return 0;
 }
 
 namespace twili {
+
+void Abort(trn::ResultError &e) {
+	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+   
+	ipc::client::Object fatal = ResultCode::AssertOk(
+		sm.GetService("fatal:u"));
+
+	uint64_t policy = 0; // ErrorReportAndErrorScreen
+	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
+		policy = 2; // ErrorScreen
+	}
+
+	struct FatalContext {
+		uint64_t x[31] = {0};
+		uint64_t sp = 0;
+		uint64_t pc = 0;
+		uint64_t pstate = 0;
+		uint64_t afsr0 = 0;
+		uint64_t afsr1 = 0;
+		uint64_t esr = 0;
+		uint64_t far = 0;
+
+		uint64_t stack_trace[32] = {0};
+		uint64_t start_address = 0;
+		uint64_t register_set_flags = 0;
+		uint32_t stack_trace_size = 0;
+
+		bool is_aarch32 = false;
+		uint32_t type = 0;
+	} ctx;
+
+	ctx.start_address = (uint64_t) env_get_aslr_base();
+	ctx.stack_trace_size = std::min<size_t>(32, e.backtrace_size);
+	std::copy_n(e.backtrace, ctx.stack_trace_size, ctx.stack_trace);
+	
+	fatal.SendSyncRequest<2>( // ThrowFatalWithCpuContext
+		ipc::InRaw<uint32_t>(e.code.code),
+		ipc::InRaw<uint32_t>(policy),
+		ipc::InRaw<uint64_t>(0),
+		ipc::InPid(),
+		ipc::Buffer<FatalContext, 0x15>(&ctx, sizeof(ctx)));
+
+	svcExitProcess();
+}
+
+void Abort(trn::ResultCode code) {
+	trn::ResultError e(code);
+	Abort(e);
+}
 
 Twili::Twili(const Config &config) :
 	config(config),

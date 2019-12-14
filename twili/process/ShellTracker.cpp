@@ -77,7 +77,7 @@ ShellTracker::ShellTracker(Twili &twili) :
 				}
 			}
 			if(r.error().code != 0x610 && r.error().code != 0x4e4) { // no events left
-				ResultCode::AssertOk(std::move(r));
+				twili::Abort(r.error());
 			}
 			return true;
 		});
@@ -156,7 +156,7 @@ std::shared_ptr<ShellProcess> ShellTracker::AttachHostProcess(trn::KProcess &&pr
 	
 		if(created.size() == 0) {
 			printf("  AHP: no processes created\n");
-			throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
+			twili::Abort(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
 		}
 		proc = created.front();
 		proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));

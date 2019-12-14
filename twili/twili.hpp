@@ -42,6 +42,9 @@
 
 namespace twili {
 
+void Abort(trn::ResultError &e);
+void Abort(trn::ResultCode code);
+
 class Twili {
  public:
 	struct Config {
