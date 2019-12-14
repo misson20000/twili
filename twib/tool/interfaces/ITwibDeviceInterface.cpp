@@ -175,6 +175,11 @@ uint64_t ITwibDeviceInterface::WaitToDebugTitle(uint64_t tid) {
 	return pid;
 }
 
+void ITwibDeviceInterface::RebootUnsafe() {
+	obj->SendSmartSyncRequest(
+		CommandID::REBOOT_UNSAFE);
+}
+
 } // namespace tool
 } // namespace twib
 } // namespace twili

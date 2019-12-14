@@ -527,6 +527,8 @@ int main(int argc, char *argv[]) {
 	run->add_option("file", run_file, "Executable to run")->check(CLI::ExistingFile)->required();
 	
 	CLI::App *reboot = app.add_subcommand("reboot", "Reboot the device");
+	bool reboot_unsafe;
+	reboot->add_flag("-u,--unsafe", reboot_unsafe, "Reboot quickly but forcefully and unsafely");
 
 	CLI::App *coredump = app.add_subcommand("coredump", "Make a coredump of a crashed process");
 	std::string core_file;
@@ -723,7 +725,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	if(reboot->parsed()) {
-		itdi.Reboot();
+		if(reboot_unsafe) {
+			itdi.Reboot();
+		} else {
+			itdi.RebootUnsafe();
+		}
 		return 0;
 	}
 

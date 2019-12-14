@@ -55,6 +55,7 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 	void OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs);
 	void WaitToDebugApplication(bridge::ResponseOpener opener);
 	void WaitToDebugTitle(bridge::ResponseOpener opener, uint64_t tid);
+	void RebootUnsafe(bridge::ResponseOpener opener);
 
  public:
 	SmartRequestDispatcher<
@@ -74,7 +75,8 @@ class ITwibDeviceInterface : public ObjectDispatcherProxy<ITwibDeviceInterface> 
 		SmartCommand<CommandID::LAUNCH_UNMONITORED_PROCESS, &ITwibDeviceInterface::LaunchUnmonitoredProcess>,
 		SmartCommand<CommandID::OPEN_FILESYSTEM_ACCESSOR, &ITwibDeviceInterface::OpenFilesystemAccessor>,
 		SmartCommand<CommandID::WAIT_TO_DEBUG_APPLICATION, &ITwibDeviceInterface::WaitToDebugApplication>,
-		SmartCommand<CommandID::WAIT_TO_DEBUG_TITLE, &ITwibDeviceInterface::WaitToDebugTitle>
+		SmartCommand<CommandID::WAIT_TO_DEBUG_TITLE, &ITwibDeviceInterface::WaitToDebugTitle>,
+		SmartCommand<CommandID::REBOOT_UNSAFE, &ITwibDeviceInterface::RebootUnsafe>
 		> dispatcher;
 
 	trn::KEvent ev_debug_application;

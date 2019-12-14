@@ -68,8 +68,14 @@ void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener,
 }
 
 void ITwibDeviceInterface::Reboot(bridge::ResponseOpener opener) {
-	ResultCode::AssertOk(bpc_init());
-	ResultCode::AssertOk(bpc_reboot_system());
+	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+	ipc::client::Object spsm = ResultCode::AssertOk(sm.GetService("spsm"));
+
+	opener.RespondOk();
+	
+	ResultCode::AssertOk(
+		spsm.SendSyncRequest<3>(
+			ipc::InRaw<bool>(true)));
 }
 
 void ITwibDeviceInterface::CoreDump(bridge::ResponseOpener opener, uint64_t pid) {
@@ -376,6 +382,19 @@ void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint6
 			wh_debug_title.reset();
 			return false;
 		});
+}
+
+void ITwibDeviceInterface::RebootUnsafe(bridge::ResponseOpener opener) {
+	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
+	ipc::client::Object bpc_ams = ResultCode::AssertOk(sm.GetService("bpc:ams"));
+
+	opener.RespondOk();
+
+	static uint8_t context[0x350] = {0};
+	
+	ResultCode::AssertOk(
+		bpc_ams.SendSyncRequest<65000>(
+			ipc::Buffer<uint8_t, 0x15>(context, sizeof(context))));
 }
 
 } // namespace bridge

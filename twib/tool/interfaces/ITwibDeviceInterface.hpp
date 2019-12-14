@@ -66,6 +66,7 @@ class ITwibDeviceInterface {
 	void AsyncWaitToDebugTitle(uint64_t tid, std::function<void(uint32_t, uint64_t)> &&cb);
 	uint64_t WaitToDebugApplication();
 	uint64_t WaitToDebugTitle(uint64_t tid);
+	void RebootUnsafe();
  private:
 	std::shared_ptr<RemoteObject> obj;
 };
