@@ -19,7 +19,9 @@
 //
 
 #include<libtransistor/cpp/nx.hpp>
+#include<libtransistor/svc.h>
 
+#include<cassert>
 #include<list>
 
 #include<stdio.h>
@@ -141,6 +143,78 @@ void HostMode(ipc::client::Object &iappletshim) {
 			.flags = 0,
 			.argv = {
 				.argv = (char**) current_argv
+			}
+		});
+
+	// Mimic nx-hbloader's applet heap override behavior as workaround for libnx
+	// Reference: https://github.com/switchbrew/nx-hbloader/blob/master/source/main.c#L102-L145
+	void  *heap_base = nullptr;
+	size_t heap_size = 0;
+
+	size_t total_mem_available, total_mem_usage;
+
+	ResultCode::AssertOk(svcGetInfo(&total_mem_available, 6, 0xffff8001, 0));
+	ResultCode::AssertOk(svcGetInfo(&total_mem_usage,     7, 0xffff8001, 0));
+
+	constexpr size_t heap_incr_multiple = 0x200000ul;
+	constexpr size_t heap_incr_multiple_mask = heap_incr_multiple - 1ul;
+
+	if(total_mem_available > (total_mem_usage + heap_incr_multiple)) {
+		heap_size = (total_mem_available - total_mem_usage - heap_incr_multiple) & ~heap_incr_multiple_mask;
+	}
+	if(!heap_size) {
+		heap_size = 0x20000000ul;
+	}
+
+	uint64_t applet_heap_size, applet_heap_reservation_size;
+	{
+		service::SM sm = ResultCode::AssertOk(service::SM::Initialize());
+
+		ipc::client::Object set_sys =
+			ResultCode::AssertOk(sm.GetService("set:sys"));
+
+		uint64_t out_size;
+
+		ResultCode::AssertOk(
+			set_sys.SendSyncRequest<38>(
+				ipc::OutRaw<uint64_t>(out_size),
+				ipc::Buffer<const char, 0x19>("hbloader", 0x48),
+				ipc::Buffer<const char, 0x19>("applet_heap_size", 0x48),
+				ipc::Buffer<decltype(applet_heap_size), 0x6>(
+					&applet_heap_size, sizeof(applet_heap_size))));
+		assert(out_size == sizeof(applet_heap_size));
+
+		ResultCode::AssertOk(
+			set_sys.SendSyncRequest<38>(
+				ipc::OutRaw<uint64_t>(out_size),
+				ipc::Buffer<const char, 0x19>("hbloader", 0x48),
+				ipc::Buffer<const char, 0x19>("applet_heap_reservation_size", 0x48),
+				ipc::Buffer<decltype(applet_heap_reservation_size), 0x6>(
+					&applet_heap_reservation_size, sizeof(applet_heap_reservation_size))));
+		assert(out_size == sizeof(applet_heap_reservation_size));
+	}
+
+	if(applet_heap_size) {
+		const size_t requested_size = (applet_heap_size + heap_incr_multiple_mask) & ~heap_incr_multiple_mask;
+		if(requested_size < heap_size) {
+			heap_size = requested_size;
+		}
+	} else if(applet_heap_reservation_size) {
+		const size_t reserved_size = (applet_heap_reservation_size + heap_incr_multiple_mask) & ~heap_incr_multiple_mask;
+		if(reserved_size < heap_size) {
+			heap_size -= reserved_size;
+		}
+	}
+
+	assert(heap_size <= std::numeric_limits<uint32_t>::max());
+	ResultCode::AssertOk(svcSetHeapSize(&heap_base, static_cast<uint32_t>(heap_size)));
+
+	entries.push_back(loader_config_entry_t {
+			.key = LCONFIG_KEY_OVERRIDE_HEAP,
+			.flags = LOADER_CONFIG_FLAG_RECOGNITION_MANDATORY,
+			.override_heap = {
+				.heap_base = heap_base,
+				.heap_size = heap_size
 			}
 		});
 
