@@ -147,7 +147,7 @@ void HostMode(ipc::client::Object &iappletshim) {
 		});
 
 	// Mimic nx-hbloader's applet heap override behavior as workaround for libnx
-	// Reference: https://github.com/switchbrew/nx-hbloader/blob/master/source/main.c#L102-L145
+	// Reference: https://github.com/switchbrew/nx-hbloader/blob/5d276d1da7a8b0657a8830e99269ea49c85c302f/source/main.c#L102-L145 
 	void  *heap_base = nullptr;
 	size_t heap_size = 0;
 
