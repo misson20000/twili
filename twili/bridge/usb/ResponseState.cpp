@@ -55,6 +55,9 @@ void USBBridge::ResponseState::SendHeader(protocol::MessageHeader &hdr) {
 }
 
 void USBBridge::ResponseState::SendData(uint8_t *data, size_t size) {
+	if(size == 0) {
+		return;
+	}
 	auto max_size = bridge.response_data_buffer.size;
 	while(size > max_size) {
 		SendData(data, max_size);

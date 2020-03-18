@@ -78,7 +78,7 @@ void TCPBridge::Connection::ResponseState::InsertObject(std::pair<uint32_t, std:
 }
 
 void TCPBridge::Connection::ResponseState::Send(uint8_t *data, size_t size) {
-	do {
+	while(size > 0) {
 		ssize_t r = bsd_send(connection->socket.fd, data, size, 0);
 		if(r <= 0) {
 			connection->deletion_flag = true;
@@ -86,7 +86,7 @@ void TCPBridge::Connection::ResponseState::Send(uint8_t *data, size_t size) {
 		}
 		size-= r;
 		data+= r;
-	} while(size > 0);
+	}
 }
 
 } // namespace tcp
