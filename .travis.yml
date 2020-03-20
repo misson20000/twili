@@ -37,7 +37,7 @@ jobs:
     - brew update
     - brew install llvm
     - export PATH="$(brew --prefix llvm)/bin:$PATH"
-    - "./.travis/twib.sh -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS=-std=c++17"
+    - "./.travis/twib.sh -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS=-std=c++17 -DWITH_LAUNCHD=ON"
     before_deploy: "./.travis/twib_before_deploy.sh"
 deploy:
   - provider: releases

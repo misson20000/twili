@@ -147,7 +147,7 @@ For help, type "help".
 Type "apropos word" to search for commands related to "word".
 (gdb) target extended-remote | twib gdb
 Remote debugging using | twib gdb
-(gdb) 
+(gdb)
 ```
 
 You can attach to an existing process with `attach 0x<pid>`. Use `twib ps` from another terminal to list process IDs. I recommend loading symbol files (via command-line or via `file` command) before attaching processes, since the stub does not provide symbols.
@@ -345,11 +345,23 @@ $ cmake -G "Unix Makefiles" .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX
 $ make -j4
 ```
 
-Finally, you can install twib/twibd. If are using systemd and built with systemd support, you will want to enable the twibd socket.
+Finally, you can install twib/twibd.
 
 ```
 $ sudo make install
+```
+
+If you are using systemd and built with systemd support, you will want to enable the twibd socket.
+
+```
 $ sudo systemctl enable --now twibd.socket
+```
+
+If you are using macOS/OSX and built with launchd support, you will want to enable the twibd service.
+
+```
+$ sudo launchctl enable system/com.misson20000.twibd
+$ sudo launchctl bootstrap system /Library/LaunchDaemons/com.misson20000.twibd.plist
 ```
 
 # Twib Usage
@@ -402,8 +414,8 @@ Lists all devices currently known to Twib.
 ```
 $ twib list-devices
 Device ID | Nickname          | Firmware Version | Bridge Type
-1e462a6e  | m20k's Switch     | 4.0.1            | tcp        
-f41efe28  | m20k's Switch     | 3.0.0            | usb 
+1e462a6e  | m20k's Switch     | 4.0.1            | tcp
+f41efe28  | m20k's Switch     | 3.0.0            | usb
 ```
 
 ## twib connect-tcp
@@ -463,14 +475,14 @@ Lists all processes running on the target console, whether pm knows about them o
 ```
 $ twib ps
 Process ID | Result | Title ID          | Process Name | MMU Flags
-0x1        | 0x0    | 0x100000000000000 | FS           | 0x27     
-0x2        | 0x0    | 0x100000000000001 | Loader       | 0x27     
-0x3        | 0x0    | 0x100000000000002 | NCM          | 0x27     
-0x4        | 0x0    | 0x100000000000003 | ProcessMana  | 0x27     
-0x5        | 0x0    | 0x100000000000004 | sm           | 0x27     
-0x6        | 0x0    | 0x100000000000028 | spl          | 0x27     
-0x51       | 0x0    | 0x100000000000021 | psc          | 0x137    
-0x52       | 0x0    | 0x10000000000001d | pcie.withou  | 0x137   
+0x1        | 0x0    | 0x100000000000000 | FS           | 0x27
+0x2        | 0x0    | 0x100000000000001 | Loader       | 0x27
+0x3        | 0x0    | 0x100000000000002 | NCM          | 0x27
+0x4        | 0x0    | 0x100000000000003 | ProcessMana  | 0x27
+0x5        | 0x0    | 0x100000000000004 | sm           | 0x27
+0x6        | 0x0    | 0x100000000000028 | spl          | 0x27
+0x51       | 0x0    | 0x100000000000021 | psc          | 0x137
+0x52       | 0x0    | 0x10000000000001d | pcie.withou  | 0x137
 ...
 ```
 
@@ -684,7 +696,7 @@ struct message {
 	u32 tag;
 	u64 payload_size;
 	u32 object_count;
-	
+
 	// payload
 	u8 payload[payload_size];
 

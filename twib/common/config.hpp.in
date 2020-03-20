@@ -1,6 +1,7 @@
 #pragma once
 
 #cmakedefine01 WITH_SYSTEMD
+#cmakedefine01 WITH_LAUNCHD
 
 #cmakedefine01 TWIB_GDB_ENABLED
 

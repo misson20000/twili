@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Disabled</key>
+	<true/>
+	<key>Label</key>
+	<string>com.misson20000.twibd</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@TWIBD_PATH@</string>
+		<string>--launchd</string>
+	</array>
+	<key>Sockets</key>
+	<dict>
+		<key>twibd-listener</key>
+		<dict>
+			<key>SockFamily</key>
+			<string>Unix</string>
+			<key>SockPathName</key>
+			<string>@TWIB_UNIX_FRONTEND_DEFAULT_PATH@</string>
+			<key>SockPathMode</key>
+			<integer>438</integer> <!-- 0666 -->
+		</dict>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/var/log/twibd/out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/var/log/twibd/err.log</string>
+</dict>
+</plist>
