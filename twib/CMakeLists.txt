@@ -18,6 +18,7 @@ endif()
 set(MSGPACK11_BUILD_TESTS OFF CACHE BOOL "Build msgpack11 unit tests")
 
 set(WITH_SYSTEMD OFF CACHE BOOL "Enable systemd integration in twibd")
+set(WITH_LAUNCHD OFF CACHE BOOL "Enable launchd integration in twibd")
 
 if(NOT WIN32)
 	set(TWIB_GDB_ENABLED ON CACHE BOOL "Enable GDB stub in twib")
@@ -64,6 +65,7 @@ if(TWIBD_LIBUSB_BACKEND_ENABLED AND TWIBD_LIBUSBK_BACKEND_ENABLED)
 endif()
 
 message(STATUS "systemd support: ${WITH_SYSTEMD}")
+message(STATUS "launchd support: ${WITH_LAUNCHD}")
 message(STATUS "twib gdb stub: ${TWIB_GDB_ENABLED}")
 message(STATUS "twib unix frontend enabled: ${TWIB_UNIX_FRONTEND_ENABLED}")
 message(STATUS "twib unix frontend default path: ${TWIB_UNIX_FRONTEND_DEFAULT_PATH}")

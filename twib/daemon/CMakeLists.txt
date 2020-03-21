@@ -69,4 +69,15 @@ if(WITH_SYSTEMD)
 	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/twibd.service DESTINATION ${SYSTEMD_CONFIG_DIR})
 endif()
 
+if(WITH_LAUNCHD)
+	set(TWIBD_PATH "${CMAKE_INSTALL_PREFIX}/bin/twibd")
+	configure_file(
+		"${CMAKE_CURRENT_SOURCE_DIR}/com.misson20000.twibd.plist"
+		"${CMAKE_CURRENT_BINARY_DIR}/com.misson20000.twibd.plist"
+		)
+
+	set(LAUNCHD_CONFIG_DIR "/Library/LaunchDaemons")
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/com.misson20000.twibd.plist DESTINATION ${LAUNCHD_CONFIG_DIR})
+endif()
+
 install(TARGETS twibd RUNTIME DESTINATION bin)

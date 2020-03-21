@@ -31,6 +31,10 @@
 #include<systemd/sd-daemon.h>
 #endif
 
+#if WITH_LAUNCHD == 1
+#include<launch.h>
+#endif
+
 #include<msgpack11.hpp>
 #include<CLI/CLI.hpp>
 
@@ -82,10 +86,10 @@ void Daemon::AddDevice(std::shared_ptr<Device> device) {
 	LogMessage(Info, "adding device with id %08x", device->device_id);
 	std::weak_ptr<Device> &entry = devices[device->device_id];
 	std::shared_ptr<Device> entry_lock = entry.lock();
-	
+
 	if(!entry_lock || entry_lock->GetPriority() <= device->GetPriority()) { // don't let tcp devices clobber usb devices
 		entry = device;
-	
+
 		LogMessage(Debug, "resetting objects on new device");
 		local_client->SendRequest(
 			Request(nullptr, device->device_id, 0, 0xffffffff, 0)); // we don't care about the response
@@ -101,7 +105,7 @@ void Daemon::AddClient(std::shared_ptr<Client> client) {
 	} while(clients.find(client_id) != clients.end());
 	client->client_id = client_id;
 	LogMessage(Info, "adding client with newly assigned id %08x", client_id);
-	
+
 	clients[client_id] = client;
 }
 
@@ -153,7 +157,7 @@ void Daemon::Process() {
 				LogMessage(Debug, "  object id: %08x", rq.object_id);
 				LogMessage(Debug, "  command id: %08x", rq.command_id);
 				LogMessage(Debug, "  tag: %08x", rq.tag);
-		
+
 				if(rq.device_id == 0) {
 					PostResponse(HandleRequest(rq));
 				} else {
@@ -205,7 +209,7 @@ void Daemon::Process() {
 				for(auto o : rs.objects) {
 					LogMessage(Debug, "    0x%x", o->object_id);
 				}
-		
+
 				std::shared_ptr<Client> client = GetClient(rs.client_id);
 				if(!client) {
 					LogMessage(Info, "dropping response for bad client: 0x%x", rs.client_id);
@@ -233,7 +237,7 @@ Response Daemon::HandleRequest(Request &rq) {
 			LogMessage(Debug, "waiting for ISL...");
 			initial_scan_lock.wait();
 			LogMessage(Debug, "got ISL");
-			
+
 			Response r = rq.RespondOk();
 			std::vector<msgpack11::MsgPack> device_packs;
 			{
@@ -250,14 +254,14 @@ Response Daemon::HandleRequest(Request &rq) {
 			}
 
 			util::Buffer response_payload;
-			
+
 			msgpack11::MsgPack array_pack(device_packs);
 			std::string ser = array_pack.dump();
 			response_payload.Write<uint64_t>(ser.size());
 			response_payload.Write(ser);
-			
+
 			r.payload = response_payload.GetData();
-			
+
 			return r; }
 		case protocol::ITwibMetaInterface::Command::CONNECT_TCP: {
 			LogMessage(Debug, "command 1 issued to twibd meta object: CONNECT_TCP");
@@ -367,10 +371,15 @@ int main(int argc, char *argv[]) {
 
 	int verbosity = 3;
 	app.add_flag("-v,--verbose", verbosity, "Enable verbose messages. Use twice to enable debug messages");
-	
+
 	bool systemd_mode = false;
 #if WITH_SYSTEMD == 1
 	app.add_flag("--systemd", systemd_mode, "Log in systemd format and obtain sockets from systemd (disables unix and tcp frontends)");
+#endif
+
+	bool launchd_mode = false;
+#if WITH_LAUNCHD == 1
+	app.add_flag("--launchd", launchd_mode, "Obtain sockets from launchd (disables unix and tcp frontends)");
 #endif
 
 #if TWIB_UNIX_FRONTEND_ENABLED == 1
@@ -453,9 +462,9 @@ int main(int argc, char *argv[]) {
 	daemon::Daemon daemon;
 	g_Daemon = &daemon;
 	g_Running = true;
-	
+
 	std::vector<std::shared_ptr<daemon::frontend::Frontend>> frontends;
-	if(!systemd_mode) {
+	if(!systemd_mode && !launchd_mode) {
 #if TWIB_TCP_FRONTEND_ENABLED == 1
 		if(tcp_frontend_enabled) {
 			frontends.push_back(daemon::CreateTCPFrontend(daemon, tcp_frontend_port));
@@ -492,8 +501,27 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
+#if WITH_LAUNCHD == 1
+	if(launchd_mode) {
+		int *fds = nullptr;
+		size_t num_fds = 0;
+		int err = launch_activate_socket("twibd-listener", &fds, &num_fds);
+		if(err != 0 || fds == nullptr || num_fds == 0) {
+			LogMessage(Warning, "failed to get FDs from launchd");
+		} else {
+			LogMessage(Info, "got %zu sockets from launchd", num_fds);
+			for(size_t i = 0; i < num_fds; i++) {
+				frontends.push_back(std::make_shared<daemon::frontend::SocketFrontend>(daemon, platform::Socket(fds[i])));
+			}
+		}
+		if(fds != nullptr) {
+			free(fds);
+		}
+	}
+#endif
+
 	std::signal(SIGINT, &sigint_handler);
-	
+
 	while(g_Running) {
 		daemon.Process();
 	}
