@@ -33,7 +33,7 @@ else()
 	set(TWIB_UNIX_FRONTEND_ENABLED OFF CACHE BOOL "Enable UNIX socket frontend")
 	set(TWIB_NAMED_PIPE_FRONTEND_ENABLED ON CACHE BOOL "Enable named pipe frontend (windows only)")
 endif()
-set(TWIB_UNIX_FRONTEND_DEFAULT_PATH "/var/run/twibd.sock" CACHE FILEPATH "Default path for the twibd UNIX socket frontend")
+set(TWIB_UNIX_FRONTEND_DEFAULT_PATH "/run/twibd.sock" CACHE FILEPATH "Default path for the twibd UNIX socket frontend")
 
 set(TWIB_TCP_FRONTEND_ENABLED ON CACHE BOOL "Enable TCP socket frontend")
 set(TWIB_TCP_FRONTEND_DEFAULT_PORT 15151 CACHE STRING "Default port for twibd TCP socket frontend")

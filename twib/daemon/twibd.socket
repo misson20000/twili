@@ -3,7 +3,7 @@ Description=Twili Bridge Daemon Socket
 
 [Socket]
 ListenStream=@TWIB_UNIX_FRONTEND_DEFAULT_PATH@
-ListenMode=0666
+SocketMode=0666
 Accept=no
 
 [Install]
