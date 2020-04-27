@@ -327,7 +327,7 @@ You will need libusb development headers installed. On Debian-based distros, the
 Clone this repo and clone its submodules.
 
 ```
-$ git clone --recurse-modules git@github.com:misson20000/twili.git
+$ git clone --recurse-submodules git@github.com:misson20000/twili.git
 ```
 
 Change into the `twib/` subdirectory, and make a `build/` directory.
