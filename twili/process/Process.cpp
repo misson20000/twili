@@ -27,6 +27,7 @@
 #include<libtransistor/util.h>
 
 #include "../twili.hpp"
+#include "../Services.hpp"
 #include "../ELFCrashReport.hpp"
 
 using namespace trn;
@@ -43,9 +44,9 @@ Process::~Process() {
 void Process::AddNotes(ELFCrashReport &report) {
 	// write nso info notes
 	{
-		Result<std::vector<service::ldr::NsoInfo>> r = twili.services.ldr_dmnt.GetNsoInfos(GetPid());
+		Result<std::vector<hos_types::LoadedModuleInfo>> r = twili.services->GetNsoInfos(GetPid());
 		if(r) {
-			std::vector<service::ldr::NsoInfo> infos;
+			std::vector<hos_types::LoadedModuleInfo> infos = *r;
 			for(auto &info : infos) {
 				ELF::Note::twili_nso_info twinso = {
 					.addr = info.addr,

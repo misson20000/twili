@@ -21,6 +21,7 @@
 #include "ECSProcess.hpp"
 
 #include "../twili.hpp"
+#include "../Services.hpp"
 #include "fs/ActualFile.hpp"
 #include "fs/NRONSOTransmutationFile.hpp"
 
@@ -54,9 +55,7 @@ void ECSProcess::ChangeState(MonitoredProcess::State state) {
 	
 	if(state == MonitoredProcess::State::Exited) {
 		if(ecs_pending) {
-			ResultCode::AssertOk(
-				twili.services.ldr_shel.SendSyncRequest<65001>( // ClearExternalContentSource
-					trn::ipc::InRaw<uint64_t>(title_id)));
+			ResultCode::AssertOk(twili.services->ClearExternalContentSource(title_id));
 		}
 	}
 }
@@ -70,12 +69,8 @@ bool ECSProcess::PrepareForLaunch() {
 	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
 
 	printf("installing ExternalContentSource\n");
-	KObject session;
-	ResultCode::AssertOk(
-		twili.services.ldr_shel.SendSyncRequest<65000>( // SetExternalContentSource
-			trn::ipc::InRaw<uint64_t>(title_id),
-			trn::ipc::OutHandle<KObject, trn::ipc::move>(session)));
-	printf("installed ExternalContentSource\n");
+	KObject session = ResultCode::AssertOk(twili.services->SetExternalContentSource(title_id));
+	printf("installed ExternalContentSource: 0x%x\n", session.handle);
 	ecs_pending = true;
 	
 	ResultCode::AssertOk(

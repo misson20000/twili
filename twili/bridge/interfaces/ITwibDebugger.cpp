@@ -25,6 +25,7 @@
 #include "err.hpp"
 #include "title_id.hpp"
 #include "../../twili.hpp"
+#include "../../Services.hpp"
 #include "../../process/MonitoredProcess.hpp"
 
 using namespace trn;
@@ -165,8 +166,7 @@ void ITwibDebugger::GetNsoInfos(bridge::ResponseOpener opener) {
 	
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 	
-	std::vector<service::ldr::NsoInfo> nso_info = ResultCode::AssertOk(
-		twili.services.ldr_dmnt.GetNsoInfos(pid));
+	std::vector<hos_types::LoadedModuleInfo> nso_info = ResultCode::AssertOk(twili.services->GetNsoInfos(pid));
 
 	opener.RespondOk(std::move(nso_info));
 }
@@ -225,15 +225,7 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 
-	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<1>( // LaunchDebugProcess
-				ipc::InRaw<uint64_t>(pid)));
-	} else {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<2>( // LaunchDebugProcess
-				ipc::InRaw<uint64_t>(pid)));
-	}
+	ResultCode::AssertOk(twili.services->StartProcess(pid));
 	
 	opener.RespondOk();
 }
@@ -245,15 +237,7 @@ void ITwibDebugger::GetNroInfos(bridge::ResponseOpener opener) {
 
 	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
 
-	std::vector<service::ro::NroInfo> nro_info;
-
-	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
-		ResultCode::AssertOk(
-			twili.services.ro_dmnt.GetNroInfos(pid));
-	}
-	// TODO: ask SciresM to backport ro:dmnt?
-
-	opener.RespondOk(std::move(nro_info));
+	opener.RespondOk(ResultCode::AssertOk(twili.services->GetNroInfos(pid)));
 }
 
 } // namespace bridge

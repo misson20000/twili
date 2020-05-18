@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2019 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2020 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -23,29 +23,29 @@
 #include<libtransistor/cpp/ipcclient.hpp>
 
 namespace twili {
-namespace service {
-namespace ro {
+namespace nifm {
 
-struct NroInfo {
-	union {
-		uint8_t build_id[0x20];
-		uint64_t build_id_64[4];
-	};
-	uint64_t addr;
-	size_t size;
-};
-
-class IDebugMonitorInterface {
+class IRequest {
  public:
-	IDebugMonitorInterface() = default;
-	IDebugMonitorInterface(ipc_object_t object);
-	IDebugMonitorInterface(trn::ipc::client::Object &&object);
+	enum class State : uint32_t {
+		Error = 1,
+		Pending = 2,
+		Connected = 3,
+	};
+	IRequest() = default;
+	IRequest(ipc_object_t object);
+	IRequest(trn::ipc::client::Object &&object);
 
-	trn::Result<std::vector<NroInfo>> GetNroInfos(uint64_t pid);
+	State GetRequestState();
+	trn::ResultCode GetResult();
+	std::tuple<trn::KEvent, trn::KEvent> GetSystemEventReadableHandles();
+	void Cancel();
+	void Submit();
+	void SetConnectionConfirmationOption(uint8_t option);
+	void SetPersistent(bool);
 	
 	trn::ipc::client::Object object;
 };
 
-} // namespace ro
-} // namespace service
+} // namespace nifm
 } // namespace twili

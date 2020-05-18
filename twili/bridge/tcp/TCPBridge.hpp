@@ -31,7 +31,7 @@
 #include "../ResponseOpener.hpp"
 #include "../RequestHandler.hpp"
 
-#include "../../ipcbind/nifm/IRequest.hpp"
+#include "../../nifm.hpp"
 #include "../../Threading.hpp"
 #include "../../Socket.hpp"
 
@@ -63,7 +63,7 @@ class TCPBridge {
 	std::list<std::shared_ptr<Connection>> connections;
 	std::shared_ptr<bridge::Object> object_zero;
 	
-	service::nifm::IRequest network;
+	nifm::IRequest network;
 	
 	bool thread_destroy = false;
 	trn_thread_t thread;
@@ -71,7 +71,7 @@ class TCPBridge {
 	void SocketThread();
 
 	void ResetSockets();
-	service::nifm::IRequest::State network_state = service::nifm::IRequest::State::Error;
+	nifm::IRequest::State network_state = nifm::IRequest::State::Error;
 	trn::KEvent network_state_event;
 	thread::Mutex network_state_mutex;
 	thread::Condvar network_state_condvar;

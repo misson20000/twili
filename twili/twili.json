@@ -5,7 +5,7 @@
 	"title_id_range_max":	"0x0100000000006480",
 	"main_thread_stack_size":	"0x00100000",
 	"main_thread_priority":	44,
-	"default_cpu_id":	0,
+	"default_cpu_id":	3,
 	"process_category":	0,
 	"is_retail":	true,
 	"pool_partition":	1,
@@ -128,14 +128,15 @@
 				"svcTerminateProcess":	"0x7b",
 				"svcGetProcessInfo":	"0x7c",
 				"svcCreateResourceLimit":	"0x7d",
-				"svcSetResourceLimitLimitValue":	"0x7e"
+				"svcSetResourceLimitLimitValue":	"0x7e",
+				"svcCallSecureMonitor":	"0x7f"
 			}
 		}, {
 			"type":	"kernel_flags",
 			"value":	{
 				"highest_thread_priority":	59,
 				"lowest_thread_priority":	28,
-				"lowest_cpu_id":	0,
+				"lowest_cpu_id":	3,
 				"highest_cpu_id":	3
 			}
 		}, {

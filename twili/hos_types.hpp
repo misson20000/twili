@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2020 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -18,29 +18,34 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "IGeneralService.hpp"
-
-using namespace trn;
+#pragma once
 
 namespace twili {
-namespace service {
-namespace nifm {
+namespace hos_types {
 
-IGeneralService::IGeneralService(ipc_object_t object) : object(object) {
-}
+struct LoadedModuleInfo {
+	union {
+		uint8_t build_id[0x20];
+		uint64_t build_id_64[4];
+	};
+	uint64_t addr;
+	size_t size;
+};
 
-IGeneralService::IGeneralService(ipc::client::Object &&object) : object(std::move(object)) {
-}
+struct ResourceLimitInfo {
+	size_t current_value;
+	size_t limit_value;
+};
 
-IRequest IGeneralService::CreateRequest(uint32_t requirement_preset) {
-	IRequest rq;
-	ResultCode::AssertOk(
-		object.SendSyncRequest<4>(
-			ipc::InRaw<uint32_t>(requirement_preset),
-			ipc::OutObject(rq)));
-	return rq;
-}
+enum class ShellEventType : uint32_t {
+	Exit = 1,
+	Launch = 4,
+};
 
-} // namespace nifm
-} // namespace service
+struct ShellEventInfo {
+	uint64_t pid;
+	ShellEventType event;
+};
+
+} // namespace hos_types
 } // namespace twili

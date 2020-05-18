@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2020 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,32 +20,22 @@
 
 #pragma once
 
-#include<libtransistor/cpp/ipcclient.hpp>
+#include<compare>
 
 namespace twili {
-namespace service {
-namespace ldr {
 
-struct NsoInfo {
-	union {
-		uint8_t build_id[0x20];
-		uint64_t build_id_64[4];
-	};
-	uint64_t addr;
-	size_t size;
-};
-
-class IDebugMonitorInterface {
+class SystemVersion {
  public:
-	IDebugMonitorInterface() = default;
-	IDebugMonitorInterface(ipc_object_t object);
-	IDebugMonitorInterface(trn::ipc::client::Object &&object);
+	static void SetCurrent();
+	static const SystemVersion &Current();
+	inline constexpr SystemVersion(uint8_t major, uint8_t minor, uint8_t micro) : major(major), minor(minor), micro(micro) {
+	}
 
-	trn::Result<std::vector<NsoInfo>> GetNsoInfos(uint64_t pid);
-	
-	trn::ipc::client::Object object;
+	inline constexpr auto operator<=>(const SystemVersion&) const = default;
+
+	const uint8_t major;
+	const uint8_t minor;
+	const uint8_t micro;
 };
 
-} // namespace ldr
-} // namespace service
-} // namespace twili
+}

@@ -30,20 +30,23 @@
 #include "process/AppletTracker.hpp"
 #include "process/ShellTracker.hpp"
 
-#include "bridge/usb/USBBridge.hpp"
-#include "bridge/tcp/TCPBridge.hpp"
-
-#include "ipcbind/pm/IShellService.hpp"
-#include "ipcbind/ldr/IDebugMonitorInterface.hpp"
-#include "ipcbind/ro/IDebugMonitorInterface.hpp"
-#include "ipcbind/nifm/IGeneralService.hpp"
-
 #include "FileManager.hpp"
 
 namespace twili {
 
-void Abort(trn::ResultError &e);
-void Abort(trn::ResultCode code);
+_Noreturn void Abort(trn::ResultError &e);
+_Noreturn void Abort(trn::ResultCode code);
+
+class Services;
+
+namespace bridge {
+namespace usb {
+class USBBridge;
+}
+namespace tcp {
+class TCPBridge;
+}
+}
 
 class Twili {
  public:
@@ -60,7 +63,7 @@ class Twili {
 		
 		// [logging]
 		int logging_verbosity = 0;
-		bool enable_usb_log = false;
+		bool enable_usb_log = true;
 
 		// [usb_bridge]
 		bool enable_usb_bridge = true;
@@ -92,26 +95,14 @@ class Twili {
 		std::string name;
 	} twili_registration;
 	
-	struct Services {
-	 public:
-		Services();
-
-		trn::ipc::client::Object lr;
-		trn::ipc::client::Object pm_dmnt;
-		service::pm::IShellService pm_shell;
-		service::ldr::IDebugMonitorInterface ldr_dmnt;
-		service::ro::IDebugMonitorInterface ro_dmnt;
-		trn::ipc::client::Object ldr_shel;
-		trn::ipc::client::Object ns_dev;
-		service::nifm::IGeneralService nifm;
-	} services;
+	std::unique_ptr<Services> services;
 
 	FileManager file_manager;
 	process::AppletTracker applet_tracker;
 	process::ShellTracker shell_tracker;
 	
-	std::optional<bridge::usb::USBBridge> usb_bridge;
-	std::optional<bridge::tcp::TCPBridge> tcp_bridge;
+	std::unique_ptr<bridge::usb::USBBridge> usb_bridge;
+	std::unique_ptr<bridge::tcp::TCPBridge> tcp_bridge;
 	
 	std::list<std::shared_ptr<process::MonitoredProcess>> monitored_processes;
 	std::shared_ptr<process::MonitoredProcess> FindMonitoredProcess(uint64_t pid);

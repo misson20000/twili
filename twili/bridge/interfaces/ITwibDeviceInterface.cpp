@@ -35,6 +35,7 @@
 #include "../../msgpack11/msgpack11.hpp"
 
 #include "../../twili.hpp"
+#include "../../Services.hpp"
 #include "../../process/UnmonitoredProcess.hpp"
 #include "../../ELFCrashReport.hpp"
 
@@ -235,14 +236,9 @@ void ITwibDeviceInterface::GetMemoryInfo(bridge::ResponseOpener opener) {
 	
 	std::vector<msgpack11::MsgPack::object> resource_limit_infos;
 	for(size_t i = 0; i < 3; i++) {
-		size_t current_value, limit_value;
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<65001>( // AtmosphereGetCurrentLimitInfo
-				ipc::InRaw<uint32_t>((uint32_t) i),
-				ipc::InRaw<uint32_t>(0), // LimitableResource_Memory
-				ipc::OutRaw<uint64_t>(current_value),
-				ipc::OutRaw<uint64_t>(limit_value)));
-		resource_limit_infos.push_back({{"category", i}, {"current_value", current_value}, {"limit_value", limit_value}});
+		auto rl = ResultCode::AssertOk(twili.services->GetCurrentLimitInfo(i, 0)); // LimitableResource_Memory
+		
+		resource_limit_infos.push_back({{"category", i}, {"current_value", rl.current_value}, {"limit_value", rl.limit_value}});
 	}
 	
 	msgpack11::MsgPack meminfo = msgpack11::MsgPack::object {
@@ -274,7 +270,7 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 }
 
 void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage) {
-	opener.RespondOk(ResultCode::AssertOk(twili.services.pm_shell.LaunchProcess(flags, tid, storage)));
+	opener.RespondOk(ResultCode::AssertOk(twili.services->LaunchProgram(flags, tid, storage)));
 }
 
 void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs) {
@@ -301,43 +297,10 @@ void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener,
 }
 
 void ITwibDeviceInterface::WaitToDebugApplication(bridge::ResponseOpener opener) {
-	if(wh_debug_application) {
-		throw ResultError(TWILI_ERR_ALREADY_WAITING);
-	}
-
-	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<5>( // EnableDebugForApplication
-				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_application)));
-	} else {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<6>( // EnableDebugForApplication
-				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_application)));
-	}
-	
-	wh_debug_application = twili.event_waiter.Add(
-		ev_debug_application,
-		[this, opener]() mutable -> bool {
-			uint64_t pid;
-
-			try {
-				if(env_get_kernel_version() >= KERNEL_VERSION_500) {
-					ResultCode::AssertOk(
-						twili.services.pm_dmnt.SendSyncRequest<4>( // GetApplicationProcessId
-							ipc::OutRaw<uint64_t>(pid)));
-				} else {
-					ResultCode::AssertOk(
-						twili.services.pm_dmnt.SendSyncRequest<5>( // GetApplicationProcessId
-							ipc::OutRaw<uint64_t>(pid)));
-				}
-				opener.RespondOk(std::move(pid));
-			} catch(trn::ResultError &e) {
-				opener.RespondError(e.code);
-			}
-			
-			wh_debug_application.reset();
-			return false;
-		});
+	/*
+		AMS dmnt slurps up all the debug hooks... need to negotiate that.
+	 */
+	throw ResultError(TWILI_ERR_TODO);
 }
 
 void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint64_t tid) {
@@ -345,36 +308,13 @@ void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint6
 		throw ResultError(TWILI_ERR_ALREADY_WAITING);
 	}
 
-	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<3>( // EnableDebugForTitleId
-				ipc::InRaw<uint64_t>(tid),
-				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_title)));
-	} else {
-		ResultCode::AssertOk(
-			twili.services.pm_dmnt.SendSyncRequest<4>( // EnableDebugForTitleId
-				ipc::InRaw<uint64_t>(tid),
-				ipc::OutHandle<trn::KEvent, ipc::copy>(ev_debug_title)));
-	}
+	ev_debug_title = ResultCode::AssertOk(twili.services->HookToCreateProcess(tid));
 	
 	wh_debug_title = twili.event_waiter.Add(
 		ev_debug_title,
 		[this, opener, tid]() mutable -> bool {
-			uint64_t pid;
-
 			try {
-				if(env_get_kernel_version() >= KERNEL_VERSION_500) {
-					ResultCode::AssertOk(
-						twili.services.pm_dmnt.SendSyncRequest<2>( // GetTitleProcessId
-							ipc::InRaw<uint64_t>(tid),
-							ipc::OutRaw<uint64_t>(pid)));
-				} else {
-					ResultCode::AssertOk(
-						twili.services.pm_dmnt.SendSyncRequest<3>( // GetTitleProcessId
-							ipc::InRaw<uint64_t>(tid),
-							ipc::OutRaw<uint64_t>(pid)));
-				}
-				opener.RespondOk(std::move(pid));
+				opener.RespondOk(ResultCode::AssertOk(twili.services->GetProcessId(tid)));
 			} catch(trn::ResultError &e) {
 				opener.RespondError(e.code);
 			}

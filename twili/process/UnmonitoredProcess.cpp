@@ -23,6 +23,7 @@
 #include<libtransistor/cpp/nx.hpp>
 
 #include "../twili.hpp"
+#include "../Services.hpp"
 
 using namespace trn;
 
@@ -38,7 +39,7 @@ uint64_t UnmonitoredProcess::GetPid() {
 
 void UnmonitoredProcess::Terminate() {
 	// try to terminate a process via pm:shell
-	if(twili.services.pm_shell.TerminateProcessByPid(pid)) {
+	if(twili.services->TerminateProgram(pid)) {
 		return;
 	}
 

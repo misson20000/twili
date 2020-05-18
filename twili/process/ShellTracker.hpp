@@ -42,7 +42,8 @@ namespace process {
 class ShellTracker : public Tracker<ShellProcess> {
  public:
 	ShellTracker(Twili &twili);
-
+	~ShellTracker();
+	
 	// Tracker contract
 	virtual std::shared_ptr<ShellProcess> CreateProcess() override;
 	virtual void QueueLaunch(std::shared_ptr<ShellProcess> process) override;
@@ -54,6 +55,8 @@ class ShellTracker : public Tracker<ShellProcess> {
 
 	Twili &twili;
  private:
+	thread::EventThread event_thread;
+	
 	trn::KEvent shell_event;
 	std::shared_ptr<trn::WaitHandle> shell_wait;
 	std::shared_ptr<trn::WaitHandle> tracker_signal;
@@ -74,9 +77,6 @@ class ShellTracker : public Tracker<ShellProcess> {
 
 	// ns:dev launches processes synchronously, but we need to serve ECS filesystem
 	// so we can't block main IPC server thread on process launch.
-	
-	// make sure to put this near the end so it destructs early
-	thread::EventThread event_thread;
 };
 
 } // namespace process

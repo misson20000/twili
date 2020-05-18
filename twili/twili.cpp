@@ -41,10 +41,14 @@ typedef bool _Bool;
 
 #include "util.hpp"
 #include "twili.hpp"
+#include "SystemVersion.hpp"
+#include "Services.hpp"
 #include "process_creation.hpp"
 #include "process/Process.hpp"
 #include "process/UnmonitoredProcess.hpp"
 #include "service/ITwiliService.hpp"
+#include "bridge/usb/USBBridge.hpp"
+#include "bridge/tcp/TCPBridge.hpp"
 #include "bridge/interfaces/ITwibDeviceInterface.hpp"
 #include "err.hpp"
 
@@ -71,6 +75,10 @@ int main() {
 			printf("brought up USB serial\n");
 		}
 
+		twili::SystemVersion::SetCurrent();
+		auto v = twili::SystemVersion::Current();
+		printf("running %d.%d.%d\n", v.major, v.minor, v.micro);
+		
 		switch(config.state) {
 		case twili::Twili::Config::State::Fresh:
 			printf("using fresh config\n");
@@ -102,6 +110,16 @@ int main() {
 		printf("done\n");
 	} catch(trn::ResultError &e) {
 		std::cout << "caught ResultError: " << e.what() << std::endl;
+		printf("  backtrace:\n");
+		uint64_t aslr_base = (uint64_t) env_get_aslr_base();
+		for(size_t i = 0; i < e.backtrace_size; i++) {
+			uint64_t addr = e.backtrace[i];
+			if(addr >= aslr_base && addr < aslr_base + 0x10000000) {
+				printf("    - twili + 0x%lx\n", addr - aslr_base);
+			} else {
+				printf("    - 0x%lx\n", addr);
+			}
+		}
 		twili::Abort(e);
 	}
 	
@@ -168,14 +186,18 @@ Twili::Twili(const Config &config) :
 		[this](auto s) {
 			return new twili::service::ITwiliService(this);
 		}),
+	services(twili::Services::CreateForSystemVersion(twili::SystemVersion::Current())),
 	file_manager(*this),
 	applet_tracker(*this),
 	shell_tracker(*this) {
-	if(config.enable_usb_bridge) {
-		usb_bridge.emplace(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
-	}
+	printf("finished constructing most members\n");
+	//if(config.enable_usb_bridge) {
+	//	usb_bridge = std::make_unique<bridge::usb::USBBridge>(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+	//	printf("constructed USB bridge\n");
+	//}
 	if(config.enable_tcp_bridge) {
-		tcp_bridge.emplace(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+		tcp_bridge = std::make_unique<bridge::tcp::TCPBridge>(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+		printf("constructed TCP bridge\n");
 	}
 
 	printf("initialized Twili\n");
@@ -270,42 +292,6 @@ Twili::ServiceRegistration::~ServiceRegistration() {
 	ResultCode::AssertOk(sm_init());
 	ResultCode::AssertOk(sm_unregister_service(name.c_str()));
 	sm_finalize();
-}
-
-Twili::Services::Services() {
-	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-
-	lr = ResultCode::AssertOk(sm.GetService("lr"));
-	
-	pm_dmnt = ResultCode::AssertOk(sm.GetService("pm:dmnt"));
-	
-	pm_shell = twili::service::pm::IShellService(
-		ResultCode::AssertOk(
-			sm.GetService("pm:shell")));
-	
-	ldr_dmnt = twili::service::ldr::IDebugMonitorInterface(
-		ResultCode::AssertOk(
-			sm.GetService("ldr:dmnt")));
-
-	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
-		ro_dmnt = twili::service::ro::IDebugMonitorInterface(
-			ResultCode::AssertOk(
-				sm.GetService("ro:dmnt")));
-	}
-	
-	printf("acquiring ldr:shel\n");
-	ldr_shel = ResultCode::AssertOk(sm.GetService("ldr:shel"));
-
-	ns_dev = ResultCode::AssertOk(sm.GetService("ns:dev"));
-	
-	ipc::client::Object nifm_static = ResultCode::AssertOk(
-		sm.GetService("nifm:s"));
-	
-	ResultCode::AssertOk(
-		nifm_static.SendSyncRequest<4>( // CreateGeneralService
-			ipc::OutObject(nifm)));
-
-	printf("acquired services\n");
 }
 
 } // namespace twili

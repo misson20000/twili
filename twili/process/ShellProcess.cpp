@@ -21,6 +21,7 @@
 #include "AppletProcess.hpp"
 
 #include "../twili.hpp"
+#include "../Services.hpp"
 #include "fs/ActualFile.hpp"
 #include "fs/VectorFile.hpp"
 
@@ -43,8 +44,7 @@ ShellProcess::ShellProcess(ShellTracker &tracker) :
 
 void ShellProcess::KillImpl() {
 	// no assert so we don't die if this fails
-	twili.services.ns_dev.SendSyncRequest<1>( // TerminateProcess
-		trn::ipc::InRaw<uint64_t>(GetPid()));
+	twili.services->TerminateProgram(GetPid());
 }
 
 void ShellProcess::AddHBABIEntries(std::vector<loader_config_entry_t> &entries) {

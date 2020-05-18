@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2020 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -18,12 +18,11 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "IRequest.hpp"
+#include "nifm.hpp"
 
 using namespace trn;
 
 namespace twili {
-namespace service {
 namespace nifm {
 
 IRequest::IRequest(ipc_object_t object) : object(object) {
@@ -51,10 +50,18 @@ ResultCode IRequest::GetResult() {
 
 std::tuple<trn::KEvent, trn::KEvent> IRequest::GetSystemEventReadableHandles() {
 	trn::KEvent h1, h2;
-	ResultCode::AssertOk(
+	printf("=> GetSystemEventReadableHandles\n");
+	auto r =
 		object.SendSyncRequest<2>(
 			ipc::OutHandle<trn::KEvent, ipc::copy>(h1),
-			ipc::OutHandle<trn::KEvent, ipc::copy>(h2)));
+			ipc::OutHandle<trn::KEvent, ipc::copy>(h2));
+	if(!r) {
+		printf("  => 0x%x\n", r.error().code);
+	} else {
+		printf("  => ok\n");
+	}
+	ResultCode::AssertOk(std::move(r));
+	
 	return std::make_tuple(std::move(h1), std::move(h2));
 }
 
@@ -81,5 +88,4 @@ void IRequest::SetPersistent(bool option) {
 }
 
 } // namespace nifm
-} // namespace service
 } // namespace twili

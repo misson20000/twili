@@ -23,6 +23,7 @@
 #include<mutex>
 
 #include "../twili.hpp"
+#include "../Services.hpp"
 #include "ShellProcess.hpp"
 #include "fs/ActualFile.hpp"
 
@@ -36,51 +37,55 @@ namespace process {
 
 ShellTracker::ShellTracker(Twili &twili) :
 	twili(twili) {
+	printf("in shell tracker constructor\n");
+	
+	shell_event = ResultCode::AssertOk(twili.services->GetShellEventHandle());
 
-	handle_t evt_h;
-	ResultCode::AssertOk(
-		twili.services.ns_dev.SendSyncRequest<4>( // GetShellEventHandle
-			ipc::OutHandle<handle_t, ipc::copy>(evt_h)));
-	shell_event = KEvent(evt_h);
+	printf("got shell event handle\n");
 	
 	shell_wait = event_thread.event_waiter.Add(
 		shell_event,
 		[this]() {
 			std::unique_lock<thread::Mutex> lock(queue_mutex);
 			shell_event.ResetSignal();
-			uint32_t evt;
-			uint64_t pid;
-			Result<std::nullopt_t> r = std::nullopt;
-			while(
-				(r = this->twili.services.ns_dev.SendSyncRequest<5>( // GetShellEventInfo
-					ipc::OutRaw<uint32_t>(evt),
-					ipc::OutRaw<uint64_t>(pid)))) {
-				auto i = tracking.find(pid);
-				if(evt == 1) { // exit
-					printf("got exit notification for 0x%lx\n", pid);
+
+			std::optional<hos_types::ShellEventInfo> r;
+			while((r = ResultCode::AssertOk(this->twili.services->GetShellEventInfo()))) {
+				hos_types::ShellEventInfo sei = *r;
+				
+				auto i = tracking.find(sei.pid);
+				printf("got notification %d for pid 0x%lx\n", (int) sei.event, sei.pid);
+
+				switch(sei.event) {
+				case hos_types::ShellEventType::Exit:
+					printf("got exit notification for 0x%lx\n", sei.pid);
 					if(i != tracking.end()) {
 						printf("  marking as exited\n");
 						i->second->ChangeState(MonitoredProcess::State::Exited);
 						tracking.erase(i);
 					}
-				} else if(evt == 2) { // crash
-					printf("got crash notification for 0x%lx\n", pid);
+					break;
+				/* TODO
+				case hos_types::ShellEventType::Crash:
+					printf("got crash notification for 0x%lx\n", sei.pid);
 					if(i != tracking.end()) {
 						printf("  marking as crashed\n");
 						i->second->ChangeState(MonitoredProcess::State::Crashed);
 					}
-				} else if(evt == 4) { // launch
-					printf("got launch notification for 0x%lx\n", pid);
+					break; */
+				case hos_types::ShellEventType::Launch:
+					printf("got launch notification for 0x%lx\n", sei.pid);
 					// don't care
-				} else {
-					printf("Unknown ns:dev shell event for 0x%lx: %d\n", pid, evt);
+					break;
+				default:
+					printf("unknown shell event for 0x%lx: %d\n", sei.pid, (int) sei.event);
 				}
 			}
-			if(r.error().code != 0x610 && r.error().code != 0x4e4) { // no events left
-				twili::Abort(r.error());
-			}
+			
 			return true;
 		});
+
+	printf("added shell event to shell tracker waiter\n");
 
 	tracker_signal = event_thread.event_waiter.AddSignal(
 		[this]() {
@@ -90,7 +95,14 @@ ShellTracker::ShellTracker(Twili &twili) :
 			return true;
 		});
 
+	printf("added signal to shell tracker waiter\n");
+
 	event_thread.Start();
+}
+
+ShellTracker::~ShellTracker() {
+	printf("destroying shell tracker (is stack unwinding?)\n");
+	event_thread.StopSync();
 }
 
 std::shared_ptr<ShellProcess> ShellTracker::CreateProcess() {
@@ -110,8 +122,9 @@ void ShellTracker::PrintDebugInfo() {
 	printf("ShellTracker debug:\n");
 	printf("  queued:\n");
 	for(auto proc : queued) {
-		printf("    - %p\n", proc.get());
-		printf("      type: %s\n", typeid(*proc.get()).name());
+		auto p = proc.get();
+		printf("    - %p\n", p);
+		printf("      type: %s\n", typeid(*p).name());
 		printf("      pid: 0x%lx\n", proc->GetPid());
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);
@@ -119,8 +132,9 @@ void ShellTracker::PrintDebugInfo() {
 	}
 	printf("  created:\n");
 	for(auto proc : created) {
-		printf("    - %p\n", proc.get());
-		printf("      type: %s\n", typeid(*proc.get()).name());
+		auto p = proc.get();
+		printf("    - %p\n", p);
+		printf("      type: %s\n", typeid(*p).name());
 		printf("      pid: 0x%lx\n", proc->GetPid());
 		printf("      state: %d\n", proc->GetState());
 		printf("      result: 0x%x\n", proc->GetResult().code);
@@ -179,11 +193,7 @@ void ShellTracker::TryToLaunch() {
 	const uint8_t storage_id = 3; // nand system
 	
 	printf("redirecting path...\n");
-	ipc::client::Object ilr;
-	ResultCode::AssertOk(
-		twili.services.lr.SendSyncRequest<0>( // OpenLocationResolver
-			ipc::InRaw<uint8_t>(storage_id),
-			ipc::OutObject(ilr)));
+	ipc::client::Object ilr = ResultCode::AssertOk(twili.services->OpenLocationResolver(storage_id));
 
 	// This path points to an empty nsp. It just needs to exist to make
 	// loader happy...
@@ -201,19 +211,12 @@ void ShellTracker::TryToLaunch() {
 	} else {
 		launch_flags = 0x31; // notify exit, notify debug, notify debug special
 	}
-	uint64_t pid;
-	auto r =
-		twili.services.ns_dev.SendSyncRequest<0>( // LaunchProgram
-			ipc::InRaw<uint32_t>(launch_flags),
-			ipc::InRaw<uint64_t>(title_id::ShellProcessDefaultTitle),
-			ipc::InRaw<uint32_t>(0), // padding???
-			ipc::InRaw<uint32_t>(storage_id),
-			ipc::OutRaw<uint64_t>(pid)
-			);
+
 	printf("requested launch\n");
+	auto r = twili.services->LaunchProgram(launch_flags, title_id::ShellProcessDefaultTitle, storage_id);
 	if(r) {
 		printf("  => OK\n");
-		tracking.emplace(std::make_pair(pid, proc));
+		tracking.emplace(std::make_pair(*r, proc));
 	} else {
 		printf("  => 0x%x\n", r.error().code);
 		proc->SetResult(r.error());

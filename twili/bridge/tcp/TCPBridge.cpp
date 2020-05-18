@@ -27,6 +27,7 @@
 #include<system_error>
 
 #include "../../twili.hpp"
+#include "../../Services.hpp"
 
 namespace twili {
 namespace bridge {
@@ -37,11 +38,15 @@ using trn::ResultError;
 
 TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
-	network(twili.services.nifm.CreateRequest(2)),
+	network(ResultCode::AssertOk(twili.services->CreateRequest(2))),
 	object_zero(object_zero) {
 	printf("initializing TCPBridge\n");
 	ResultCode::AssertOk(bsd_init());
 
+	printf("cancel network?\n");
+	network.Cancel();
+	printf("cancel network.\n");
+	
 	network_state_event = std::move(std::get<0>(network.GetSystemEventReadableHandles()));
 	printf("network event: 0x%x\n", network_state_event.handle);
 	
@@ -55,7 +60,7 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			
 			network_state = network.GetRequestState();
 			printf("network state changed: %d\n", network_state);
-			if(network_state != service::nifm::IRequest::State::Connected) {
+			if(network_state != nifm::IRequest::State::Connected) {
 				// signal event thread if it's blocked in poll
 				announce_socket.Close();
 				server_socket.Close();
@@ -100,13 +105,13 @@ void TCPBridge::SocketThread() {
 		{ // scope for lock
 			// wait for network connection
 			std::unique_lock<thread::Mutex> lock(network_state_mutex);
-			if(network_state != service::nifm::IRequest::State::Connected) {
+			if(network_state != nifm::IRequest::State::Connected) {
 				printf("network is down\n");
 				connections.clear(); // kill all our connections
 				
 				// wait for network to come back up
 				printf("waiting for network to come up\n");
-				while(network_state != service::nifm::IRequest::State::Connected && !thread_destroy) {
+				while(network_state != nifm::IRequest::State::Connected && !thread_destroy) {
 					network_state_condvar.Wait(network_state_mutex, -1);
 				}
 				if(thread_destroy) {
@@ -135,7 +140,7 @@ void TCPBridge::SocketThread() {
 			printf("server socket error\n");
 			printf("  revents: 0x%x\n", fds[0].revents);
 			printf("  errno: %d\n", bsd_errno);
-			if(network_state == service::nifm::IRequest::State::Connected) {
+			if(network_state == nifm::IRequest::State::Connected) {
 				printf("network connection is still up\n");
 				thread_destroy = 1;
 				return;
