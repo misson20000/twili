@@ -646,7 +646,7 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
-		if(!run_applet) {
+		if(!run_applet && !run_shell) {
 			LogMessage(Fatal, "Managed process has been removed.");
 			return 1;
 		}
