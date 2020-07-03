@@ -45,7 +45,7 @@ bool AppletTracker::HasControlProcess() {
 
 void AppletTracker::AttachControlProcess() {
 	if(has_control_process) {
-		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
+		twili::Abort(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
 	process_queued_wevent.Signal(); // for hbmenu launch
 	has_control_process = true;
@@ -53,7 +53,7 @@ void AppletTracker::AttachControlProcess() {
 
 void AppletTracker::ReleaseControlProcess() {
 	if(!has_control_process) {
-		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
+		twili::Abort(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
 	}
 	has_control_process = false;
 

@@ -26,6 +26,7 @@
 #include<vector>
 #include<string>
 
+#include "twili.hpp"
 #include "process/Process.hpp"
 
 using trn::ResultCode;
@@ -73,7 +74,7 @@ void ELFCrashReport::Generate(process::Process &process, twili::bridge::Response
 			if(r.error().code == 0x8c01) {
 				break;
 			} else {
-				throw trn::ResultError(r.error());
+				twili::Abort(r.error());
 			}
 		}
 
