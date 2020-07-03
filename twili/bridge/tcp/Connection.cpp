@@ -157,11 +157,8 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 		current_object = i->second;
 		current_handler = current_object->OpenRequest(current_mh.command_id, current_mh.payload_size, opener);
 	} catch(trn::ResultError &e) {
-		if(current_state && !current_state->has_begun) {
-			opener.RespondError(e.code);
-		} else {
-			throw e;
-		}
+		printf("TCPConnection: Somebody is still throwing exceptions!\n");
+		twili::Abort(e);
 	}
 }
 

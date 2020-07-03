@@ -70,11 +70,12 @@ void USBBridge::ResponseState::SendData(uint8_t *data, size_t size) {
 }
 
 void USBBridge::ResponseState::Finalize() {
+	// these mean that the response code didn't do what it told us it would...
 	if(transferred_size != total_size) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+		twili::Abort(TWILI_ERR_BAD_RESPONSE);
 	}
 	if(objects.size() != object_count) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+		twili::Abort(TWILI_ERR_BAD_RESPONSE);
 	}
 
 	if(object_count > 0) {

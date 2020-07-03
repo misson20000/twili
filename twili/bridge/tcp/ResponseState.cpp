@@ -53,11 +53,12 @@ void TCPBridge::Connection::ResponseState::SendData(uint8_t *data, size_t size) 
 }
 
 void TCPBridge::Connection::ResponseState::Finalize() {
+	// these mean that the response code didn't do what it told us it would...
 	if(transferred_size != total_size) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+		twili::Abort(TWILI_ERR_BAD_RESPONSE);
 	}
 	if(objects.size() != object_count) {
-		throw ResultError(TWILI_ERR_BAD_RESPONSE);
+		twili::Abort(TWILI_ERR_BAD_RESPONSE);
 	}
 
 	if(object_count > 0) {
@@ -78,11 +79,12 @@ void TCPBridge::Connection::ResponseState::InsertObject(std::pair<uint32_t, std:
 }
 
 void TCPBridge::Connection::ResponseState::Send(uint8_t *data, size_t size) {
-	while(size > 0) {
+	while(!connection->deletion_flag && size > 0) {
 		ssize_t r = bsd_send(connection->socket.fd, data, size, 0);
 		if(r <= 0) {
 			connection->deletion_flag = true;
-			throw ResultError(TWILI_ERR_TCP_TRANSFER);
+			connection->Panic();
+			return;
 		}
 		size-= r;
 		data+= r;

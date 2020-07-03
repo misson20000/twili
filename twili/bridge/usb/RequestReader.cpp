@@ -105,7 +105,8 @@ void USBBridge::RequestReader::PostObjectBuffer() {
 	size_t size = current_header.object_count * sizeof(uint32_t);
 	if(size > bridge->request_data_buffer.size) {
 		printf("Too many object IDs in request\n");
-		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		bridge->ResetInterface();
+		return;
 	}
 	
 	object_urb_id = ResultCode::AssertOk(
@@ -118,13 +119,15 @@ void USBBridge::RequestReader::MetadataTransactionCompleted() {
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_meta, report, meta_urb_id);
 	if(entry->urb_status != 3) {
 		printf("Meta URB status (%d) != 3\n", entry->urb_status);
-		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		bridge->ResetInterface();
+		return;
 	}
 	if(entry->transferred_size == 0) {
 		return;
 	}
 	if(entry->transferred_size != sizeof(protocol::MessageHeader)) {
-		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		bridge->ResetInterface();
+		return;
 	}
 	memcpy(&current_header, bridge->request_meta_buffer.data, sizeof(protocol::MessageHeader));
 	if(bridge->twili->config.logging_verbosity >= 1) {
@@ -156,28 +159,34 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 		auto entry = USBBridge::FindReport(bridge->endpoint_request_data, report, object_urb_id);
 		if(entry->urb_status != 3) {
 			printf("Object URB status (%d) != 3\n", entry->urb_status);
-			throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+			bridge->ResetInterface();
+			return;
 		}
 		if(entry->transferred_size != current_header.object_count * sizeof(uint32_t)) {
 			printf("Didn't receive enough object IDs\n");
-			throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
-			std::copy( // copy object IDs
-				((uint32_t*) bridge->request_data_buffer.data),
-				((uint32_t*) bridge->request_data_buffer.data) + current_header.object_count,
-				object_ids.insert(object_ids.end(), current_header.object_count, 0));
-			FinalizeCommand();
+			bridge->ResetInterface();
+			return;
 		}
+		
+		std::copy( // copy object IDs
+			((uint32_t*) bridge->request_data_buffer.data),
+			((uint32_t*) bridge->request_data_buffer.data) + current_header.object_count,
+			object_ids.insert(object_ids.end(), current_header.object_count, 0));
+		FinalizeCommand();
+
 		return;
 	}
 	
 	auto entry = USBBridge::FindReport(bridge->endpoint_request_data, report, data_urb_id);
 	if(entry->urb_status != 3) {
 		printf("Data URB status (%d) != 3\n", entry->urb_status);
-		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		bridge->ResetInterface();
+		return;
 	}
 	if(payload_size + entry->transferred_size > current_header.payload_size) {
 		printf("Overshot payload size\n");
-		throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+		bridge->ResetInterface();
+		return;
 	}
 
 	payload_size+= entry->transferred_size;
@@ -198,6 +207,8 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 			opener.RespondError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 		} else {
 			printf("USBRequestReader: dropped std::bad_alloc during FlushReceiveBuffer\n");
+			bridge->ResetInterface();
+			return;
 		}
 		CleanupCommand();
 	}
@@ -245,18 +256,11 @@ void USBBridge::RequestReader::BeginProcessingCommand() {
 		current_object = i->second;
 		current_handler = current_object->OpenRequest(current_header.command_id, current_header.payload_size, opener);
 	} catch(trn::ResultError &e) {
-		if(current_state && !current_state->has_begun) {
-			opener.RespondError(e.code);
-		} else {
-			throw e;
-		}
+		printf("USBRequestReader: Somebody is still throwing exceptions!\n");
+		twili::Abort(e);
 	} catch(std::bad_alloc &e) {
-		if(current_state && !current_state->has_begun) {
-			printf("out of memory!\n");
-			opener.RespondError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
-		} else {
-			throw e;
-		}
+		printf("USBRequestReader: out of memory while opening request\n");
+		twili::Abort(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 	}
 }
 
