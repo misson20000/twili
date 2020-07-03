@@ -22,6 +22,8 @@
 
 #include<libtransistor/cpp/nx.hpp>
 
+#include "../twili.hpp"
+
 #include "err.hpp"
 #include "Buffer.hpp"
 
@@ -70,6 +72,11 @@ class SmartRequestHandler<Func> : public RequestHandler {
 	}
 
 	virtual void FlushReceiveBuffer(util::Buffer &input_buffer) {
+		if(has_signaled_bad_request) {
+			DiscardingRequestHandler::GetInstance()->FlushReceiveBuffer(input_buffer);
+			return;
+		}
+		
 		// if we haven't reached the end of non-streaming data, attempt
 		// to consume that.
 		if(!streaming) {
@@ -82,22 +89,28 @@ class SmartRequestHandler<Func> : public RequestHandler {
 				InputStream *stream = parameter_holder.GetStream();
 				if(stream) {
 					if(stream->expected_size != payload_size - consumed_size) {
-						throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
+						SignalBadRequest();
+						return;
 					}
 				} else {
 					if(consumed_size < payload_size) {
-						// too much data
-						throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
+						// host sent too much data
+						SignalBadRequest();
+						return;
 					}
 				}
-				streaming = true; // sink any further data if we get any
+				streaming = true; // sink any further data into stream if we get any
+				
+				// TODO: consider shuffling this into Finalize or streaming start
 				InvocationHelper(object, parameter_holder.GetValues(), std::index_sequence_for<Args...>());
 			}
 		} else {
 			if(parameter_holder.GetStream()) {
 				parameter_holder.GetStream()->receive(input_buffer);
 			} else if(input_buffer.ReadAvailable()) {
-				throw trn::ResultError(TWILI_ERR_PROTOCOL_BAD_REQUEST); // too much data
+				// host sent too much data
+				SignalBadRequest();
+				return;
 			}
 		}
 	}
@@ -111,6 +124,7 @@ class SmartRequestHandler<Func> : public RequestHandler {
 
  private:
 	T &object;
+	bool has_signaled_bad_request = false;
 
 	template<std::size_t... I>
 	void InvocationHelper(T &object, std::tuple<Args...> args, std::index_sequence<I...>) {
@@ -122,6 +136,12 @@ class SmartRequestHandler<Func> : public RequestHandler {
 	size_t payload_size = 0;
 	bool streaming = false;
 	ResponseOpener response_opener;
+
+	void SignalBadRequest() {
+		twili::Assert<TWILI_ERR_FATAL_BRIDGE_STATE>(!has_signaled_bad_request);
+		response_opener.RespondError(TWILI_ERR_PROTOCOL_BAD_REQUEST);
+		has_signaled_bad_request = true;
+	}
 };
 
 template<auto, auto>

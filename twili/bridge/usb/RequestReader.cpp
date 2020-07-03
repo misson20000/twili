@@ -189,21 +189,17 @@ void USBBridge::RequestReader::DataTransactionCompleted() {
 		// pass to request handler
 		current_handler->FlushReceiveBuffer(payload_buffer);
 	} catch(trn::ResultError &e) {
-		if(!current_state->has_begun) {
-			ResponseOpener opener(current_state);
-			opener.RespondError(e.code);
-		} else {
-			printf("USBRequestReader: dropped error during FlushReceiveBuffer: 0x%x\n", e.code.code);
-			CleanupCommand();
-		}
+		printf("USBRequestReader: Somebody is still throwing exceptions!\n");
+		twili::Abort(e);
 	} catch(std::bad_alloc &e) {
 		if(!current_state->has_begun) {
+			printf("USBRequestReader: ran out of memory. trying to signal this to user...\n");
 			ResponseOpener opener(current_state);
 			opener.RespondError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 		} else {
 			printf("USBRequestReader: dropped std::bad_alloc during FlushReceiveBuffer\n");
-			CleanupCommand();
 		}
+		CleanupCommand();
 	}
 	
 	if(payload_size < current_header.payload_size) {
@@ -269,13 +265,8 @@ void USBBridge::RequestReader::FinalizeCommand() {
 		current_handler->Finalize(payload_buffer);
 		CleanupCommand();
 	} catch(ResultError &e) {
-		if(current_state && !current_state->has_begun) {
-			ResponseOpener opener(current_state);
-			opener.RespondError(e.code);
-		} else {
-			printf("USBRequestReader: dropped error during Finalize: 0x%x\n", e.code.code);
-			ResetHandler();
-		}
+		printf("USBRequestReader: Somebody is still throwing exceptions!\n");
+		twili::Abort(e);
 	}
 }
 

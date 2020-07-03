@@ -43,7 +43,7 @@ void TCPBridge::Connection::PumpInput() {
 	std::tuple<uint8_t*, size_t> target = in_buffer.Reserve(8192);
 	ssize_t r = bsd_recv(socket.fd, (void*) std::get<0>(target), std::get<1>(target), 0);
 	if(r <= 0) {
-		deletion_flag = true;
+		Panic();
 		return;
 	} else {
 		in_buffer.MarkWritten(r);
@@ -108,27 +108,20 @@ void TCPBridge::Connection::Synchronized() {
 		try {
 			current_handler->FlushReceiveBuffer(payload_buffer);
 		} catch(trn::ResultError &e) {
-			if(current_state && !current_state->has_begun) {
-				ResponseOpener opener(current_state);
-				opener.RespondError(e.code);
-			} else {
-				printf("TCPConnection: dropped error during FlushReceiveBuffer: 0x%x\n", e.code.code);
-				CleanupCommand();
-			}
+			printf("TCPConnection: Somebody is still throwing exceptions!\n");
+			twili::Abort(e);
 		}
 		break;
 	case Task::FinalizeCommand:
 		try {
 			current_handler->Finalize(payload_buffer);
-			CleanupCommand();
+			twili::Assert<TWILI_ERR_FATAL_BRIDGE_STATE>((bool) current_object);
+			current_object->FinalizeCommand();
+			current_object.reset();
+			ResetHandler();
 		} catch(trn::ResultError &e) {
-			if(current_state && !current_state->has_begun) {
-				ResponseOpener opener(current_state);
-				opener.RespondError(e.code);
-			} else {
-				printf("TCPConnection: dropped error during Finalize: 0x%x\n", e.code.code);
-				CleanupCommand();
-			}
+			printf("TCPConnection: Somebody is still throwing exceptions!\n");
+			twili::Abort(e);
 		}
 		break;
 	case Task::Idle:
@@ -172,17 +165,15 @@ void TCPBridge::Connection::BeginProcessingCommandImpl() {
 	}
 }
 
-void TCPBridge::Connection::CleanupCommand() {
-	if(current_object) {
-		current_object->FinalizeCommand();
-		current_object.reset();
-	}
-	ResetHandler();
-}
-
 void TCPBridge::Connection::ResetHandler() {
 	current_state.reset();
 	current_handler = DiscardingRequestHandler::GetInstance();
+}
+
+void TCPBridge::Connection::Panic() {
+	deletion_flag = true;
+	socket.Close();
+	// this is about the best we can do
 }
 
 } // namespace tcp

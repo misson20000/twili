@@ -107,8 +107,10 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 	
 	util::Socket socket;
  private:
+	void Panic(); // unrecoverable protocol error- abort!
+	
 	TCPBridge &bridge;
-
+	
 	/*
 	 * Requests that the main thread process something,
 	 * and then blocks until the main thread finishes. I know that this
@@ -122,7 +124,6 @@ class TCPBridge::Connection : public std::enable_shared_from_this<TCPBridge::Con
 	void Synchronize(Task task);
 	
 	void BeginProcessingCommandImpl(); // should run on main thread
-	void CleanupCommand(); // should run on main thread
 	
 	util::Buffer in_buffer;
 
