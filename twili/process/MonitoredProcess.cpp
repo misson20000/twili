@@ -128,7 +128,8 @@ void MonitoredProcess::AppendCode(std::shared_ptr<fs::ProcessFile> file) {
 
 void MonitoredProcess::Attach(std::shared_ptr<trn::KProcess> process) {
 	if(proc) {
-		throw trn::ResultError(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
+		// logic error
+		twili::Abort(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
 	}
 	proc = process;
 	ChangeState(State::Attached);

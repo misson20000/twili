@@ -22,6 +22,7 @@
 
 #include<libtransistor/cpp/nx.hpp>
 
+#include "../../twili.hpp"
 #include "err.hpp"
 
 namespace twili {
@@ -30,44 +31,49 @@ namespace fs {
 
 ActualFile::ActualFile(FILE *file) : file(file) {
 	if(file == NULL) {
-		printf("failed to open file\n");
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
+		// don't construct with null files, please. use Open instead.
+		twili::Abort(TWILI_ERR_IO_ERROR);
 	}
 }
 
-ActualFile::ActualFile(const char *path) : file(fopen(path, "rb")) {
+trn::ResultCode ActualFile::Open(const char *path, std::shared_ptr<ActualFile> *out) {
+	FILE *file = fopen(path, "rb");
+	
 	if(file == NULL) {
-		printf("failed to open '%s'\n", path);
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
+		return TWILI_ERR_IO_ERROR;
 	}
+
+	*out = std::make_shared<ActualFile>(file);
+	
+	return RESULT_OK;
 }
 
 ActualFile::~ActualFile() {
-	if(file != NULL) {
-		fclose(file);
-	}
+	fclose(file);
 }
 
-size_t ActualFile::Read(size_t offset, size_t size, uint8_t *out) {
+trn::ResultCode ActualFile::Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) {
 	if(fseek(file, offset, SEEK_SET) != 0) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
+		return TWILI_ERR_IO_ERROR;
 	}
-	return fread((void*) out, 1, size, file);
+	*out_size = fread((void*) out, 1, size, file);
+	return RESULT_OK;
 }
 
-size_t ActualFile::GetSize() {
+trn::ResultCode ActualFile::GetSize(size_t *out_size) {
 	if(!has_size) {
 		if(fseek(file, 0, SEEK_END) != 0) {
-			throw trn::ResultError(TWILI_ERR_IO_ERROR);
+			return TWILI_ERR_IO_ERROR;
 		}
 		off_t out = ftello(file);
 		if(out == -1) {
-			throw trn::ResultError(TWILI_ERR_IO_ERROR);
+			return TWILI_ERR_IO_ERROR;
 		}
 		size = out;
 		has_size = true;
 	}
-	return size;
+	*out_size = size;
+	return RESULT_OK;
 }
 
 } // namespace fs

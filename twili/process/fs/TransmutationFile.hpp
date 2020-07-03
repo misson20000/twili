@@ -38,18 +38,18 @@ class TransmutationFile : public ProcessFile {
 		virtual ~Segment() = default;
 		// It's up to TransmutationFile to try to avoid out-of-bounds reads,
 		// but give a way to report them if they do happen for some reason.
-		virtual size_t Read(size_t offset, size_t size, uint8_t *out) = 0;
+		virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) = 0;
 		virtual size_t Size() = 0;
 	};
 
 	TransmutationFile();
-	virtual size_t Read(size_t offset, size_t size, uint8_t *out);
-	virtual size_t GetSize();
+	virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) override;
+	virtual trn::ResultCode GetSize(size_t *out_size) override;
 	
 	class BackedSegment : public Segment {
 	 public:
 		BackedSegment(std::shared_ptr<ProcessFile> file, size_t file_offset, size_t size);
-		virtual size_t Read(size_t offset, size_t size, uint8_t *out) override;
+		virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) override;
 		virtual size_t Size() override;
 	 private:
 		std::shared_ptr<ProcessFile> file;
@@ -59,7 +59,7 @@ class TransmutationFile : public ProcessFile {
 	class MemorySegment : public Segment {
 	 public:
 		MemorySegment(uint8_t *buffer, size_t size);
-		virtual size_t Read(size_t offset, size_t size, uint8_t *out) override;
+		virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) override;
 		virtual size_t Size() override;
 	 private:
 		uint8_t *buffer;

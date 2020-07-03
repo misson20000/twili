@@ -33,8 +33,8 @@ class VectorFile : public ProcessFile {
 	VectorFile(std::vector<uint8_t> vector);
 	virtual ~VectorFile() override = default;
 	
-	virtual size_t Read(size_t offset, size_t size, uint8_t *out) override;
-	virtual size_t GetSize() override;
+	virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *size_out) override;
+	virtual trn::ResultCode GetSize(size_t *size_out) override;
  private:
 	std::vector<uint8_t> vector;
 };

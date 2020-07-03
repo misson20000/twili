@@ -102,8 +102,13 @@ void ITwibProcessMonitor::AppendCode(bridge::ResponseOpener opener, InputStream 
 	code.finish =
 		[this, file, path, opener](util::Buffer &buffer) {
 			printf("nro stream finished\n");
-			fclose(file);
-			process->AppendCode(std::make_shared<process::fs::ActualFile>(path.c_str()));
+			fclose(file); // need to close and re-open with different mode
+
+			std::shared_ptr<process::fs::ActualFile> file;
+			// we literally just made this file- something has gone pretty wrong if it's gone already
+			twili::Assert(process::fs::ActualFile::Open(path.c_str(), &file));
+			process->AppendCode(std::move(file));
+			
 			opener.RespondOk();
 		};
 }

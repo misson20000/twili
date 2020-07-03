@@ -69,13 +69,11 @@ ProcessFileSystem::IFile::IFile(trn::ipc::server::IPCServer *server, std::shared
 }
 
 trn::ResultCode ProcessFileSystem::IFile::Read(trn::ipc::InRaw<uint32_t> unk0, trn::ipc::InRaw<uint64_t> offset, trn::ipc::InRaw<uint64_t> in_size, trn::ipc::OutRaw<uint64_t> out_size, trn::ipc::Buffer<uint8_t, 0x46, 0> out_buffer) {
-	out_size = file->Read(offset.value, std::min(in_size.value, out_buffer.size), out_buffer.data);
-	return 0;
+	return file->Read(offset.value, std::min(in_size.value, out_buffer.size), out_buffer.data, out_size.value);
 }
 
 trn::ResultCode ProcessFileSystem::IFile::GetSize(trn::ipc::OutRaw<uint64_t> file_size) {
-	file_size = file->GetSize();
-	return 0;
+	return file->GetSize(file_size.value);
 }
 
 } // namespace fs

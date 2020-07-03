@@ -22,6 +22,8 @@
 
 #include<stdio.h>
 
+#include "../../twili.hpp"
+
 namespace twili {
 namespace process {
 namespace fs {
@@ -33,7 +35,7 @@ void TransmutationFile::SetSegments(std::vector<std::unique_ptr<Segment>> &&segm
 	this->segments = std::move(segments);
 }
 
-size_t TransmutationFile::Read(size_t offset, size_t size, uint8_t *out) {
+trn::ResultCode TransmutationFile::Read(size_t offset, size_t size, uint8_t *out, size_t *size_out) {
 	size_t segment_begin = 0;
 	size_t segment_end = 0;
 	size_t total_read = 0;
@@ -47,7 +49,8 @@ size_t TransmutationFile::Read(size_t offset, size_t size, uint8_t *out) {
 			if(seg_size > size) {
 				seg_size = size;
 			}
-			size_t actual_read = (*i)->Read(seg_off, seg_size, out);
+			size_t actual_read;
+			TWILI_CHECK((*i)->Read(seg_off, seg_size, out, &actual_read));
 			if(actual_read < seg_size) {
 				// if we get a short read, give up
 				printf(
@@ -66,20 +69,21 @@ size_t TransmutationFile::Read(size_t offset, size_t size, uint8_t *out) {
 	return total_read;
 }
 
-size_t TransmutationFile::GetSize() {
+trn::ResultCode TransmutationFile::GetSize(size_t *size_out) {
 	size_t total_size = 0;
 	for(auto i = segments.begin(); i != segments.end(); i++) {
 		total_size+= (*i)->Size();
 	}
-	return total_size;
+	*size_out = total_size;
+	return RESULT_OK;
 }
 
 TransmutationFile::BackedSegment::BackedSegment(std::shared_ptr<ProcessFile> file, size_t file_offset, size_t size) :
 	file(file), file_offset(file_offset), size(size) {
 }
 
-size_t TransmutationFile::BackedSegment::Read(size_t offset, size_t size, uint8_t *out) {
-	return file->Read(file_offset + offset, size, out);
+trn::ResultCode TransmutationFile::BackedSegment::Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) {
+	return file->Read(file_offset + offset, size, out, out_size);
 }
 
 size_t TransmutationFile::BackedSegment::Size() {
@@ -89,9 +93,10 @@ size_t TransmutationFile::BackedSegment::Size() {
 TransmutationFile::MemorySegment::MemorySegment(uint8_t *buffer, size_t size) : buffer(buffer), size(size) {
 }
 
-size_t TransmutationFile::MemorySegment::Read(size_t offset, size_t size, uint8_t *out) {
+trn::ResultCode TransmutationFile::MemorySegment::Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) {
 	std::copy_n(buffer + offset, size, out);
-	return size;
+	*out_size = size;
+	return RESULT_OK;
 }
 
 size_t TransmutationFile::MemorySegment::Size() {

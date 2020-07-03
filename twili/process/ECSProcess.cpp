@@ -67,8 +67,10 @@ trn::ResultCode ECSProcess::PrepareForLaunch() {
 	} else if(files.empty()) {
 		return TWILI_ERR_NO_MODULES;
 	}
-	
-	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
+
+	std::shared_ptr<fs::NSOTransmutationFile> transmutation;
+	TWILI_CHECK(fs::NRONSOTransmutationFile::Create(files.front(), &transmutation));
+	virtual_exefs.SetMain(std::move(transmutation));
 
 	KObject session;
 	printf("installing ExternalContentSource\n");

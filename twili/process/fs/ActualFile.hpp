@@ -32,11 +32,12 @@ class ActualFile : public ProcessFile {
  public:
 	// takes ownership
 	ActualFile(FILE *file);
-	ActualFile(const char *path);
+
+	static trn::ResultCode Open(const char *path, std::shared_ptr<ActualFile> *out);
 	virtual ~ActualFile() override;
 
-	virtual size_t Read(size_t offset, size_t size, uint8_t *out) override;
-	virtual size_t GetSize() override;
+	virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) override;
+	virtual trn::ResultCode GetSize(size_t *out_size) override;
  private:
 	FILE *file;
 	bool has_size = false;

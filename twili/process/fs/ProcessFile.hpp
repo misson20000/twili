@@ -23,6 +23,8 @@
 #include<stdlib.h>
 #include<stdint.h>
 
+#include<libtransistor/cpp/nx.hpp>
+
 namespace twili {
 namespace process {
 namespace fs {
@@ -30,8 +32,8 @@ namespace fs {
 class ProcessFile {
  public:
 	virtual ~ProcessFile() = default;
-	virtual size_t Read(size_t offset, size_t size, uint8_t *out) = 0;
-	virtual size_t GetSize() = 0;
+	virtual trn::ResultCode Read(size_t offset, size_t size, uint8_t *out, size_t *out_size) = 0;
+	virtual trn::ResultCode GetSize(size_t *out_size) = 0;
 };
 
 } // namespace fs

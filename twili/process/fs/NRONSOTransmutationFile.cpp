@@ -18,8 +18,11 @@
 // along with Twili.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include<libtransistor/cpp/nx.hpp>
 #include "NRONSOTransmutationFile.hpp"
+
+#include<libtransistor/cpp/nx.hpp>
+
+#include "../../twili.hpp"
 #include "err.hpp"
 
 namespace twili {
@@ -28,21 +31,27 @@ namespace fs {
 
 static_assert(sizeof(NRONSOTransmutationFile::NROHeader) == 0x70, "nro header size should be 0x70");
 
-std::shared_ptr<NSOTransmutationFile> NRONSOTransmutationFile::Create(std::shared_ptr<ProcessFile> nro) {
-	NROHeader header(nro);
-	return std::make_shared<NSOTransmutationFile>(
+trn::ResultCode NRONSOTransmutationFile::Create(std::shared_ptr<ProcessFile> nro, std::shared_ptr<NSOTransmutationFile> *out) {
+	NROHeader header;
+	TWILI_CHECK(header.Read(nro));
+
+	*out = std::make_shared<NSOTransmutationFile>(
 		std::make_unique<TransmutationFile::BackedSegment>(nro, header.segments[0].offset, header.segments[0].size),
 		std::make_unique<TransmutationFile::BackedSegment>(nro, header.segments[1].offset, header.segments[1].size),
 		std::make_unique<TransmutationFile::BackedSegment>(nro, header.segments[2].offset, header.segments[2].size),
 		header.bss_size, header.build_id);
+
+	return RESULT_OK;
 }
 
-NRONSOTransmutationFile::NROHeader::NROHeader(std::shared_ptr<ProcessFile> nro) {
-	if(nro->Read(0x10, sizeof(*this), (uint8_t*) this) < sizeof(*this)) {
-		throw trn::ResultError(TWILI_ERR_IO_ERROR);
-	}
-	if(magic != 0x304f524e) {
-		throw trn::ResultError(TWILI_ERR_INVALID_NRO);
+trn::ResultCode NRONSOTransmutationFile::NROHeader::Read(std::shared_ptr<ProcessFile> nro) {
+	uint64_t actual_size;
+	if(nro->Read(0x10, sizeof(*this), (uint8_t*) this, &actual_size) != RESULT_OK ||
+		 actual_size < sizeof(*this) ||
+		 magic != 0x304f524e) {
+		return TWILI_ERR_INVALID_NRO;
+	} else {
+		return RESULT_OK;
 	}
 }
 

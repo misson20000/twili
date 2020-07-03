@@ -34,8 +34,9 @@ AppletTracker::AppletTracker(Twili &twili) :
 	twili(twili),
 	process_queued_wevent(process_queued_event),
 	monitor(*this) {
-	printf("building AppletTracker\n");
-	hbmenu_nro = std::make_shared<process::fs::ActualFile>("/sd/hbmenu.nro");
+	std::shared_ptr<fs::ActualFile> af;
+	twili::Assert(fs::ActualFile::Open("/sd/hbmenu.nro", &af));
+	this->hbmenu_nro = std::move(af);
 }
 
 bool AppletTracker::HasControlProcess() {

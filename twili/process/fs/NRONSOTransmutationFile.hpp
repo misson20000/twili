@@ -31,14 +31,16 @@ namespace fs {
 
 class NRONSOTransmutationFile {
  public:
-	static std::shared_ptr<NSOTransmutationFile> Create(std::shared_ptr<ProcessFile> nro);
+	NRONSOTransmutationFile() = delete;
+	static trn::ResultCode Create(std::shared_ptr<ProcessFile> nro, std::shared_ptr<NSOTransmutationFile> *out);
 
 	struct NROSegmentHeader {
 		uint32_t offset;
 		uint32_t size;
 	};
 	struct NROHeader {
-		NROHeader(std::shared_ptr<ProcessFile> nro);
+		trn::ResultCode Read(std::shared_ptr<ProcessFile> nro);
+		
 		uint32_t magic;
 		uint32_t version;
 		uint32_t size;
