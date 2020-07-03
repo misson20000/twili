@@ -63,7 +63,7 @@ void Condvar::Wait(Mutex &m, uint64_t timeout) {
 }
 
 EventThread::EventThread() {
-	ResultCode::AssertOk(trn_thread_create(&thread, EventThread::ThreadEntryShim, this, -1, -2, 0x4000, nullptr));
+	twili::Assert(trn_thread_create(&thread, EventThread::ThreadEntryShim, this, -1, -2, 0x4000, nullptr));
 	interrupt_signal = event_waiter.AddSignal(
 		[this]() {
 			interrupt_signal->ResetSignal();
@@ -79,7 +79,7 @@ EventThread::~EventThread() {
 void EventThread::Start() {
 	thread_running = true;
 	exit_requested = false;
-	ResultCode::AssertOk(trn_thread_start(&thread));
+	twili::Assert(trn_thread_start(&thread));
 }
 
 void EventThread::Interrupt() {
@@ -105,7 +105,7 @@ void EventThread::ThreadEntryShim(void *arg) {
 void EventThread::ThreadFunc() {
 	try {
 		while(!exit_requested) {
-			ResultCode::AssertOk(event_waiter.Wait(3000000000));
+			twili::Assert(event_waiter.Wait(3000000000));
 		}
 	} catch(ResultError &e) {
 		twili::Abort(e);

@@ -45,7 +45,7 @@ void ITwibFileAccessor::Read(bridge::ResponseOpener opener, uint64_t offset, uin
 	std::vector<uint8_t> buffer(std::max(size, limit));
 	size_t actual_size;
 
-	ResultCode::AssertOk(ifile_read(ifile, &actual_size, buffer.data(), buffer.size(), 0, offset, buffer.size()));
+	TWILI_BRIDGE_CHECK(ifile_read(ifile, &actual_size, buffer.data(), buffer.size(), 0, offset, buffer.size()));
 	buffer.resize(actual_size);
 	
 	opener.RespondOk(std::move(buffer));
@@ -53,16 +53,24 @@ void ITwibFileAccessor::Read(bridge::ResponseOpener opener, uint64_t offset, uin
 
 void ITwibFileAccessor::Write(bridge::ResponseOpener opener, uint64_t offset, InputStream &stream) {
 	std::shared_ptr<uint64_t> offset_shared = std::make_shared<uint64_t>(offset);
-
+	std::shared_ptr<trn::ResultCode> r = std::make_shared<trn::ResultCode>(RESULT_OK);
+	
 	stream.receive =
-		[this, offset_shared](util::Buffer &buffer) {
-			size_t a = buffer.ReadAvailable();
-			ResultCode::AssertOk(ifile_write(ifile, 0, *offset_shared, a, buffer.Read(), a));
-			*offset_shared+= a;
+		[this, offset_shared, r](util::Buffer &buffer) {
+			if(*r == RESULT_OK) {
+				size_t a = buffer.ReadAvailable();
+				*r = ifile_write(ifile, 0, *offset_shared, a, buffer.Read(), a);
+				buffer.MarkRead(a); // TODO: split into separate commit, since this is an important fix
+				*offset_shared+= a;
+			} else {
+				buffer.MarkRead(buffer.ReadAvailable());
+			}
 		};
 
 	stream.finish =
-		[this, opener](util::Buffer &buffer) {
+		[this, opener, r](util::Buffer &buffer) {
+			TWILI_BRIDGE_CHECK(*r);
+			
 			// since our receiver always consumes the entire buffer, we
 			// don't have to worry about finishing it.
 			opener.RespondOk();
@@ -70,18 +78,18 @@ void ITwibFileAccessor::Write(bridge::ResponseOpener opener, uint64_t offset, In
 }
 
 void ITwibFileAccessor::Flush(bridge::ResponseOpener opener) {
-	ResultCode::AssertOk(ifile_flush(ifile));
+	TWILI_BRIDGE_CHECK(ifile_flush(ifile));
 	opener.RespondOk();
 }
 
 void ITwibFileAccessor::SetSize(bridge::ResponseOpener opener, size_t size) {
-	ResultCode::AssertOk(ifile_set_size(ifile, size));
+	TWILI_BRIDGE_CHECK(ifile_set_size(ifile, size));
 	opener.RespondOk();
 }
 
 void ITwibFileAccessor::GetSize(bridge::ResponseOpener opener) {
 	size_t size;
-	ResultCode::AssertOk(ifile_get_size(ifile, &size));
+	TWILI_BRIDGE_CHECK(ifile_get_size(ifile, &size));
 	opener.RespondOk(std::move(size));
 }
 

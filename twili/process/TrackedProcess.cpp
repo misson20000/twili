@@ -52,7 +52,7 @@ void TrackedProcessBase::ChangeState(State state)  {
 		}
 
 		// find target entry...
-		memory_info_t mi = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, 0)));
+		memory_info_t mi = std::get<0>(twili::Assert(svc::QueryProcessMemory(*proc, 0)));
 		int coderegions_found = 0;
 		while((uint64_t) mi.base_addr + mi.size > 0) {
 			if(mi.memory_type == 3 && mi.permission == 5) {
@@ -62,7 +62,7 @@ void TrackedProcessBase::ChangeState(State state)  {
 					target_entry = (uint64_t) mi.base_addr;
 				}
 			}
-			mi = std::get<0>(ResultCode::AssertOk(svc::QueryProcessMemory(*proc, (uint64_t) mi.base_addr + mi.size)));
+			mi = std::get<0>(twili::Assert(svc::QueryProcessMemory(*proc, (uint64_t) mi.base_addr + mi.size)));
 		}
 		if(coderegions_found != 2) {
 			printf("CODE REGION COUNT MISMATCH (expected 2, counted %d)\n", coderegions_found);

@@ -61,7 +61,7 @@ int main() {
 		twili::Twili::Config config;
 
 		if(config.enable_usb_log) {
-			ResultCode::AssertOk(usb_serial_init());
+			twili::Assert(usb_serial_init());
 			// set up serial console
 			int usb_fd = usb_serial_open_fd();
 			if(usb_fd < 0) {
@@ -94,7 +94,7 @@ int main() {
 		static twili::Twili twili(config);
 		
 		while(!twili.destroy_flag) {
-			ResultCode::AssertOk(twili.event_waiter.Wait(3000000000));
+			twili::Assert(twili.event_waiter.Wait(3000000000));
 			twili.monitored_processes.remove_if(
 				[](const auto &proc) {
 					return proc->GetState() == twili::process::MonitoredProcess::State::Exited;
@@ -179,7 +179,7 @@ void Abort(trn::ResultCode code) {
 Twili::Twili(const Config &config) :
 	config(config),
 	event_waiter(),
-	server(ResultCode::AssertOk(trn::ipc::server::IPCServer::Create(&event_waiter))),
+	server(twili::Assert(trn::ipc::server::IPCServer::Create(&event_waiter))),
 	twili_registration(
 		server, config.service_name.c_str(),
 		[this](auto s) {
@@ -284,12 +284,12 @@ std::shared_ptr<process::Process> Twili::FindProcess(uint64_t pid) {
 }
 
 Twili::ServiceRegistration::ServiceRegistration(trn::ipc::server::IPCServer &server, std::string name, std::function<trn::Result<trn::ipc::server::Object*>(trn::ipc::server::IPCServer *server)> factory) : name(name) {
-	ResultCode::AssertOk(server.CreateService(name.c_str(), factory));
+	twili::Assert(server.CreateService(name.c_str(), factory));
 }
 
 Twili::ServiceRegistration::~ServiceRegistration() {
-	ResultCode::AssertOk(sm_init());
-	ResultCode::AssertOk(sm_unregister_service(name.c_str()));
+	twili::Assert(sm_init());
+	twili::Assert(sm_unregister_service(name.c_str()));
 	sm_finalize();
 }
 

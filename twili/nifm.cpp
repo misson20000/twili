@@ -20,6 +20,8 @@
 
 #include "nifm.hpp"
 
+#include "twili.hpp"
+
 using namespace trn;
 
 namespace twili {
@@ -33,7 +35,7 @@ IRequest::IRequest(ipc::client::Object &&object) : object(std::move(object)) {
 
 IRequest::State IRequest::GetRequestState() {
 	State state;
-	ResultCode::AssertOk(
+	twili::Assert(
 		object.SendSyncRequest<0>(
 			ipc::OutRaw(state)));
 	return state;
@@ -50,41 +52,38 @@ ResultCode IRequest::GetResult() {
 
 std::tuple<trn::KEvent, trn::KEvent> IRequest::GetSystemEventReadableHandles() {
 	trn::KEvent h1, h2;
-	printf("=> GetSystemEventReadableHandles\n");
-	auto r =
+	twili::Assert(twili::Unwrap(
 		object.SendSyncRequest<2>(
 			ipc::OutHandle<trn::KEvent, ipc::copy>(h1),
-			ipc::OutHandle<trn::KEvent, ipc::copy>(h2));
-	if(!r) {
-		printf("  => 0x%x\n", r.error().code);
-	} else {
-		printf("  => ok\n");
-	}
-	ResultCode::AssertOk(std::move(r));
+			ipc::OutHandle<trn::KEvent, ipc::copy>(h2))));
 	
 	return std::make_tuple(std::move(h1), std::move(h2));
 }
 
 void IRequest::Cancel() {
-	ResultCode::AssertOk(
-		object.SendSyncRequest<3>());
+	twili::Assert(
+		twili::Unwrap(
+			object.SendSyncRequest<3>()));
 }
 
 void IRequest::Submit() {
-	ResultCode::AssertOk(
-		object.SendSyncRequest<4>());
+	twili::Assert(
+		twili::Unwrap(
+			object.SendSyncRequest<4>()));
 }
 
 void IRequest::SetConnectionConfirmationOption(uint8_t option) {
-	ResultCode::AssertOk(
-		object.SendSyncRequest<11>(
-			ipc::InRaw(option)));
+	twili::Assert(
+		twili::Unwrap(
+			object.SendSyncRequest<11>(
+				ipc::InRaw(option))));
 }
 
 void IRequest::SetPersistent(bool option) {
-	ResultCode::AssertOk(
-		object.SendSyncRequest<12>(
-			ipc::InRaw(option)));
+	twili::Assert(
+		twili::Unwrap(
+			object.SendSyncRequest<12>(
+				ipc::InRaw(option))));
 }
 
 } // namespace nifm

@@ -43,7 +43,7 @@ void ITwibDirectoryAccessor::Read(bridge::ResponseOpener opener) {
 	std::vector<idirectoryentry_t> buffer(32);
 
 	uint64_t actual_count;
-	ResultCode::AssertOk(idirectory_read(idirectory, &actual_count, buffer.data(), buffer.size() * sizeof(idirectoryentry_t)));
+	TWILI_BRIDGE_CHECK(idirectory_read(idirectory, &actual_count, buffer.data(), buffer.size() * sizeof(idirectoryentry_t)));
 	buffer.resize(actual_count);
 	
 	opener.RespondOk(std::move(buffer));
@@ -51,7 +51,7 @@ void ITwibDirectoryAccessor::Read(bridge::ResponseOpener opener) {
 
 void ITwibDirectoryAccessor::GetEntryCount(bridge::ResponseOpener opener) {
 	uint64_t count;
-	ResultCode::AssertOk(idirectory_get_entry_count(idirectory, &count));
+	TWILI_BRIDGE_CHECK(idirectory_get_entry_count(idirectory, &count));
 	opener.RespondOk(std::move(count));
 }
 

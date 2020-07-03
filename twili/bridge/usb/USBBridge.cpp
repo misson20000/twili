@@ -76,25 +76,25 @@ static const size_t TRANSFER_BUFFER_SIZE = 64 * 1024; // 64 KiB
 
 USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
-	ds(ResultCode::AssertOk(trn::service::usb::ds::DS::Initialize(2, nullptr))),
-	usb_state_change_event(ResultCode::AssertOk(ds.GetStateChangeEvent())),
+	ds(twili::Assert(trn::service::usb::ds::DS::Initialize(2, nullptr))),
+	usb_state_change_event(twili::Assert(ds.GetStateChangeEvent())),
 	request_reader(this),
 	request_meta_buffer(0x1000),
 	response_meta_buffer(0x1000),
 	request_data_buffer(TRANSFER_BUFFER_SIZE),
 	response_data_buffer(TRANSFER_BUFFER_SIZE) {
 	
-	interface = ResultCode::AssertOk(
+	interface = twili::Assert(
 		ds.GetInterface(interface_descriptor, "twili_bridge"));
-	endpoint_request_meta = ResultCode::AssertOk(
+	endpoint_request_meta = twili::Assert(
 		interface->GetEndpoint(endpoint_out_descriptor)); // out from host
-	endpoint_request_data = ResultCode::AssertOk(
+	endpoint_request_data = twili::Assert(
 		interface->GetEndpoint(endpoint_out_descriptor)); // out from host
-	endpoint_response_meta = ResultCode::AssertOk(
+	endpoint_response_meta = twili::Assert(
 		interface->GetEndpoint(endpoint_in_descriptor)); // into host
-	endpoint_response_data = ResultCode::AssertOk(
+	endpoint_response_data = twili::Assert(
 		interface->GetEndpoint(endpoint_in_descriptor)); // into host
-	ResultCode::AssertOk(interface->Enable());
+	twili::Assert(interface->Enable());
 
 	objects.insert(std::pair<uint32_t, std::shared_ptr<bridge::Object>>(0, object_zero));
 
@@ -104,7 +104,7 @@ USBBridge::USBBridge(Twili *twili, std::shared_ptr<bridge::Object> object_zero) 
 }
 
 usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, usb_ds_report_t &report, uint32_t urb_id) {
-	report = ResultCode::AssertOk(endpoint->GetReportData());
+	report = twili::Assert(endpoint->GetReportData());
 	usb_ds_report_entry_t *entry = nullptr;
 	for(uint32_t i = 0; i < report.entry_count; i++) {
 		if(report.entries[i].urb_id == urb_id) {
@@ -115,15 +115,17 @@ usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<trn::service::usb::
 }
 
 void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size) {
-	uint32_t urb_id = ResultCode::AssertOk(endpoint->PostBufferAsync(buffer, size));
+	// TODO: make this fallible :/
+	
+	uint32_t urb_id = twili::Assert(endpoint->PostBufferAsync(buffer, size));
 	trn::Result<std::nullopt_t> r(std::nullopt);
 	while(!(r = endpoint->completion_event.WaitSignal(30000000000))) {
 		// if we time out, just keep waiting since we can't really cancel the transfer
 		if(r.error().code != 0xea01) {
-			ResultCode::AssertOk(r.error().code);
+			twili::Assert(r.error().code);
 		}
 	}
-	ResultCode::AssertOk(endpoint->completion_event.ResetSignal());
+	twili::Assert(endpoint->completion_event.ResetSignal());
 	
 	usb_ds_report_t report;
 	auto entry = FindReport(endpoint, report, urb_id);
@@ -137,7 +139,7 @@ void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> 
 }
 
 bool USBBridge::USBStateChangeCallback() {
-	if(ResultCode::AssertOk(ds.GetState()) == trn::service::usb::ds::State::INITIALIZED) {
+	if(twili::Assert(ds.GetState()) == trn::service::usb::ds::State::INITIALIZED) {
 		printf("finished USB bringup\n");
 		try {
 			request_reader.Begin();

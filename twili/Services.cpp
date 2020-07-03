@@ -37,14 +37,14 @@ struct ObjectsHolder;
 template<>
 struct ObjectsHolder<Target_1_0_0> {
 	ObjectsHolder(trn::service::SM &&sm) :
-		pm_dmnt(ResultCode::AssertOk(sm.GetService("pm:dmnt"))),
-		ldr_dmnt(ResultCode::AssertOk(sm.GetService("ldr:dmnt"))),
-		ldr_shel(ResultCode::AssertOk(sm.GetService("ldr:shel"))),
-		ro_dmnt(ResultCode::AssertOk(sm.GetService("ro:dmnt"))),
-		lr(ResultCode::AssertOk(sm.GetService("lr"))),
-		nifm_static(ResultCode::AssertOk(sm.GetService("nifm:s"))),
-		nifm_general(ResultCode::AssertOk(CreateNifmGeneralServiceOld(nifm_static))),
-		ns_dev(ResultCode::AssertOk(sm.GetService("ns:dev"))) {
+		pm_dmnt(twili::Assert(sm.GetService("pm:dmnt"))),
+		ldr_dmnt(twili::Assert(sm.GetService("ldr:dmnt"))),
+		ldr_shel(twili::Assert(sm.GetService("ldr:shel"))),
+		ro_dmnt(twili::Assert(sm.GetService("ro:dmnt"))),
+		lr(twili::Assert(sm.GetService("lr"))),
+		nifm_static(twili::Assert(sm.GetService("nifm:s"))),
+		nifm_general(twili::Assert(CreateNifmGeneralServiceOld(nifm_static))),
+		ns_dev(twili::Assert(sm.GetService("ns:dev"))) {
 	}
 
 	trn::Result<trn::ipc::client::Object> CreateNifmGeneralServiceOld(trn::ipc::client::Object &nifm_static) {

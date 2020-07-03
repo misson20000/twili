@@ -54,7 +54,7 @@ uint64_t MonitoredProcess::GetPid() {
 	if(!proc) {
 		return 0;
 	}
-	return ResultCode::AssertOk(trn::svc::GetProcessId(proc->handle));
+	return twili::Assert(trn::svc::GetProcessId(proc->handle));
 }
 
 void MonitoredProcess::AddNotes(ELFCrashReport &report) {

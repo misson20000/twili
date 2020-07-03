@@ -68,8 +68,8 @@ void SystemVersion::SetCurrent() {
 		exo_api >> 48 & 0xff,
 		exo_api >> 40 & 0xff);*/
 
-	auto sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-	auto set_sys = ResultCode::AssertOk(sm.GetService("set:sys"));
+	auto sm = twili::Assert(trn::service::SM::Initialize());
+	auto set_sys = twili::Assert(sm.GetService("set:sys"));
 
 	std::vector<uint8_t> firmware_version(0x100);
 	ResultCode::AssertOk(

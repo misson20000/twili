@@ -69,12 +69,12 @@ void ITwibDeviceInterface::CreateMonitoredProcess(bridge::ResponseOpener opener,
 }
 
 void ITwibDeviceInterface::Reboot(bridge::ResponseOpener opener) {
-	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-	ipc::client::Object spsm = ResultCode::AssertOk(sm.GetService("spsm"));
+	trn::service::SM sm = twili::Assert(trn::service::SM::Initialize());
+	ipc::client::Object spsm = twili::Assert(sm.GetService("spsm"));
 
 	opener.RespondOk();
 	
-	ResultCode::AssertOk(
+	twili::Assert(
 		spsm.SendSyncRequest<3>(
 			ipc::InRaw<bool>(true)));
 }
@@ -95,7 +95,7 @@ void ITwibDeviceInterface::Terminate(bridge::ResponseOpener opener, uint64_t pid
 void ITwibDeviceInterface::ListProcesses(bridge::ResponseOpener opener) {
 	uint64_t pids[256];
 	uint32_t num_pids;
-	ResultCode::AssertOk(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
+	twili::Assert(svcGetProcessList(&num_pids, pids, ARRAY_LENGTH(pids)));
 
 	struct ProcessReport {
 		uint64_t process_id;
@@ -105,7 +105,7 @@ void ITwibDeviceInterface::ListProcesses(bridge::ResponseOpener opener) {
 		uint32_t mmu_flags;
 	};
 
-	uint64_t my_pid = ResultCode::AssertOk(trn::svc::GetProcessId(0xffff8001));
+	uint64_t my_pid = twili::Assert(trn::svc::GetProcessId(0xffff8001));
 	
 	auto writer = opener.BeginOk(sizeof(ProcessReport) * num_pids + sizeof(uint64_t));
 	writer.Write<uint64_t>(num_pids); // maintain std::vector packing format
@@ -154,41 +154,41 @@ void ITwibDeviceInterface::UpgradeTwili(bridge::ResponseOpener opener) {
 
 void ITwibDeviceInterface::Identify(bridge::ResponseOpener opener) {
 	printf("identifying...\n");
-	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-	trn::ipc::client::Object set_sys = ResultCode::AssertOk(
+	trn::service::SM sm = twili::Assert(trn::service::SM::Initialize());
+	trn::ipc::client::Object set_sys = twili::Assert(
 		sm.GetService("set:sys"));
-	trn::ipc::client::Object set_cal = ResultCode::AssertOk(
+	trn::ipc::client::Object set_cal = twili::Assert(
 		sm.GetService("set:cal"));
 
 	std::vector<uint8_t> firmware_version(0x100);
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_sys.SendSyncRequest<3>( // GetFirmwareVersion
-			trn::ipc::Buffer<uint8_t, 0x1a>(firmware_version)));
+			trn::ipc::Buffer<uint8_t, 0x1a>(firmware_version))));
 
 	std::array<uint8_t, 0x18> serial_number;
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_cal.SendSyncRequest<9>( // GetSerialNumber
-			trn::ipc::OutRaw<std::array<uint8_t, 0x18>>(serial_number)));
+			trn::ipc::OutRaw<std::array<uint8_t, 0x18>>(serial_number))));
 
 	std::array<uint8_t, 6> bluetooth_bd_address;
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_cal.SendSyncRequest<0>( // GetBluetoothBdAddress
-			trn::ipc::OutRaw<std::array<uint8_t, 6>>(bluetooth_bd_address)));
+			trn::ipc::OutRaw<std::array<uint8_t, 6>>(bluetooth_bd_address))));
 
 	std::array<uint8_t, 6> wireless_lan_mac_address;
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_cal.SendSyncRequest<6>( // GetWirelessLanMacAddress
-			trn::ipc::OutRaw<std::array<uint8_t, 6>>(wireless_lan_mac_address)));
+			trn::ipc::OutRaw<std::array<uint8_t, 6>>(wireless_lan_mac_address))));
 
 	std::vector<uint8_t> device_nickname(0x80);
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_sys.SendSyncRequest<77>( // GetDeviceNickName
-			trn::ipc::Buffer<uint8_t, 0x16>(device_nickname)));
+			trn::ipc::Buffer<uint8_t, 0x16>(device_nickname))));
 
 	std::array<uint8_t, 16> mii_author_id;
-	ResultCode::AssertOk(
+	TWILI_BRIDGE_CHECK(twili::Unwrap(
 		set_sys.SendSyncRequest<90>( // GetMiiAuthorId
-			trn::ipc::OutRaw<std::array<uint8_t, 16>>(mii_author_id)));
+			trn::ipc::OutRaw<std::array<uint8_t, 16>>(mii_author_id))));
 	
 	msgpack11::MsgPack ident = msgpack11::MsgPack::object {
 		{"service", "twili"},
@@ -223,17 +223,20 @@ void ITwibDeviceInterface::OpenNamedPipe(bridge::ResponseOpener opener, std::str
 }
 
 void ITwibDeviceInterface::OpenActiveDebugger(bridge::ResponseOpener opener, uint64_t pid) {
-	trn::KDebug debug = ResultCode::AssertOk(
-		trn::svc::DebugActiveProcess(pid));
+	auto r = trn::svc::DebugActiveProcess(pid);
 
-	opener.RespondOk(opener.MakeObject<ITwibDebugger>(twili, std::move(debug), twili.FindMonitoredProcess(pid)));
+	if(r) {
+		opener.RespondOk(opener.MakeObject<ITwibDebugger>(twili, std::move(*r), twili.FindMonitoredProcess(pid)));
+	} else {
+		opener.RespondError(r.error());
+	}
 }
 
 void ITwibDeviceInterface::GetMemoryInfo(bridge::ResponseOpener opener) {
 	size_t total_mem_available, total_mem_usage;
 
-	ResultCode::AssertOk(svcGetInfo(&total_mem_available, 6, 0xffff8001, 0));
-	ResultCode::AssertOk(svcGetInfo(&total_mem_usage,     7, 0xffff8001, 0));
+	TWILI_BRIDGE_CHECK(svcGetInfo(&total_mem_available, 6, 0xffff8001, 0));
+	TWILI_BRIDGE_CHECK(svcGetInfo(&total_mem_usage,     7, 0xffff8001, 0));
 	
 	std::vector<msgpack11::MsgPack::object> resource_limit_infos;
 	for(size_t i = 0; i < 3; i++) {
@@ -282,16 +285,16 @@ void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener,
 	
 	class FspSrvHolder {
 	 public:
-		FspSrvHolder() { ResultCode::AssertOk(fsp_srv_init(0)); }
+		FspSrvHolder() { twili::Assert(fsp_srv_init(0)); }
 		~FspSrvHolder() { fsp_srv_finalize(); }
 	} fsp_srv_holder;
 
 	if(fs == "sd") {
-		ResultCode::AssertOk(fsp_srv_mount_sd_card(&ifs));
+		TWILI_BRIDGE_CHECK(fsp_srv_mount_sd_card(&ifs));
 	} else if(fs == "nand_user") {
-		ResultCode::AssertOk(fsp_srv_open_bis_filesystem(&ifs, 30, ""));
+		TWILI_BRIDGE_CHECK(fsp_srv_open_bis_filesystem(&ifs, 30, ""));
 	} else if(fs == "nand_system") {
-		ResultCode::AssertOk(fsp_srv_open_bis_filesystem(&ifs, 31, ""));
+		TWILI_BRIDGE_CHECK(fsp_srv_open_bis_filesystem(&ifs, 31, ""));
 	} else {
 		opener.RespondError(TWILI_ERR_UNKNOWN_FILESYSTEM);
 		return;
@@ -327,14 +330,14 @@ void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint6
 }
 
 void ITwibDeviceInterface::RebootUnsafe(bridge::ResponseOpener opener) {
-	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
-	ipc::client::Object bpc_ams = ResultCode::AssertOk(sm.GetService("bpc:ams"));
+	trn::service::SM sm = twili::Assert(trn::service::SM::Initialize());
+	ipc::client::Object bpc_ams = twili::Assert(sm.GetService("bpc:ams"));
 
 	opener.RespondOk();
 
 	static uint8_t context[0x350] = {0};
 	
-	ResultCode::AssertOk(
+	twili::Assert(
 		bpc_ams.SendSyncRequest<65000>(
 			ipc::Buffer<uint8_t, 0x15>(context, sizeof(context))));
 }

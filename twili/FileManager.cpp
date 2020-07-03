@@ -48,12 +48,12 @@ FileManager::FileManager(Twili &twili) {
 	if(r != RESULT_OK) {
 		if(r == FSPSRV_ERR_NOT_FOUND) {
 			printf("  not found, making...\n");
-			trn::ResultCode::AssertOk(trn_fs_mkdir(temp_location.c_str()));
+			twili::Assert(trn_fs_mkdir(temp_location.c_str()));
 			printf("  opening again...\n");
-			trn::ResultCode::AssertOk(trn_fs_opendir(&dir, temp_location.c_str()));
+			twili::Assert(trn_fs_opendir(&dir, temp_location.c_str()));
 		} else {
 			printf("  failed: 0x%x\n", r);
-			trn::ResultCode::AssertOk(r);
+			twili::Assert(r);
 		}
 	}
 
@@ -66,11 +66,11 @@ FileManager::FileManager(Twili &twili) {
 		printf("found %.*s\n", (int)dirent.name_size, dirent.name);
 		snprintf(path, sizeof(path), "%s/%.*s", temp_location.c_str(), (int)dirent.name_size, dirent.name);
 		printf("  unlinking %s\n", path);
-		trn::ResultCode::AssertOk(trn_fs_unlink(path));
+		twili::Assert(trn_fs_unlink(path));
 	}
 	if(r != LIBTRANSISTOR_ERR_FS_OUT_OF_DIR_ENTRIES) {
 		printf("failed to iterate directory\n");
-		trn::ResultCode::AssertOk(r);
+		twili::Assert(r);
 	}
 
 	printf("prepared directory\n");

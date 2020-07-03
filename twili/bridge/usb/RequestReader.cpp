@@ -84,10 +84,14 @@ void USBBridge::RequestReader::Begin() {
 }
 
 void USBBridge::RequestReader::PostMetaBuffer() {
-	meta_urb_id = ResultCode::AssertOk(
-		bridge->endpoint_request_meta->PostBufferAsync(
-			bridge->request_meta_buffer.data,
-			sizeof(protocol::MessageHeader)));
+	auto r = bridge->endpoint_request_meta->PostBufferAsync(
+		bridge->request_meta_buffer.data,
+		sizeof(protocol::MessageHeader));
+	if(r) {
+		meta_urb_id = *r;
+	} else {
+		bridge->ResetInterface();
+	}
 }
 
 void USBBridge::RequestReader::PostDataBuffer() {
@@ -96,9 +100,12 @@ void USBBridge::RequestReader::PostDataBuffer() {
 		size = current_header.payload_size - payload_size;
 	}
 
-	data_urb_id = ResultCode::AssertOk(
-		bridge->endpoint_request_data->PostBufferAsync(
-			bridge->request_data_buffer.data, size));
+	auto r = bridge->endpoint_request_data->PostBufferAsync(bridge->request_data_buffer.data, size);
+	if(r) {
+		data_urb_id = *r;
+	} else {
+		bridge->ResetInterface();
+	}
 }
 
 void USBBridge::RequestReader::PostObjectBuffer() {
@@ -109,9 +116,12 @@ void USBBridge::RequestReader::PostObjectBuffer() {
 		return;
 	}
 	
-	object_urb_id = ResultCode::AssertOk(
-		bridge->endpoint_request_data->PostBufferAsync(
-			bridge->request_data_buffer.data, size));
+	auto r = bridge->endpoint_request_data->PostBufferAsync(bridge->request_data_buffer.data, size);
+	if(r) {
+		object_urb_id = *r;
+	} else {
+		bridge->ResetInterface();
+	}
 }
 
 void USBBridge::RequestReader::MetadataTransactionCompleted() {

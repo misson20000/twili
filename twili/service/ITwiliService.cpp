@@ -64,7 +64,7 @@ trn::ResultCode ITwiliService::OpenPipe(trn::ipc::InPid pid, trn::ipc::OutObject
 	std::shared_ptr<process::MonitoredProcess> proc = twili->FindMonitoredProcess(pid.value);
 	if(!proc) {
 		printf("opening pipe %d for non-monitored process: %ld\n", fd, pid.value);
-		object = trn::ResultCode::AssertOk(server->CreateObject<IPipeStandard>(this, fd));
+		object = twili::Assert(server->CreateObject<IPipeStandard>(this, fd));
 	} else {
 		printf("opening pipe %d for monitored process: %ld\n", fd, pid.value);
 		std::shared_ptr<TwibPipe> pipe;
@@ -81,7 +81,7 @@ trn::ResultCode ITwiliService::OpenPipe(trn::ipc::InPid pid, trn::ipc::OutObject
 		default:
 			return TWILI_ERR_INVALID_PIPE;
 		}
-		object = trn::ResultCode::AssertOk(server->CreateObject<IPipeTwib>(this, pipe));
+		object = twili::Assert(server->CreateObject<IPipeTwib>(this, pipe));
 	}
 	val.value = object;
 	return RESULT_OK;
@@ -156,7 +156,7 @@ trn::ResultCode ITwiliService::CreateNamedOutputPipe(trn::ipc::Buffer<uint8_t, 0
 
 	auto r = twili->named_pipes.emplace(name, std::make_shared<TwibPipe>(twili->config.pipe_buffer_size_limit));
 	if(r.second) {
-		val.value = trn::ResultCode::AssertOk(server->CreateObject<IPipeTwib>(this, r.first->second));
+		val.value = twili::Assert(server->CreateObject<IPipeTwib>(this, r.first->second));
 		return RESULT_OK;
 	} else {
 		return TWILI_ERR_PIPE_ALREADY_EXISTS;

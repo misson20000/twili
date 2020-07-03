@@ -79,8 +79,12 @@ void ITwibDebugger::PumpEvents() {
 }
 
 void ITwibDebugger::QueryMemory(bridge::ResponseOpener opener, uint64_t addr) {
-	std::tuple<memory_info_t, uint32_t> info = ResultCode::AssertOk(
-		trn::svc::QueryDebugProcessMemory(debug, addr));
+	auto r = trn::svc::QueryDebugProcessMemory(debug, addr);
+	if(!r) {
+		TWILI_BRIDGE_CHECK(r.error());
+	}
+	
+	std::tuple<memory_info_t, uint32_t> info = *r;
 
 	opener.RespondOk(
 		std::move(std::get<0>(info)),
@@ -89,29 +93,36 @@ void ITwibDebugger::QueryMemory(bridge::ResponseOpener opener, uint64_t addr) {
 
 void ITwibDebugger::ReadMemory(bridge::ResponseOpener opener, uint64_t addr, uint64_t size) {
 	std::vector<uint8_t> buffer(size);
-	ResultCode::AssertOk(
-		trn::svc::ReadDebugProcessMemory(buffer.data(), debug, addr, buffer.size()));
+	
+	TWILI_BRIDGE_CHECK(twili::Unwrap(trn::svc::ReadDebugProcessMemory(buffer.data(), debug, addr, buffer.size())));
 
 	opener.RespondOk(std::move(buffer));
 }
 
 void ITwibDebugger::WriteMemory(bridge::ResponseOpener opener, uint64_t addr, InputStream &stream) {
 	std::shared_ptr<uint64_t> addr_ptr = std::make_shared<uint64_t>(addr);
-
+	std::shared_ptr<trn::ResultCode> r = std::make_shared<trn::ResultCode>(RESULT_OK);
+	
 	printf("starting write memory...\n");
 	
 	stream.receive =
-		[this, addr_ptr](util::Buffer &buf) {
-			printf("WriteMemory: stream received 0x%lx bytes\n", buf.ReadAvailable());
-			ResultCode::AssertOk(
-				trn::svc::WriteDebugProcessMemory(debug, buf.Read(), *addr_ptr, buf.ReadAvailable()));
-			*addr_ptr+= buf.ReadAvailable();
-			buf.MarkRead(buf.ReadAvailable());
+		[this, addr_ptr, r](util::Buffer &buf) {
+			if(*r == RESULT_OK) {
+				printf("WriteMemory: stream received 0x%lx bytes\n", buf.ReadAvailable());
+				// TODO: what happens if we keep streaming data in?
+				*r = twili::Unwrap(trn::svc::WriteDebugProcessMemory(debug, buf.Read(), *addr_ptr, buf.ReadAvailable()));
+				*addr_ptr+= buf.ReadAvailable();
+				buf.MarkRead(buf.ReadAvailable());
+			} else {
+				printf("WriteMemory: discarding due to error 0x%x\n", r->code);
+				buf.MarkRead(buf.ReadAvailable());
+			}
 		};
 
 	stream.finish =
-		[opener](util::Buffer &buf) {
+		[opener, r](util::Buffer &buf) {
 			printf("WriteMemory: stream finished\n");
+			TWILI_BRIDGE_CHECK(*r);
 			opener.RespondOk();
 		};
 }
@@ -132,23 +143,23 @@ void ITwibDebugger::GetDebugEvent(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::GetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id) {
-	thread_context_t context = ResultCode::AssertOk(
-		trn::svc::GetDebugThreadContext(debug, thread_id, 15));
+	auto r = trn::svc::GetDebugThreadContext(debug, thread_id, 15);
+	if(!r) {
+		TWILI_BRIDGE_CHECK(r.error());
+	}
 
-	opener.RespondOk(std::move(context));
+	opener.RespondOk(std::move(*r));
 }
 
 void ITwibDebugger::BreakProcess(bridge::ResponseOpener opener) {
-	ResultCode::AssertOk(
-		trn::svc::BreakDebugProcess(debug));
+	TWILI_BRIDGE_CHECK(twili::Unwrap(trn::svc::BreakDebugProcess(debug)));
 
 	opener.RespondOk();
 }
 
 void ITwibDebugger::ContinueDebugEvent(bridge::ResponseOpener opener, uint32_t flags, std::vector<uint64_t> thread_ids) {
 	// TODO: flags for pre-3.0.0
-	ResultCode::AssertOk(
-		trn::svc::ContinueDebugEvent(debug, flags, thread_ids.data(), thread_ids.size()));
+	TWILI_BRIDGE_CHECK(twili::Unwrap(trn::svc::ContinueDebugEvent(debug, flags, thread_ids.data(), thread_ids.size())));
 
 	opener.RespondOk();
 }
@@ -168,7 +179,7 @@ void ITwibDebugger::GetNsoInfos(bridge::ResponseOpener opener) {
 		TWILI_ERR_SYSMODULE_BEING_DEBUGGED :
 		RESULT_OK);
 	
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
+	uint64_t pid = twili::Assert(trn::svc::GetProcessId(debug.handle));
 	
 	std::vector<hos_types::LoadedModuleInfo> nso_info;
 	TWILI_BRIDGE_CHECK(twili.services->GetNsoInfos(pid, &nso_info));
@@ -199,7 +210,7 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 		memory_info_t mi;
 		do {
 			mi = std::get<0>(
-				ResultCode::AssertOk(
+				twili::Assert(
 					trn::svc::QueryDebugProcessMemory(debug, addr)));
 
 			if(mi.memory_type == 3 && mi.permission == 5) { // CODE_STATIC RX
@@ -225,7 +236,7 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
+	uint64_t pid = twili::Assert(trn::svc::GetProcessId(debug.handle));
 
 	TWILI_BRIDGE_CHECK(twili.services->StartProcess(pid));
 	
@@ -242,7 +253,7 @@ void ITwibDebugger::GetNroInfos(bridge::ResponseOpener opener) {
 		TWILI_ERR_SYSMODULE_BEING_DEBUGGED :
 		RESULT_OK);
 
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
+	uint64_t pid = twili::Assert(trn::svc::GetProcessId(debug.handle));
 
 	std::vector<hos_types::LoadedModuleInfo> nro_info;
 	TWILI_BRIDGE_CHECK(twili.services->GetNroInfos(pid, &nro_info));

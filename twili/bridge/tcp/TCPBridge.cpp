@@ -92,8 +92,8 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 			return true;
 		});
 	
-	ResultCode::AssertOk(trn_thread_create(&thread, TCPBridge::ThreadEntryShim, this, -1, -2, 0x4000, nullptr));
-	ResultCode::AssertOk(trn_thread_start(&thread));
+	twili::Assert(trn_thread_create(&thread, TCPBridge::ThreadEntryShim, this, -1, -2, 0x4000, nullptr));
+	twili::Assert(trn_thread_start(&thread));
 }
 
 void TCPBridge::ThreadEntryShim(void *arg) {

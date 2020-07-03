@@ -45,35 +45,35 @@ ITwibFilesystemAccessor::~ITwibFilesystemAccessor() {
 void ITwibFilesystemAccessor::CreateFile(bridge::ResponseOpener opener, uint32_t mode, uint64_t size, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
-	ResultCode::AssertOk(ifilesystem_create_file(ifs, mode, size, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_create_file(ifs, mode, size, path_buffer));
 	opener.RespondOk();
 }
 
 void ITwibFilesystemAccessor::DeleteFile(bridge::ResponseOpener opener, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
-	ResultCode::AssertOk(ifilesystem_delete_file(ifs, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_delete_file(ifs, path_buffer));
 	opener.RespondOk();
 }
 
 void ITwibFilesystemAccessor::CreateDirectory(bridge::ResponseOpener opener, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
-	ResultCode::AssertOk(ifilesystem_create_directory(ifs, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_create_directory(ifs, path_buffer));
 	opener.RespondOk();
 }
 
 void ITwibFilesystemAccessor::DeleteDirectory(bridge::ResponseOpener opener, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
-	ResultCode::AssertOk(ifilesystem_delete_directory(ifs, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_delete_directory(ifs, path_buffer));
 	opener.RespondOk();
 }
 
 void ITwibFilesystemAccessor::DeleteDirectoryRecursively(bridge::ResponseOpener opener, std::string path) {
 	char path_buffer[0x301];
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
-	ResultCode::AssertOk(ifilesystem_delete_directory_recursively(ifs, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_delete_directory_recursively(ifs, path_buffer));
 	opener.RespondOk();
 }
 
@@ -82,7 +82,7 @@ void ITwibFilesystemAccessor::RenameFile(bridge::ResponseOpener opener, std::str
 	char dst_buffer[0x301];
 	std::strncpy(src_buffer, src.c_str(), sizeof(src_buffer));
 	std::strncpy(dst_buffer, dst.c_str(), sizeof(dst_buffer));
-	ResultCode::AssertOk(ifilesystem_rename_file(ifs, src_buffer, dst_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_rename_file(ifs, src_buffer, dst_buffer));
 	opener.RespondOk();
 }
 
@@ -91,7 +91,7 @@ void ITwibFilesystemAccessor::RenameDirectory(bridge::ResponseOpener opener, std
 	char dst_buffer[0x301];
 	std::strncpy(src_buffer, src.c_str(), sizeof(src_buffer));
 	std::strncpy(dst_buffer, dst.c_str(), sizeof(dst_buffer));
-	ResultCode::AssertOk(ifilesystem_rename_directory(ifs, src_buffer, dst_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_rename_directory(ifs, src_buffer, dst_buffer));
 	opener.RespondOk();
 }
 
@@ -100,7 +100,7 @@ void ITwibFilesystemAccessor::GetEntryType(bridge::ResponseOpener opener, std::s
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
 
 	uint32_t entry_type;
-	ResultCode::AssertOk(ifilesystem_get_entry_type(ifs, &entry_type, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_get_entry_type(ifs, &entry_type, path_buffer));
 	
 	opener.RespondOk(std::move(entry_type));
 }
@@ -110,7 +110,7 @@ void ITwibFilesystemAccessor::OpenFile(bridge::ResponseOpener opener, uint32_t m
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
 
 	ifile_t ifile;
-	ResultCode::AssertOk(ifilesystem_open_file(ifs, &ifile, mode, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_open_file(ifs, &ifile, mode, path_buffer));
 	
 	opener.RespondOk(opener.MakeObject<ITwibFileAccessor>(ifile));
 }
@@ -120,7 +120,7 @@ void ITwibFilesystemAccessor::OpenDirectory(bridge::ResponseOpener opener, std::
 	std::strncpy(path_buffer, path.c_str(), sizeof(path_buffer));
 
 	idirectory_t idir;
-	ResultCode::AssertOk(ifilesystem_open_directory(ifs, &idir, 3, path_buffer));
+	TWILI_BRIDGE_CHECK(ifilesystem_open_directory(ifs, &idir, 3, path_buffer));
 	
 	opener.RespondOk(opener.MakeObject<ITwibDirectoryAccessor>(idir));
 }

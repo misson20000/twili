@@ -64,8 +64,11 @@ ELFCrashReport::Thread *ELFCrashReport::GetThread(uint64_t thread_id) {
 void ELFCrashReport::Generate(process::Process &process, twili::bridge::ResponseOpener ro) {
 	process.AddNotes(*this);
 	
-	trn::KDebug debug = ResultCode::AssertOk(
-		trn::svc::DebugActiveProcess(process.GetPid()));
+	trn::KDebug debug = ({
+			auto r = trn::svc::DebugActiveProcess(process.GetPid());
+			if(!r) { ro.RespondError(r.error()); return; }
+			std::move(*r); });
+	
 	printf("  opened debug: 0x%x\n", debug.handle);
 
 	while(1) {
@@ -205,7 +208,7 @@ void ELFCrashReport::Generate(process::Process &process, twili::bridge::Response
 	// add VMA regions
 	uint64_t vaddr = 0;
 	do {
-		std::tuple<memory_info_t, uint32_t> r = ResultCode::AssertOk(
+		std::tuple<memory_info_t, uint32_t> r = twili::Assert(
 			trn::svc::QueryDebugProcessMemory(debug, vaddr));
 		memory_info_t mi = std::get<0>(r);
 
@@ -274,7 +277,7 @@ void ELFCrashReport::Generate(process::Process &process, twili::bridge::Response
 			if(size > i->size - offset) {
 				size = i->size - offset;
 			}
-			ResultCode::AssertOk(trn::svc::ReadDebugProcessMemory(transfer_buffer.data(), debug, i->virtual_addr + offset, size));
+			twili::Assert(trn::svc::ReadDebugProcessMemory(transfer_buffer.data(), debug, i->virtual_addr + offset, size));
 			r.Write(transfer_buffer.data(), size);
 		}
 	}
@@ -351,7 +354,7 @@ ELF::Note::elf_prstatus ELFCrashReport::Thread::GeneratePRSTATUS(trn::KDebug &de
 		.times = {0},
 		.pr_reg = {0}
 	};
-	thread_context_t context = ResultCode::AssertOk(trn::svc::GetDebugThreadContext(debug, thread_id, 15)); // where does this 15 number come from?
+	thread_context_t context = twili::Assert(trn::svc::GetDebugThreadContext(debug, thread_id, 15)); // where does this 15 number come from?
 	memcpy(prstatus.pr_reg, context.regs, sizeof(prstatus.pr_reg));
 	return prstatus;
 }
