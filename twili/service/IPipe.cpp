@@ -68,18 +68,13 @@ IPipeTwib::IPipeTwib(trn::ipc::server::IPCServer *server, std::shared_ptr<TwibPi
 }
 
 trn::ResultCode IPipeTwib::Dispatch(trn::ipc::Message msg, uint32_t request_id) {
-	try {
-		switch(request_id) {
-		case 0:
-			return trn::ipc::server::RequestHandler<&IPipeTwib::Read>::Handle(this, msg);
-		case 1:
-			return trn::ipc::server::RequestHandler<&IPipeTwib::Write>::Handle(this, msg);
-		}
-		return 1;
-	} catch(trn::ResultError &e) {
-		printf("caught result error 0x%x while dispatching for IPipeTwib\n", e.code.code);
-		throw e;
+	switch(request_id) {
+	case 0:
+		return trn::ipc::server::RequestHandler<&IPipeTwib::Read>::Handle(this, msg);
+	case 1:
+		return trn::ipc::server::RequestHandler<&IPipeTwib::Write>::Handle(this, msg);
 	}
+	return 1;
 }
 
 trn::ResultCode IPipeTwib::Read(std::function<void(trn::ResultCode)> cb, trn::ipc::OutRaw<uint64_t> size, trn::ipc::Buffer<uint8_t, 0x6, 0> buffer) {

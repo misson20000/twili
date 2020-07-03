@@ -215,7 +215,8 @@ void ITwibDeviceInterface::ListNamedPipes(bridge::ResponseOpener opener) {
 void ITwibDeviceInterface::OpenNamedPipe(bridge::ResponseOpener opener, std::string name) {
 	auto i = twili.named_pipes.find(name);
 	if(i == twili.named_pipes.end()) {
-		throw ResultError(TWILI_ERR_NO_SUCH_PIPE);
+		opener.RespondError(TWILI_ERR_NO_SUCH_PIPE);
+		return;
 	}
 	
 	opener.RespondOk(opener.MakeObject<ITwibPipeReader>(i->second));

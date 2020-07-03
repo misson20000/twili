@@ -20,6 +20,7 @@
 
 #include "TwibPipe.hpp"
 
+#include "twili.hpp"
 #include "err.hpp"
 
 using trn::ResultError;
@@ -126,7 +127,7 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 					// it's because we hit EoF.
 					if(!std::holds_alternative<WritePendingState>(state)) {
 						if(!hit_eof) {
-							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+							twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 						} else {
 							return;
 						}
@@ -150,7 +151,7 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 					// it's because we closed.
 					if(!std::holds_alternative<WritePendingState>(state)) {
 						if(!hit_eof) {
-							throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+							twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 						} else {
 							return;
 						}
@@ -158,7 +159,7 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 
 					// sanity
 					if(read_size > wps.size) {
-						throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+						twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 					}
 
 					// Adjust WPS based on how much we read out.
@@ -171,7 +172,7 @@ void TwibPipe::Read(std::function<size_t(uint8_t *data, size_t actual_size)> cb)
 				}
 			},
 			[&](ReadPendingState &rps) {
-				throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+				twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 			},
 		}, state);
 }
@@ -197,7 +198,7 @@ void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> c
 				}
 			},
 			[&](WritePendingState &wps) {
-				throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+				twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 			},
 			[&](ReadPendingState &rps) {
 				// move this out so we control lifetime
@@ -216,7 +217,7 @@ void TwibPipe::Write(uint8_t *data, size_t size, std::function<void(bool eof)> c
 					// signal async write handler that we finished
 					cb(false);
 				} else {
-					throw ResultError(TWILI_ERR_INVALID_PIPE_STATE);
+					twili::Abort(TWILI_ERR_INVALID_PIPE_STATE);
 				}
 			}
 		}, state);

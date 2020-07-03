@@ -111,7 +111,7 @@ usb_ds_report_entry_t *USBBridge::FindReport(std::shared_ptr<trn::service::usb::
 			return &report.entries[i];
 		}
 	}
-	throw ResultError(TWILI_ERR_FATAL_USB_TRANSFER);
+	twili::Abort(TWILI_ERR_FATAL_USB_TRANSFER);
 }
 
 void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> endpoint, uint8_t *buffer, size_t size) {
@@ -128,7 +128,7 @@ void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> 
 	usb_ds_report_t report;
 	auto entry = FindReport(endpoint, report, urb_id);
 	if(entry->urb_status != 3) {
-		throw ResultError(TWILI_ERR_USB_TRANSFER);
+		twili::Abort(TWILI_ERR_USB_TRANSFER);
 	}
 	if(entry->transferred_size < size) {
 		printf("[USBB] didn't send all bytes, posting again...\n");
@@ -163,17 +163,17 @@ USBBridge::~USBBridge() {
 USBBuffer::USBBuffer(size_t size) : size(size) {
 	data = (uint8_t*) alloc_pages(size, size, nullptr);
 	if(data == NULL) {
-		throw ResultError(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
+		twili::Abort(LIBTRANSISTOR_ERR_OUT_OF_MEMORY);
 	}
 	auto r = ResultCode::ExpectOk(svcSetMemoryAttribute(data, size, 0x8, 0x8));
 	if(!r) {
 		free_pages(data);
-		throw ResultError(r.error());
+		twili::Abort(r.error());
 	}
 }
 
 USBBuffer::~USBBuffer() {
-	ResultCode::AssertOk(svcSetMemoryAttribute(data, size, 0x0, 0x0));
+	twili::Assert(svcSetMemoryAttribute(data, size, 0x0, 0x0));
 	free_pages(data);
 }
 

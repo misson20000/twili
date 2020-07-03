@@ -43,10 +43,10 @@ ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&deb
 	if(title_id != 0) {
 		auto r = twili.debugging_titles.insert(title_id);
 		if(!r.second) {
-			throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+			twili::Abort(TWILI_ERR_INVALID_DEBUGGER_STATE);
 		}
 	} else {
-		throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+		twili::Abort(TWILI_ERR_INVALID_DEBUGGER_STATE);
 	}
 }
 
@@ -64,7 +64,8 @@ void ITwibDebugger::PumpEvents() {
 
 		if(e.event_type == DEBUG_EVENT_ATTACH_PROCESS) {
 			if(title_id != 0) {
-				throw ResultError(TWILI_ERR_INVALID_DEBUGGER_STATE);
+				// kernel is doing something weird to us
+				twili::Abort(TWILI_ERR_INVALID_DEBUGGER_STATE);
 			}
 			title_id = e.attach_process.title_id;
 		}
@@ -73,7 +74,7 @@ void ITwibDebugger::PumpEvents() {
 	}
 	
 	if(r.error().code != 0x8c01) {
-		throw r.error();
+		twili::Abort(r.error());
 	}
 }
 
@@ -116,14 +117,14 @@ void ITwibDebugger::WriteMemory(bridge::ResponseOpener opener, uint64_t addr, In
 }
 
 void ITwibDebugger::ListThreads(bridge::ResponseOpener opener) {
-	throw ResultError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
+	opener.RespondError(LIBTRANSISTOR_ERR_UNIMPLEMENTED);
 }
 
 void ITwibDebugger::GetDebugEvent(bridge::ResponseOpener opener) {
 	PumpEvents();
 	
 	if(event_queue.empty()) {
-		throw ResultError(0x8c01);
+		opener.RespondError(0x8c01);
 	} else {
 		opener.RespondOk(std::move(event_queue.front()));
 		event_queue.pop_front();

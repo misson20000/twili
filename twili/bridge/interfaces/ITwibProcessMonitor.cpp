@@ -63,7 +63,7 @@ void ITwibProcessMonitor::Launch(bridge::ResponseOpener opener) {
 
 		process->Launch(opener);
 	} else {
-		throw ResultError(TWILI_ERR_INVALID_PROCESS_STATE);
+		opener.RespondError(TWILI_ERR_INVALID_PROCESS_STATE);
 	}
 }
 
@@ -74,7 +74,7 @@ void ITwibProcessMonitor::LaunchSuspended(bridge::ResponseOpener opener) {
 
 		process->LaunchSuspended(opener);
 	} else {
-		throw ResultError(TWILI_ERR_INVALID_PROCESS_STATE);
+		opener.RespondError(TWILI_ERR_INVALID_PROCESS_STATE);
 	}
 }
 

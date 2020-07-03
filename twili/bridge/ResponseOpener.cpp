@@ -20,6 +20,7 @@
 
 #include "ResponseOpener.hpp"
 
+#include "../twili.hpp"
 #include "err.hpp"
 
 namespace twili {
@@ -33,10 +34,10 @@ ResponseOpener::ResponseOpener(std::shared_ptr<detail::ResponseState> state) : s
 
 ResponseWriter ResponseOpener::BeginError(ResultCode code, size_t payload_size, uint32_t object_count) const {
 	if(state->has_begun) {
-		throw ResultError(TWILI_ERR_FATAL_BRIDGE_STATE);
+		twili::Abort(TWILI_ERR_FATAL_BRIDGE_STATE);
 	}
 	if(object_count * sizeof(uint32_t) > state->GetMaxTransferSize()) {
-		throw ResultError(TWILI_ERR_FATAL_BRIDGE_STATE);
+		twili::Abort(TWILI_ERR_FATAL_BRIDGE_STATE);
 	}
 	
 	protocol::MessageHeader hdr;
