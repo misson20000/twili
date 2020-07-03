@@ -39,13 +39,13 @@ uint64_t UnmonitoredProcess::GetPid() {
 
 void UnmonitoredProcess::Terminate() {
 	// try to terminate a process via pm:shell
-	if(twili.services->TerminateProgram(pid)) {
+	if(twili.services->TerminateProgram(pid) == RESULT_OK) {
 		return;
 	}
 
 	// try to terminate a process via svcTerminateDebugProcess as a last resort
-	trn::KDebug debug = ResultCode::AssertOk(trn::svc::DebugActiveProcess(pid));
-	ResultCode::AssertOk(svcTerminateDebugProcess(debug.handle));
+	KObject debug = twili::Assert(trn::svc::DebugActiveProcess(pid));
+	twili::Assert(svcTerminateDebugProcess(debug.handle));
 }
 
 } // namespace process

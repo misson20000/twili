@@ -55,6 +55,8 @@ class ShellTracker : public Tracker<ShellProcess> {
 
 	Twili &twili;
  private:
+	// ns:dev launches processes synchronously, but we need to serve ECS filesystem
+	// so we can't block main IPC server thread on process launch.
 	thread::EventThread event_thread;
 	
 	trn::KEvent shell_event;
@@ -72,11 +74,9 @@ class ShellTracker : public Tracker<ShellProcess> {
 	std::map<uint64_t, std::shared_ptr<ShellProcess>> tracking GUARDED_BY(queue_mutex);
 	
 	bool ReadyToLaunch() REQUIRES(queue_mutex);
-	std::shared_ptr<ShellProcess> PopQueuedProcess() REQUIRES(queue_mutex);
+	trn::ResultCode PopQueuedProcess(std::shared_ptr<ShellProcess> *out) REQUIRES(queue_mutex);
 	void TryToLaunch() REQUIRES(queue_mutex);
-
-	// ns:dev launches processes synchronously, but we need to serve ECS filesystem
-	// so we can't block main IPC server thread on process launch.
+	trn::ResultCode RequestLaunchECSProgram(uint64_t *pid_out);
 };
 
 } // namespace process

@@ -66,7 +66,7 @@ int main() {
 			// set up serial console
 			int usb_fd = usb_serial_open_fd();
 			if(usb_fd < 0) {
-				throw trn::ResultError(-usb_fd);
+				twili::Abort(TWILI_ERR_USB_SERIAL_INIT_FAILED);
 			}
 			dup2(usb_fd, STDOUT_FILENO);
 			dup2(usb_fd, STDERR_FILENO);

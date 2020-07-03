@@ -97,10 +97,10 @@ void TrackedProcessBase::Kill() {
 	KillImpl();
 }
 
-bool TrackedProcessBase::PrepareForLaunch() {
+trn::ResultCode TrackedProcessBase::PrepareForLaunch() {
 	if(exit_pending) {
 		ChangeState(State::Exited);
-		return false; // skip over us
+		return TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH; // skip over us
 	}
 	return ECSProcess::PrepareForLaunch();
 }

@@ -43,19 +43,16 @@ Process::~Process() {
 
 void Process::AddNotes(ELFCrashReport &report) {
 	// write nso info notes
-	{
-		Result<std::vector<hos_types::LoadedModuleInfo>> r = twili.services->GetNsoInfos(GetPid());
-		if(r) {
-			std::vector<hos_types::LoadedModuleInfo> infos = *r;
-			for(auto &info : infos) {
-				ELF::Note::twili_nso_info twinso = {
-					.addr = info.addr,
-					.size = info.size,
-				};
-				memcpy(twinso.build_id, info.build_id, sizeof(info.build_id));
-				report.AddNote<ELF::Note::twili_nso_info>("Twili", ELF::NT_TWILI_NSO, twinso);
-			}
-		}
+	std::vector<hos_types::LoadedModuleInfo> infos;
+	twili.services->GetNsoInfos(GetPid(), &infos); // discard result- this is best effort
+		
+	for(auto &info : infos) {
+		ELF::Note::twili_nso_info twinso = {
+			.addr = info.addr,
+			.size = info.size,
+		};
+		memcpy(twinso.build_id, info.build_id, sizeof(info.build_id));
+		report.AddNote<ELF::Note::twili_nso_info>("Twili", ELF::NT_TWILI_NSO, twinso);
 	}
 }
 

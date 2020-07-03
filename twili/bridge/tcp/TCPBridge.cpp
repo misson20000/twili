@@ -38,10 +38,10 @@ using trn::ResultError;
 
 TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) :
 	twili(twili),
-	network(ResultCode::AssertOk(twili.services->CreateRequest(2))),
 	object_zero(object_zero) {
 	printf("initializing TCPBridge\n");
-	ResultCode::AssertOk(bsd_init());
+	twili::Assert(twili.services->CreateRequest(2, &network));
+	twili::Assert(bsd_init());
 
 	printf("cancel network?\n");
 	network.Cancel();

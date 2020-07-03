@@ -36,6 +36,42 @@ namespace twili {
 
 _Noreturn void Abort(trn::ResultError &e);
 _Noreturn void Abort(trn::ResultCode code);
+#define TWILI_CHECK(code) do { trn::ResultCode _tmp = (code); if(_tmp != RESULT_OK) { return _tmp; }} while(0)
+
+template<typename T>
+inline T Assert(trn::Result<T> &r) {
+	if(r) {
+		return *r;
+	} else {
+		Abort(r.error());
+	}
+}
+
+template<typename T>
+inline T Assert(trn::Result<T> &&r) {
+	if(r) {
+		return std::move(*r);
+	} else {
+		Abort(r.error());
+	}
+}
+
+inline void Assert(trn::ResultCode code) {
+	if(code != RESULT_OK) {
+		twili::Abort(code);
+	}
+}
+
+template<uint32_t code>
+inline void Assert(bool b) {
+	if(!b) {
+		twili::Abort(code);
+	}
+}
+
+inline trn::ResultCode Unwrap(trn::Result<std::nullopt_t> r) {
+	if(r) { return RESULT_OK; } else { return r.error(); }
+}
 
 class Services;
 

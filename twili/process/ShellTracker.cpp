@@ -39,7 +39,7 @@ ShellTracker::ShellTracker(Twili &twili) :
 	twili(twili) {
 	printf("in shell tracker constructor\n");
 	
-	shell_event = ResultCode::AssertOk(twili.services->GetShellEventHandle());
+	twili::Assert(twili.services->GetShellEventHandle(&shell_event));
 
 	printf("got shell event handle\n");
 	
@@ -50,7 +50,8 @@ ShellTracker::ShellTracker(Twili &twili) :
 			shell_event.ResetSignal();
 
 			std::optional<hos_types::ShellEventInfo> r;
-			while((r = ResultCode::AssertOk(this->twili.services->GetShellEventInfo()))) {
+			// our IPC command wrapper converts appropriate "no more events" responses into empty optional
+			while(twili::Assert(this->twili.services->GetShellEventInfo(&r)), r) {
 				hos_types::ShellEventInfo sei = *r;
 				
 				auto i = tracking.find(sei.pid);
@@ -146,21 +147,21 @@ bool ShellTracker::ReadyToLaunch() {
 	return created.size() == 0; // no processes waiting in limbo
 }
 
-std::shared_ptr<ShellProcess> ShellTracker::PopQueuedProcess() {
+trn::ResultCode ShellTracker::PopQueuedProcess(std::shared_ptr<ShellProcess> *out) {
 	while(queued.size() > 0) {
 		std::shared_ptr<ShellProcess> proc = queued.front();
 		queued.pop_front();
 
-		// returns true if process wasn't cancelled,
-		// but if it returns false, attempt to dequeue
-		// another process
-		if(proc->PrepareForLaunch()) {
-			created.push_back(proc);
-			return proc;
-		}
+		trn::ResultCode r = proc->PrepareForLaunch();
+		if(r == TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH) { continue; }
+		TWILI_CHECK(r);
+
+		created.push_back(proc);
+		*out = std::move(proc);
+		return RESULT_OK;
 	}
-	
-	return std::shared_ptr<ShellProcess>();
+
+	return TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH;
 }
 
 std::shared_ptr<ShellProcess> ShellTracker::AttachHostProcess(trn::KProcess &&process) {
@@ -185,21 +186,41 @@ void ShellTracker::TryToLaunch() {
 		return;
 	}
 
-	std::shared_ptr<ShellProcess> proc = PopQueuedProcess();
-	if(!proc) {
+	std::shared_ptr<ShellProcess> proc;
+	trn::ResultCode r = PopQueuedProcess(&proc);
+	
+	if(r == TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH || !proc) {
 		return;
 	}
 
+	uint64_t pid;
+	
+	if(r == RESULT_OK) {
+		r = RequestLaunchECSProgram(&pid);
+	}
+
+	if(r == RESULT_OK) {
+		printf("  => OK\n");
+		tracking.emplace(std::make_pair(pid, proc));
+	} else {
+		printf("  => 0x%x\n", r.code);
+		proc->SetResult(r);
+		proc->ChangeState(MonitoredProcess::State::Exited);
+		created.clear();
+	}
+}
+
+trn::ResultCode ShellTracker::RequestLaunchECSProgram(uint64_t *pid_out) {
 	const uint8_t storage_id = 3; // nand system
 	
-	printf("redirecting path...\n");
-	ipc::client::Object ilr = ResultCode::AssertOk(twili.services->OpenLocationResolver(storage_id));
+	ipc::client::Object ilr;
+	twili::Assert(twili.services->OpenLocationResolver(storage_id, &ilr));
 
 	// This path points to an empty nsp. It just needs to exist to make
 	// loader happy...
 	char path[] = "@Sdcard://atmosphere/contents/0100000000006482/exefs.nsp";
 	
-	ResultCode::AssertOk(
+	twili::Assert(
 		ilr.SendSyncRequest<1>( // RedirectProgramPath
 			ipc::InRaw<uint64_t>(title_id::ShellProcessDefaultTitle),
 			ipc::Buffer<char, 0x19>(path, sizeof(path))));
@@ -213,16 +234,7 @@ void ShellTracker::TryToLaunch() {
 	}
 
 	printf("requested launch\n");
-	auto r = twili.services->LaunchProgram(launch_flags, title_id::ShellProcessDefaultTitle, storage_id);
-	if(r) {
-		printf("  => OK\n");
-		tracking.emplace(std::make_pair(*r, proc));
-	} else {
-		printf("  => 0x%x\n", r.error().code);
-		proc->SetResult(r.error());
-		proc->ChangeState(MonitoredProcess::State::Exited);
-		created.clear();
-	}
+	return twili.services->LaunchProgram(launch_flags, title_id::ShellProcessDefaultTitle, storage_id, pid_out);
 }
 
 } // namespace process

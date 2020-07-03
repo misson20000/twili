@@ -44,8 +44,8 @@ class ECSProcess : public MonitoredProcess {
 	virtual void ChangeState(MonitoredProcess::State state) override;
 
 	// sets up ExternalContentSource for loader
-	// returns false if this process is no longer requested to launch
-	virtual bool PrepareForLaunch();
+	// may return TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH to cancel cleanly.
+	virtual trn::ResultCode PrepareForLaunch();
  protected:
 	fs::ProcessFileSystem virtual_exefs;
 

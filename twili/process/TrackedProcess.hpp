@@ -55,9 +55,9 @@ class TrackedProcessBase : public ECSProcess {
 	virtual void ChangeState(State state) override;
 	virtual void Kill() override;
 
-	// sets up ExternalContentSource for loader
-	// returns false if this process is no longer requested to launch
-	virtual bool PrepareForLaunch() override;
+	// sets up ExternalContentSource for loader,
+	// may return TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH to cancel cleanly.
+	virtual trn::ResultCode PrepareForLaunch() override;
  protected:
 	std::optional<bridge::ResponseOpener> run_opener;
 	virtual void KillImpl();

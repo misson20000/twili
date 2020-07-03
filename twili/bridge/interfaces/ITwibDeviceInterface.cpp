@@ -236,7 +236,8 @@ void ITwibDeviceInterface::GetMemoryInfo(bridge::ResponseOpener opener) {
 	
 	std::vector<msgpack11::MsgPack::object> resource_limit_infos;
 	for(size_t i = 0; i < 3; i++) {
-		auto rl = ResultCode::AssertOk(twili.services->GetCurrentLimitInfo(i, 0)); // LimitableResource_Memory
+		hos_types::ResourceLimitInfo rl;
+		TWILI_BRIDGE_CHECK(twili.services->GetCurrentLimitInfo(i, 0, &rl)); // LimitableResource_Memory
 		
 		resource_limit_infos.push_back({{"category", i}, {"current_value", rl.current_value}, {"limit_value", rl.limit_value}});
 	}
@@ -270,7 +271,9 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 }
 
 void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage) {
-	opener.RespondOk(ResultCode::AssertOk(twili.services->LaunchProgram(flags, tid, storage)));
+	uint64_t pid;
+	TWILI_BRIDGE_CHECK(twili.services->LaunchProgram(flags, tid, storage, &pid));
+	opener.RespondOk();
 }
 
 void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs) {
@@ -300,25 +303,23 @@ void ITwibDeviceInterface::WaitToDebugApplication(bridge::ResponseOpener opener)
 	/*
 		AMS dmnt slurps up all the debug hooks... need to negotiate that.
 	 */
-	throw ResultError(TWILI_ERR_TODO);
+	opener.RespondError(TWILI_ERR_TODO);
 }
 
 void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint64_t tid) {
-	if(wh_debug_title) {
-		throw ResultError(TWILI_ERR_ALREADY_WAITING);
-	}
-
-	ev_debug_title = ResultCode::AssertOk(twili.services->HookToCreateProcess(tid));
+	TWILI_BRIDGE_CHECK(wh_debug_title ? TWILI_ERR_ALREADY_WAITING : RESULT_OK);
+	TWILI_BRIDGE_CHECK(twili.services->HookToCreateProcess(tid, &ev_debug_title));
 	
 	wh_debug_title = twili.event_waiter.Add(
 		ev_debug_title,
 		[this, opener, tid]() mutable -> bool {
-			try {
-				opener.RespondOk(ResultCode::AssertOk(twili.services->GetProcessId(tid)));
-			} catch(trn::ResultError &e) {
-				opener.RespondError(e.code);
+			uint64_t pid;
+			trn::ResultCode r = twili.services->GetProcessId(tid, &pid);
+			if(r != RESULT_OK) {
+				opener.RespondError(r);
+			} else {
+				opener.RespondOk(std::move(pid));
 			}
-			
 			wh_debug_title.reset();
 			return false;
 		});

@@ -34,6 +34,8 @@
 namespace twili {
 namespace bridge {
 
+#define TWILI_BRIDGE_CHECK(code) do { trn::ResultCode _tmp = (code); if(_tmp != RESULT_OK) { opener.RespondError(_tmp); return; }} while(0)
+
 class ResponseOpener {
  public:
 	ResponseOpener(std::shared_ptr<detail::ResponseState> state);

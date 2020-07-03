@@ -136,121 +136,124 @@ struct ServicesImpl<ApiVersion, Target_1_0_0> : public Services {
 	}
 	
 	/* ldr_dmnt */
-	virtual trn::Result<std::vector<hos_types::LoadedModuleInfo>> GetNsoInfos(uint64_t pid) {
-		std::vector<hos_types::LoadedModuleInfo> nso_info;
+	virtual trn::ResultCode GetNsoInfos(uint64_t pid, std::vector<hos_types::LoadedModuleInfo> *vec_out) {
 		uint32_t num_nso_infos = 16;
 
 		Result<std::nullopt_t> r(std::nullopt);
 		do {
-			nso_info.resize(num_nso_infos);
+			vec_out->resize(num_nso_infos);
 		
 			r = objects.ldr_dmnt.template SendSyncRequest<2>( // GetNsoInfos
 				trn::ipc::InRaw<uint64_t>(pid),
 				trn::ipc::OutRaw<uint32_t>(num_nso_infos),
-				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(nso_info.data(), nso_info.size() * sizeof(hos_types::LoadedModuleInfo)));
-		} while(r && num_nso_infos > nso_info.size());
-		nso_info.resize(num_nso_infos);
-	
-		return r.map([&](auto const &_ignored) { return nso_info; });
+				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
+		} while(r && num_nso_infos > vec_out->size());
+		vec_out->resize(num_nso_infos);
+
+		return twili::Unwrap(r);
 	}
 
 	/* pm_dmnt */
-	virtual trn::Result<std::nullopt_t> StartProcess(uint64_t pid) {
-		return objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::StartProcess()>(
-			ipc::InRaw<uint64_t>(pid));
+	virtual trn::ResultCode StartProcess(uint64_t pid) {
+		return twili::Unwrap(
+			objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::StartProcess()>(
+				ipc::InRaw<uint64_t>(pid)));
 	}
 	
-	virtual trn::Result<uint64_t> GetProcessId(uint64_t tid) {
-		uint64_t pid;
-		auto r = objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::GetProcessId()>(
+	virtual trn::ResultCode GetProcessId(uint64_t tid, uint64_t *pid) {
+		return twili::Unwrap(objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::GetProcessId()>(
 			ipc::InRaw<uint64_t>(tid),
-			ipc::OutRaw<uint64_t>(pid));
-
-		return r.map([&](auto const&_) { return pid; });
+			ipc::OutRaw<uint64_t>(*pid)));
 	}
 	
-	virtual trn::Result<trn::KEvent> HookToCreateProcess(uint64_t tid) {
+	virtual trn::ResultCode HookToCreateProcess(uint64_t tid, trn::KEvent *out) {
 		handle_t evt_h;
 		auto r = objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::HookToCreateProcess()>(
 			ipc::InRaw<uint64_t>(tid),
 			ipc::OutHandle<handle_t, ipc::copy>(evt_h));
 
-		return r.map([&](auto const&_) { return trn::KEvent(evt_h); });
+		if(r) {
+			*out = trn::KEvent(evt_h);
+			return RESULT_OK;
+		} else {
+			return r.error();
+		}
 	}
 			
-	virtual trn::Result<uint64_t> GetApplicationProcessId() {
-			uint64_t pid;
-			auto r = objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::GetApplicationProcessId()>(
-			ipc::OutRaw<uint64_t>(pid));
-			
-		return r.map([&](auto const&_) { return pid; });
+	virtual trn::ResultCode GetApplicationProcessId(uint64_t *pid) {
+		return twili::Unwrap(
+			objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::GetApplicationProcessId()>(
+				ipc::OutRaw<uint64_t>(*pid)));
 	}
 		
-	virtual trn::Result<trn::KEvent> HookToCreateApplicationProcess() {
+	virtual trn::ResultCode HookToCreateApplicationProcess(trn::KEvent *out) {
 		handle_t evt_h;
 		auto r = objects.pm_dmnt.template SendSyncRequest<PmDmntCommandTable<ApiVersion>::HookToCreateApplicationProcess()>(
 			ipc::OutHandle<handle_t, ipc::copy>(evt_h));
 
-		return r.map([&](auto const&_) { return trn::KEvent(evt_h); });
+		if(r) {
+			*out = trn::KEvent(evt_h);
+			return RESULT_OK;
+		} else {
+			return r.error();
+		}
 	}
 	
-	virtual trn::Result<std::nullopt_t> ClearHook() {
-			return trn::ResultCode::ExpectOk(TWILI_ERR_OPERATION_NOT_SUPPORTED_FOR_SYSTEM_VERSION);
+	virtual trn::ResultCode ClearHook() {
+			return TWILI_ERR_OPERATION_NOT_SUPPORTED_FOR_SYSTEM_VERSION;
 	}
 	
-	virtual trn::Result<hos_types::ResourceLimitInfo> GetCurrentLimitInfo(uint32_t category, uint32_t resource) {
-		hos_types::ResourceLimitInfo info;
-
-		auto r = objects.pm_dmnt.template SendSyncRequest<65001>( // AtmosphereGetCurrentLimitInfo
-			ipc::InRaw<uint32_t>(category),
-			ipc::InRaw<uint32_t>(resource),
-			ipc::OutRaw<uint64_t>(info.current_value),
-			ipc::OutRaw<uint64_t>(info.limit_value));
-
-		return r.map([&](auto const &_) { return info; });
+	virtual trn::ResultCode GetCurrentLimitInfo(uint32_t category, uint32_t resource, hos_types::ResourceLimitInfo *out) {
+		return twili::Unwrap(
+			objects.pm_dmnt.template SendSyncRequest<65001>( // AtmosphereGetCurrentLimitInfo
+				ipc::InRaw<uint32_t>(category),
+				ipc::InRaw<uint32_t>(resource),
+				ipc::OutRaw<uint64_t>(out->current_value),
+				ipc::OutRaw<uint64_t>(out->limit_value)));
 	}
 
 
 	/* ro_dmnt */
-	virtual trn::Result<std::vector<hos_types::LoadedModuleInfo>> GetNroInfos(uint64_t pid) {
-		std::vector<hos_types::LoadedModuleInfo> nro_info;
+	virtual trn::ResultCode GetNroInfos(uint64_t pid, std::vector<hos_types::LoadedModuleInfo> *vec_out) {
 		uint32_t num_nro_infos = 16;
 
 		Result<std::nullopt_t> r(std::nullopt);
 		do {
-			nro_info.resize(num_nro_infos);
+			vec_out->resize(num_nro_infos);
 		
 			r = objects.ro_dmnt.template SendSyncRequest<0>( // GetNroInfos
 				trn::ipc::InRaw<uint64_t>(pid),
 				trn::ipc::OutRaw<uint32_t>(num_nro_infos),
-				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0x6>(nro_info.data(), nro_info.size() * sizeof(hos_types::LoadedModuleInfo)));
-		} while(r && num_nro_infos > nro_info.size());
-		nro_info.resize(num_nro_infos);
-	
-		return r.map([&](auto const &_ignored) { return nro_info; });
+				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
+		} while(r && num_nro_infos > vec_out->size());
+		vec_out->resize(num_nro_infos);
+
+		return twili::Unwrap(r);
 	}
 
 	/* nifm */
-	virtual trn::Result<nifm::IRequest> CreateRequest(uint32_t requirement_preset) {
-		nifm::IRequest rq;
-
-		auto r = objects.nifm_general.template SendSyncRequest<4>(
+	virtual trn::ResultCode CreateRequest(uint32_t requirement_preset, nifm::IRequest *out) {
+		return twili::Unwrap(
+			objects.nifm_general.template SendSyncRequest<4>(
 				ipc::InRaw<uint32_t>(requirement_preset),
-				ipc::OutObject(rq));
-		
-		return r.map([&](auto const &_) { return std::move(rq); });
+				ipc::OutObject(*out)));
 	}
 
 	/* ns:dev (1.0.0-9.2.0), pgl (10.0.0+) */
-	virtual trn::Result<trn::KEvent> GetShellEventHandle() {
+	virtual trn::ResultCode GetShellEventHandle(trn::KEvent *out) {
 		handle_t evt_h;
 		auto r = objects.ns_dev.template SendSyncRequest<4>( // GetShellEventHandle
 			ipc::OutHandle<handle_t, ipc::copy>(evt_h));
 
-		return r.map([&](auto const &_) { return KEvent(evt_h); });
+		if(r) {
+			*out = trn::KEvent(evt_h);
+			return RESULT_OK;
+		} else {
+			return r.error();
+		}
 	}
 	
-	virtual trn::Result<std::optional<hos_types::ShellEventInfo>> GetShellEventInfo() {
+	virtual trn::ResultCode GetShellEventInfo(std::optional<hos_types::ShellEventInfo> *out) {
 		// TODO: translate events between different firmware versions???
 
 		uint32_t evt;
@@ -261,55 +264,50 @@ struct ServicesImpl<ApiVersion, Target_1_0_0> : public Services {
 			ipc::OutRaw<uint64_t>(pid));
 
 		if(!r && r.error().code == 0x610 || r.error().code == 0x4e4) {
-			return trn::Result<std::optional<hos_types::ShellEventInfo>>();
+			out->reset();
+		} else if(r) {
+			*out = hos_types::ShellEventInfo { pid, (hos_types::ShellEventType) evt };
 		} else {
-			return r.map([&](auto const &_) { return std::optional(hos_types::ShellEventInfo { pid, (hos_types::ShellEventType) evt }); });
+			return r.error();
 		}
+		return RESULT_OK;
 	}
 
-	virtual trn::Result<uint64_t> LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id) {
-		uint64_t pid;
-		auto r =
+	virtual trn::ResultCode LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id, uint64_t *pid_out) {
+		return twili::Unwrap(
 			objects.ns_dev.template SendSyncRequest<0>( // LaunchProgram
 				ipc::InRaw<uint32_t>(launch_flags),
 				ipc::InRaw<uint64_t>(title_id),
 				ipc::InRaw<uint32_t>(0), // padding???
 				ipc::InRaw<uint32_t>(storage_id),
-				ipc::OutRaw<uint64_t>(pid));
-
-		return r.map([&](auto const &_) { return pid; });
+				ipc::OutRaw<uint64_t>(*pid_out)));
 	}
 
-	virtual trn::Result<std::nullopt_t> TerminateProgram(uint64_t pid) {
-		return objects.ns_dev.template SendSyncRequest<1>( // TerminateProcess
-			trn::ipc::InRaw<uint64_t>(pid));
+	virtual trn::ResultCode TerminateProgram(uint64_t pid) {
+		return twili::Unwrap(
+			objects.ns_dev.template SendSyncRequest<1>( // TerminateProcess
+				trn::ipc::InRaw<uint64_t>(pid)));
 	}
 	
 	/* lr */
-	virtual trn::Result<trn::ipc::client::Object> OpenLocationResolver(uint8_t storage_id) {
-		trn::ipc::client::Object ilr;
-		
-		auto r = objects.lr.template SendSyncRequest<0>( // OpenLocationResolver
+	virtual trn::ResultCode OpenLocationResolver(uint8_t storage_id, trn::ipc::client::Object *ilr) {
+		return twili::Unwrap(
+			objects.lr.template SendSyncRequest<0>( // OpenLocationResolver
 				ipc::InRaw<uint8_t>(storage_id),
-				ipc::OutObject(ilr));
-
-		return r.map([&](auto const &_) { return std::move(ilr); });
+				ipc::OutObject(*ilr)));
 	}
 
 	/* ecs */
-	virtual trn::Result<trn::KObject> SetExternalContentSource(uint64_t title_id) {
-		trn::KObject session;
-		
-		auto r = objects.ldr_shel.template SendSyncRequest<65000>( // SetExternalContentSource
+	virtual trn::ResultCode SetExternalContentSource(uint64_t title_id, trn::KObject *session_out) {
+		return twili::Unwrap(objects.ldr_shel.template SendSyncRequest<65000>( // SetExternalContentSource
 			ipc::InRaw<uint64_t>(title_id),
-			ipc::OutHandle<KObject, ipc::move>(session));
-		
-		return r.map([&](auto const &_) { return std::move(session); });
+			ipc::OutHandle<KObject, ipc::move>(*session_out)));
 	}
 	
-	virtual trn::Result<std::nullopt_t> ClearExternalContentSource(uint64_t title_id) {
-		return objects.ldr_shel.template SendSyncRequest<65001>( // ClearExternalContentSource
-			trn::ipc::InRaw<uint64_t>(title_id));
+	virtual trn::ResultCode ClearExternalContentSource(uint64_t title_id) {
+		return twili::Unwrap(
+			objects.ldr_shel.template SendSyncRequest<65001>( // ClearExternalContentSource
+				trn::ipc::InRaw<uint64_t>(title_id)));
 	};
 };
 
@@ -325,17 +323,25 @@ template<typename ApiVersion>
 struct ServicesImpl<ApiVersion, Target_10_0_0> : public ServicesImpl<ApiVersion, Target_6_0_0> {
 	ServicesImpl() : pgl_seo(GetPGLObserver(this->objects.pgl)) {
 	}
-									 
+
+	/* and here, we see the magic of this approach- we can represent large
+	 * services changes in separate subclasses */
+	
 	/* ns:dev (1.0.0-9.2.0), pgl (10.0.0+) */
-	virtual trn::Result<trn::KEvent> GetShellEventHandle() {
+	virtual trn::ResultCode GetShellEventHandle(trn::KEvent *out) {
 		handle_t evt_h;
 		auto r = pgl_seo.template SendSyncRequest<0>( // GetProcessEventHandle
 			ipc::OutHandle<handle_t, ipc::copy>(evt_h));
 
-		return r.map([&](auto const &_) { return KEvent(evt_h); });
+		if(r) {
+			*out = trn::KEvent(evt_h);
+			return RESULT_OK;
+		} else {
+			return r.error();
+		}
 	}
 	
-	virtual trn::Result<std::optional<hos_types::ShellEventInfo>> GetShellEventInfo() {
+	virtual trn::ResultCode GetShellEventInfo(std::optional<hos_types::ShellEventInfo> *out) {
 		uint32_t evt;
 		uint64_t pid;
 		
@@ -344,28 +350,29 @@ struct ServicesImpl<ApiVersion, Target_10_0_0> : public ServicesImpl<ApiVersion,
 			ipc::OutRaw<uint64_t>(pid));
 
 		if(!r && r.error().code == MAKE_RESULT(228, 2)) { // pgl::ResultNotAvailable
-			return trn::Result<std::optional<hos_types::ShellEventInfo>>();
+			out->reset();
+		} else if(r) {
+			*out = hos_types::ShellEventInfo { pid, (hos_types::ShellEventType) evt };
 		} else {
-			return r.map([&](auto const &_) { return std::optional(hos_types::ShellEventInfo { pid, (hos_types::ShellEventType) evt }); });
+			return r.error();
 		}
+		return RESULT_OK;
 	}
 
-	virtual trn::Result<uint64_t> LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id) {
-		uint64_t pid;
-		auto r =
+	virtual trn::ResultCode LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id, uint64_t *pid) {
+		return twili::Unwrap(
 			this->objects.pgl.template SendSyncRequest<0>( // LaunchProgram
 				ipc::InRaw<uint32_t>(launch_flags),
 				ipc::InRaw<uint64_t>(title_id),
 				ipc::InRaw<uint32_t>(0), // padding???
 				ipc::InRaw<uint32_t>(storage_id),
-				ipc::OutRaw<uint64_t>(pid));
-
-		return r.map([&](auto const &_) { return pid; });
+				ipc::OutRaw<uint64_t>(*pid)));
 	}
 
-	virtual trn::Result<std::nullopt_t> TerminateProgram(uint64_t pid) {
-		return this->objects.pgl.template SendSyncRequest<1>( // TerminateProcess
-			trn::ipc::InRaw<uint64_t>(pid));
+	virtual trn::ResultCode TerminateProgram(uint64_t pid) {
+		return twili::Unwrap(
+			this->objects.pgl.template SendSyncRequest<1>( // TerminateProcess
+				trn::ipc::InRaw<uint64_t>(pid)));
 	}
 
 	trn::ipc::client::Object pgl_seo; // IShellEventObserver
@@ -373,7 +380,7 @@ struct ServicesImpl<ApiVersion, Target_10_0_0> : public ServicesImpl<ApiVersion,
  protected:
 	trn::ipc::client::Object GetPGLObserver(trn::ipc::client::Object &pgl) {
 		trn::ipc::client::Object seo;
-		ResultCode::AssertOk(
+		twili::Assert(
 			pgl.SendSyncRequest<20>(
 				ipc::OutObject(seo)));
 		return seo;

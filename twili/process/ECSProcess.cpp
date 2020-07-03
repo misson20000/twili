@@ -55,28 +55,31 @@ void ECSProcess::ChangeState(MonitoredProcess::State state) {
 	
 	if(state == MonitoredProcess::State::Exited) {
 		if(ecs_pending) {
-			ResultCode::AssertOk(twili.services->ClearExternalContentSource(title_id));
+			// if this fails, we're very confused.
+			twili::Assert(twili.services->ClearExternalContentSource(title_id));
 		}
 	}
 }
 
-bool ECSProcess::PrepareForLaunch() {
+trn::ResultCode ECSProcess::PrepareForLaunch() {
 	if(files.size() > 1) {
-		throw ResultError(TWILI_ERR_TOO_MANY_MODULES);
+		return TWILI_ERR_TOO_MANY_MODULES;
 	} else if(files.empty()) {
-		throw ResultError(TWILI_ERR_NO_MODULES);
+		return TWILI_ERR_NO_MODULES;
 	}
+	
 	virtual_exefs.SetMain(fs::NRONSOTransmutationFile::Create(files.front()));
 
+	KObject session;
 	printf("installing ExternalContentSource\n");
-	KObject session = ResultCode::AssertOk(twili.services->SetExternalContentSource(title_id));
+	TWILI_CHECK(twili.services->SetExternalContentSource(title_id, &session));
 	printf("installed ExternalContentSource: 0x%x\n", session.handle);
 	ecs_pending = true;
-	
-	ResultCode::AssertOk(
-		twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
 
-	return true;
+	// recovering from this is possible, but confusing.
+	twili::Assert(twili.server.AttachSession<fs::ProcessFileSystem::IFileSystem>(std::move(session), virtual_exefs));
+
+	return RESULT_OK;
 }
 
 } // namespace process

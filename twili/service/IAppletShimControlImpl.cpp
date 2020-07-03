@@ -22,6 +22,7 @@
 
 #include "IAppletController.hpp"
 
+#include "../twili.hpp"
 #include "err.hpp"
 
 namespace twili {
@@ -55,14 +56,15 @@ trn::ResultCode IAppletShim::ControlImpl::GetCommand(trn::ipc::OutRaw<uint32_t> 
 }
 
 trn::ResultCode IAppletShim::ControlImpl::PopApplet(trn::ipc::OutObject<IAppletController> &controller) {
-	auto r = server->CreateObject<IAppletController>(this, std::move(tracker.PopQueuedProcess()));
+	std::shared_ptr<process::AppletProcess> proc;
+	TWILI_CHECK(tracker.PopQueuedProcess(&proc));
+	auto r = server->CreateObject<IAppletController>(this, std::move(proc));
 	if(r) {
 		controller.value = r.value();
 		return RESULT_OK;
 	} else {
 		return r.error().code;
 	}
-	return RESULT_OK;
 }
 
 } // namespace service

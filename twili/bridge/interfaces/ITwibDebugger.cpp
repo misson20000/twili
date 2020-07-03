@@ -153,36 +153,37 @@ void ITwibDebugger::ContinueDebugEvent(bridge::ResponseOpener opener, uint32_t f
 }
 
 void ITwibDebugger::SetThreadContext(bridge::ResponseOpener opener, uint64_t thread_id, uint32_t flags, thread_context_t context) {
-	ResultCode::AssertOk(
-		trn::svc::SetDebugThreadContext(debug, thread_id, &context, flags));
-
-	opener.RespondOk();
+	auto r = trn::svc::SetDebugThreadContext(debug, thread_id, &context, flags);
+	if(r) {
+		opener.RespondOk();
+	} else {
+		opener.RespondError(r.error());
+	}
 }
 
 void ITwibDebugger::GetNsoInfos(bridge::ResponseOpener opener) {
-	if(twili.debugging_titles.find(title_id::LoaderTitle) != twili.debugging_titles.end()) {
-		throw ResultError(TWILI_ERR_SYSMODULE_BEING_DEBUGGED);
-	}
+	TWILI_BRIDGE_CHECK(
+		twili.debugging_titles.find(title_id::LoaderTitle) != twili.debugging_titles.end() ?
+		TWILI_ERR_SYSMODULE_BEING_DEBUGGED :
+		RESULT_OK);
 	
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
+	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
 	
-	std::vector<hos_types::LoadedModuleInfo> nso_info = ResultCode::AssertOk(twili.services->GetNsoInfos(pid));
+	std::vector<hos_types::LoadedModuleInfo> nso_info;
+	TWILI_BRIDGE_CHECK(twili.services->GetNsoInfos(pid, &nso_info));
 
 	opener.RespondOk(std::move(nso_info));
 }
 
 void ITwibDebugger::WaitEvent(bridge::ResponseOpener opener) {
-	if(wait_handle) {
-		throw ResultError(TWILI_ERR_ALREADY_WAITING);
-	}
+	TWILI_BRIDGE_CHECK(
+		wait_handle ? TWILI_ERR_ALREADY_WAITING : RESULT_OK);
+
 	wait_handle = twili.event_waiter.Add(
 		debug,
 		[this, opener]() mutable -> bool {
-			printf("sending response\n");
 			opener.RespondOk();
-			printf("sent response, resetting wait handle\n");
 			wait_handle.reset();
-			printf("reset wait handle\n");
 			return false;
 		});
 }
@@ -223,21 +224,28 @@ void ITwibDebugger::GetTargetEntry(bridge::ResponseOpener opener) {
 }
 
 void ITwibDebugger::LaunchDebugProcess(bridge::ResponseOpener opener) {
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
+	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
 
-	ResultCode::AssertOk(twili.services->StartProcess(pid));
+	TWILI_BRIDGE_CHECK(twili.services->StartProcess(pid));
 	
 	opener.RespondOk();
 }
 
 void ITwibDebugger::GetNroInfos(bridge::ResponseOpener opener) {
-	if(twili.debugging_titles.find(title_id::RoTitle) != twili.debugging_titles.end()) {
-		throw ResultError(TWILI_ERR_SYSMODULE_BEING_DEBUGGED);
-	}
+	TWILI_BRIDGE_CHECK( // TODO: only need to check before 3.0.0
+		twili.debugging_titles.find(title_id::LoaderTitle) != twili.debugging_titles.end() ?
+		TWILI_ERR_SYSMODULE_BEING_DEBUGGED :
+		RESULT_OK);
+	TWILI_BRIDGE_CHECK(
+		twili.debugging_titles.find(title_id::RoTitle) != twili.debugging_titles.end() ?
+		TWILI_ERR_SYSMODULE_BEING_DEBUGGED :
+		RESULT_OK);
 
-	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle));
+	uint64_t pid = ResultCode::AssertOk(trn::svc::GetProcessId(debug.handle)); // excRefactor OK
 
-	opener.RespondOk(ResultCode::AssertOk(twili.services->GetNroInfos(pid)));
+	std::vector<hos_types::LoadedModuleInfo> nro_info;
+	TWILI_BRIDGE_CHECK(twili.services->GetNroInfos(pid, &nro_info));
+	opener.RespondOk(std::move(nro_info));
 }
 
 } // namespace bridge

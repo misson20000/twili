@@ -79,38 +79,40 @@ bool AppletTracker::ReadyToLaunch() {
 		 monitor.process->GetState() == process::MonitoredProcess::State::Exited); // or it has exited
 }
 
-std::shared_ptr<process::AppletProcess> AppletTracker::PopQueuedProcess() {
+trn::ResultCode AppletTracker::PopQueuedProcess(std::shared_ptr<process::AppletProcess> *out) {
 	while(queued.size() > 0) {
 		std::shared_ptr<process::AppletProcess> proc = queued.front();
 		queued.pop_front();
 
-		// returns true if process wasn't cancelled,
-		// but if it returns false, attempt to dequeue
-		// another process
-		if(proc->PrepareForLaunch()) {
-			created.push_back(proc);
-			return proc;
-		}
+		trn::ResultCode r = proc->PrepareForLaunch();
+		if(r == TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH) { continue; }
+		TWILI_CHECK(r);
+		
+		created.push_back(proc);
+		*out = std::move(proc);
+		return RESULT_OK;
 	}
 	
 	// launch hbmenu if there's nothing else to launch
 	printf("launching hbmenu\n");
 	hbmenu = CreateHbmenu();
+
+	// failure to launch hbmenu is critical
+	twili::Assert(hbmenu->PrepareForLaunch());
+
 	created.push_back(hbmenu);
-	if(!hbmenu->PrepareForLaunch()) {
-		// hbmenu shouldn't be able to be cancelled yet...
-		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_INVALID_STATE);
-	}
-	
-	return hbmenu;
+	*out = std::move(hbmenu);
+	return RESULT_OK;
 }
 
 std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KProcess &&process) {
 	printf("attaching new host process\n");
-	if(created.size() == 0) {
-		printf("  no processes created\n");
-		throw trn::ResultError(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
-	}
+
+	// if we did not request creation of a host process, something has gone
+	// seriously wrong and applet tracker state is inconsistent. no point in
+	// recovering.
+	twili::Assert<TWILI_ERR_APPLET_TRACKER_NO_PROCESS>(created.size() == 0);
+
 	std::shared_ptr<process::AppletProcess> proc = created.front();
 	proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
 	printf("  attached\n");

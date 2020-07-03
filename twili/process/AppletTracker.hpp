@@ -53,7 +53,7 @@ class AppletTracker : public Tracker<AppletProcess> {
 	void ReleaseControlProcess();
 	const trn::KEvent &GetProcessQueuedEvent();
 	bool ReadyToLaunch();
-	std::shared_ptr<AppletProcess> PopQueuedProcess();
+	trn::ResultCode PopQueuedProcess(std::shared_ptr<AppletProcess> *out);
 	
 	// for host process
 	std::shared_ptr<AppletProcess> AttachHostProcess(trn::KProcess &&process);

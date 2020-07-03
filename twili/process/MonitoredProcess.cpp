@@ -76,7 +76,7 @@ void MonitoredProcess::Terminate() {
 	if(!proc) {
 		return; // silently fail...
 	}
-	ResultCode::AssertOk(trn::svc::TerminateProcess(*this->proc));
+	twili::Assert(trn::svc::TerminateProcess(*this->proc));
 }
 
 void MonitoredProcess::Kill() {
