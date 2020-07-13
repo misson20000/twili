@@ -115,9 +115,10 @@ void TCPBridge::Connection::Synchronized() {
 	case Task::FinalizeCommand:
 		try {
 			current_handler->Finalize(payload_buffer);
-			twili::Assert<TWILI_ERR_FATAL_BRIDGE_STATE>((bool) current_object);
-			current_object->FinalizeCommand();
-			current_object.reset();
+			if(current_object) {
+				current_object->FinalizeCommand();
+				current_object.reset();
+			}
 			ResetHandler();
 		} catch(trn::ResultError &e) {
 			printf("TCPConnection: Somebody is still throwing exceptions!\n");
