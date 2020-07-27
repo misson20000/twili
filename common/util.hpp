@@ -20,6 +20,7 @@
 
 #include<optional>
 #include<vector>
+#include<stdint.h>
 
 namespace twili {
 namespace util {
