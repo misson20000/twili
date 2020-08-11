@@ -52,8 +52,8 @@ class ITwibDebugger : public ObjectDispatcherProxy<ITwibDebugger> {
  private:
 	Twili &twili;
 	trn::KDebug debug;
-	std::shared_ptr<trn::WaitHandle> wait_handle;
 	std::shared_ptr<process::MonitoredProcess> proc;
+	std::shared_ptr<trn::WaitHandle> wait_handle;
 	std::deque<debug_event_info_t> event_queue;
 
 	void PumpEvents();

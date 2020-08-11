@@ -51,6 +51,9 @@ ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&deb
 }
 
 ITwibDebugger::~ITwibDebugger() {
+	if(wait_handle) {
+		wait_handle.reset();
+	}
 	if(title_id != 0) {
 		twili.debugging_titles.erase(title_id);
 	}
