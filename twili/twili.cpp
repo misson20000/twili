@@ -199,10 +199,10 @@ Twili::Twili(const Config &config) :
 	applet_tracker(*this),
 	shell_tracker(*this) {
 	printf("finished constructing most members\n");
-	//if(config.enable_usb_bridge) {
-	//	usb_bridge = std::make_unique<bridge::usb::USBBridge>(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
-	//	printf("constructed USB bridge\n");
-	//}
+	if(config.enable_usb_bridge) {
+		usb_bridge = std::make_unique<bridge::usb::USBBridge>(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
+		printf("constructed USB bridge\n");
+	}
 	if(config.enable_tcp_bridge) {
 		tcp_bridge = std::make_unique<bridge::tcp::TCPBridge>(*this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));
 		printf("constructed TCP bridge\n");
