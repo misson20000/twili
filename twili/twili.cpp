@@ -128,11 +128,14 @@ int main() {
 namespace twili {
 
 void Abort(trn::ResultError &e) {
+	dbg_set_file(nullptr);
+	dbg_printf("<= Twili aborting due to 0x%x =>", e.code.code);
+	
 	trn::service::SM sm = ResultCode::AssertOk(trn::service::SM::Initialize());
    
 	ipc::client::Object fatal = ResultCode::AssertOk(
 		sm.GetService("fatal:u"));
-
+	
 	uint64_t policy = 0; // ErrorReportAndErrorScreen
 	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
 		policy = 2; // ErrorScreen
@@ -157,9 +160,15 @@ void Abort(trn::ResultError &e) {
 		uint32_t type = 0;
 	} ctx;
 
-	ctx.start_address = (uint64_t) env_get_aslr_base();
+	uint64_t aslr_base = (uint64_t) env_get_aslr_base();
+	
+	ctx.start_address = aslr_base;
 	ctx.stack_trace_size = std::min<size_t>(32, e.backtrace_size);
 	std::copy_n(e.backtrace, ctx.stack_trace_size, ctx.stack_trace);
+
+	for(int i = 0; i < e.backtrace_size; i++) {
+		dbg_printf("  from 0x%lx +0x%lx", aslr_base, e.backtrace[i] - aslr_base);
+	}
 	
 	fatal.SendSyncRequest<2>( // ThrowFatalWithCpuContext
 		ipc::InRaw<uint32_t>(e.code.code),
