@@ -569,6 +569,10 @@ int main(int argc, char *argv[]) {
 	FSCommands sd_commands(app, "sd", "Perform operations on target SD card", "sd");
 	FSCommands nand_user_commands(app, "nu", "Perform operations on target NAND user filesystem", "nand_user");
 	FSCommands nand_system_commands(app, "ns", "Perform operations on target NAND system filesystem", "nand_system");
+
+	CLI::App *get_module_info = app.add_subcommand("get-module-info", "Lists loaded module info for a specific process");
+	uint64_t get_module_info_process_id;
+	get_module_info->add_option("pid", get_module_info_process_id, "Process ID")->required();
 	
 	app.require_subcommand(1);
 	
@@ -862,6 +866,18 @@ int main(int argc, char *argv[]) {
 		return nand_system_commands.Run(itdi);
 	}
 
+	if(get_module_info->parsed()) {
+		auto debugger = itdi.OpenActiveDebugger(get_module_info_process_id);
+		for(auto info : debugger.GetNsoInfos()) {
+			printf("module ");
+			for(int i = 0; i < 0x20; i++) {
+				printf("%02x", info.build_id[i]);
+			}
+			printf(": loaded at 0x%lx,  +0x%lx\n", info.base_addr, info.size);
+		}
+		return 0;
+	}
+	
 	return 0;
 }
 
