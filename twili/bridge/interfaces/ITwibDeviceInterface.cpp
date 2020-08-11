@@ -88,7 +88,7 @@ void ITwibDeviceInterface::CoreDump(bridge::ResponseOpener opener, uint64_t pid)
 void ITwibDeviceInterface::Terminate(bridge::ResponseOpener opener, uint64_t pid) {
 	twili.FindProcess(pid)->Terminate();
 
-	opener.BeginOk().Finalize();
+	opener.RespondOk();
 	return;
 }
 
