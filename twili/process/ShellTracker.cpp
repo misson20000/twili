@@ -42,8 +42,9 @@ ShellTracker::ShellTracker(Twili &twili) :
 	twili::Assert(twili.services->GetShellEventHandle(&shell_event));
 
 	printf("got shell event handle\n");
-	
-	shell_wait = event_thread.event_waiter.Add(
+
+	/* Use main thread waiter here, since most things don't synchronize. */
+	shell_wait = twili.event_waiter.Add(
 		shell_event,
 		[this]() {
 			std::unique_lock<thread::Mutex> lock(queue_mutex);
@@ -86,8 +87,9 @@ ShellTracker::ShellTracker(Twili &twili) :
 			return true;
 		});
 
-	printf("added shell event to shell tracker waiter\n");
+	printf("added shell event to main waiter\n");
 
+	/* Need to punt this off to another thread so we don't block IPC server. */
 	tracker_signal = event_thread.event_waiter.AddSignal(
 		[this]() {
 			std::unique_lock<thread::Mutex> l(queue_mutex);
