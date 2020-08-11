@@ -137,17 +137,17 @@ struct ServicesImpl<ApiVersion, Target_1_0_0> : public Services {
 	
 	/* ldr_dmnt */
 	virtual trn::ResultCode GetNsoInfos(uint64_t pid, std::vector<hos_types::LoadedModuleInfo> *vec_out) {
-		uint32_t num_nso_infos = 16;
+		uint32_t num_nso_infos = 0x10; // TODO: raise this back to 0x40?
 
 		Result<std::nullopt_t> r(std::nullopt);
-		do {
-			vec_out->resize(num_nso_infos);
-		
-			r = objects.ldr_dmnt.template SendSyncRequest<2>( // GetNsoInfos
-				trn::ipc::InRaw<uint64_t>(pid),
-				trn::ipc::OutRaw<uint32_t>(num_nso_infos),
-				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
-		} while(r && num_nso_infos > vec_out->size());
+		vec_out->resize(num_nso_infos);
+
+		printf("fetching nso infos from ldr:dmnt\n");
+		r = objects.ldr_dmnt.template SendSyncRequest<2>( // GetNsoInfos
+			trn::ipc::InRaw<uint64_t>(pid),
+			trn::ipc::OutRaw<uint32_t>(num_nso_infos),
+			trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
+		printf("  => got %d\n", num_nso_infos);
 		vec_out->resize(num_nso_infos);
 
 		return twili::Unwrap(r);
@@ -215,17 +215,17 @@ struct ServicesImpl<ApiVersion, Target_1_0_0> : public Services {
 
 	/* ro_dmnt */
 	virtual trn::ResultCode GetNroInfos(uint64_t pid, std::vector<hos_types::LoadedModuleInfo> *vec_out) {
-		uint32_t num_nro_infos = 16;
+		uint32_t num_nro_infos = 0x40;
 
 		Result<std::nullopt_t> r(std::nullopt);
-		do {
-			vec_out->resize(num_nro_infos);
-		
-			r = objects.ro_dmnt.template SendSyncRequest<0>( // GetNroInfos
-				trn::ipc::InRaw<uint64_t>(pid),
-				trn::ipc::OutRaw<uint32_t>(num_nro_infos),
-				trn::ipc::Buffer<hos_types::LoadedModuleInfo, 0xa>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
-		} while(r && num_nro_infos > vec_out->size());
+		vec_out->resize(num_nro_infos);
+
+		printf("fetching nro infos from ro:dmnt\n");
+		r = objects.ro_dmnt.template SendSyncRequest<0>( // GetProcessModuleInfo
+			trn::ipc::InRaw<uint64_t>(pid),
+			trn::ipc::OutRaw<uint32_t>(num_nro_infos),
+			trn::ipc::Buffer<hos_types::LoadedModuleInfo, 6>(vec_out->data(), vec_out->size() * sizeof(hos_types::LoadedModuleInfo)));
+		printf("  => got %d\n", num_nro_infos);
 		vec_out->resize(num_nro_infos);
 
 		return twili::Unwrap(r);
