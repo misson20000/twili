@@ -66,6 +66,7 @@ void TrackedProcessBase::ChangeState(State state)  {
 		}
 		if(coderegions_found != 2) {
 			printf("CODE REGION COUNT MISMATCH (expected 2, counted %d)\n", coderegions_found);
+			twili::Abort(TWILI_ERR_ECS_CONFUSED);
 		}
 	}
 	if(state == State::Exited) {
