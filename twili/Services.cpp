@@ -360,12 +360,24 @@ struct ServicesImpl<ApiVersion, Target_10_0_0> : public ServicesImpl<ApiVersion,
 	}
 
 	virtual trn::ResultCode LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id, uint64_t *pid) {
+		uint32_t pgl_flags = 0;
+		uint32_t pm_flags = launch_flags;
+
+		struct ProgramLocation {
+			uint64_t title_id;
+			uint8_t storage_id;
+		} loc;
+
+		loc.title_id = title_id;
+		loc.storage_id = storage_id;
+
+		printf("LaunchProgram via pgl, for 10.0.0+\n");
+		
 		return twili::Unwrap(
 			this->objects.pgl.template SendSyncRequest<0>( // LaunchProgram
-				ipc::InRaw<uint32_t>(launch_flags),
-				ipc::InRaw<uint64_t>(title_id),
-				ipc::InRaw<uint32_t>(0), // padding???
-				ipc::InRaw<uint32_t>(storage_id),
+				ipc::InRaw<uint32_t>(pgl_flags), // TODO: ugh wtf? this is supposed to be u8 according to SciresM
+				ipc::InRaw<uint32_t>(pm_flags),
+				ipc::InRaw<ProgramLocation>(loc),
 				ipc::OutRaw<uint64_t>(*pid)));
 	}
 
