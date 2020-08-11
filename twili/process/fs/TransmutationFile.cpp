@@ -57,7 +57,8 @@ trn::ResultCode TransmutationFile::Read(size_t offset, size_t size, uint8_t *out
 					"TransmutationFile: short read [(0x%lx, 0x%lx) -> (0x%lx, 0x%lx)]\n",
 					offset, seg_size,
 					seg_off, actual_read);
-				return total_read + actual_read;
+				*size_out = total_read + actual_read;
+				return TWILI_ERR_IO_ERROR;
 			}
 			offset+= seg_size;
 			out+= seg_size;
@@ -66,7 +67,8 @@ trn::ResultCode TransmutationFile::Read(size_t offset, size_t size, uint8_t *out
 		}
 		segment_begin = segment_end;
 	}
-	return total_read;
+	*size_out = total_read;
+	return RESULT_OK;
 }
 
 trn::ResultCode TransmutationFile::GetSize(size_t *size_out) {
