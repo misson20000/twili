@@ -211,21 +211,8 @@ void ShellTracker::TryToLaunch() {
 }
 
 trn::ResultCode ShellTracker::RequestLaunchECSProgram(uint64_t *pid_out) {
-	const uint8_t storage_id = 3; // nand system
-	
-	ipc::client::Object ilr;
-	twili::Assert(twili.services->OpenLocationResolver(storage_id, &ilr));
+	const uint8_t storage_id = 0; // none
 
-	// This path points to an empty nsp. It just needs to exist to make
-	// loader happy...
-	char path[] = "@Sdcard://atmosphere/contents/0100000000006482/exefs.nsp";
-	
-	twili::Assert(
-		ilr.SendSyncRequest<1>( // RedirectProgramPath
-			ipc::InRaw<uint64_t>(title_id::ShellProcessDefaultTitle),
-			ipc::Buffer<char, 0x19>(path, sizeof(path))));
-	
-	printf("requesting to launch...\n");
 	uint32_t launch_flags;
 	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
 		launch_flags = 0xb; // notify exit, notify debug, notify debug special
@@ -233,7 +220,6 @@ trn::ResultCode ShellTracker::RequestLaunchECSProgram(uint64_t *pid_out) {
 		launch_flags = 0x31; // notify exit, notify debug, notify debug special
 	}
 
-	printf("requested launch\n");
 	return twili.services->LaunchProgram(launch_flags, title_id::ShellProcessDefaultTitle, storage_id, pid_out);
 }
 
