@@ -278,7 +278,7 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 void ITwibDeviceInterface::LaunchUnmonitoredProcess(bridge::ResponseOpener opener, uint32_t flags, uint64_t tid, uint64_t storage) {
 	uint64_t pid;
 	TWILI_BRIDGE_CHECK(twili.services->LaunchProgram(flags, tid, storage, &pid));
-	opener.RespondOk();
+	opener.RespondOk(std::move(pid));
 }
 
 void ITwibDeviceInterface::OpenFilesystemAccessor(bridge::ResponseOpener opener, std::string fs) {
