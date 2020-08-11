@@ -175,7 +175,7 @@ void ControlMode(ipc::client::Object &iappletshim) {
 							ipc::OutObject(controller)); // PopApplet
 
 					if(!r) {
-						if(r.error().code == TWILI_ERR_APPLET_TRACKER_NO_PROCESS) {
+						if(r.error().code == TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH) {
 							// it's possible for us to get dispatched the CREATE_APPLET
 							// command and then for the ITwibProcessMonitor to die before
 							// we pop the applet.
