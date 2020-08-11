@@ -331,8 +331,16 @@ void ITwibDeviceInterface::WaitToDebugTitle(bridge::ResponseOpener opener, uint6
 }
 
 void ITwibDeviceInterface::RebootUnsafe(bridge::ResponseOpener opener) {
-	trn::service::SM sm = twili::Assert(trn::service::SM::Initialize());
-	ipc::client::Object bpc_ams = twili::Assert(sm.GetService("bpc:ams"));
+	session_h bpc_ams_handle;
+	char bpc_ams_name[8] = "bpc:ams";
+	twili::Assert(svcConnectToNamedPort(&bpc_ams_handle, bpc_ams_name));
+
+	ipc_object_t object;
+	object.object_id = -1;
+	object.session = bpc_ams_handle;
+	object.is_borrowed = false;
+	
+	ipc::client::Object bpc_ams = object;
 
 	opener.RespondOk();
 
