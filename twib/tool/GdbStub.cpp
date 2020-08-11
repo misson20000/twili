@@ -736,6 +736,7 @@ void GdbStub::QueryGetRemoteCommand(util::Buffer &packet) {
 	try {
 		if(command == "help") {
 			response << "Available commands:" << std::endl;
+			response << "  - get base" << std::endl;
 			response << "  - wait application" << std::endl;
 			response << "  - wait title <title id>" << std::endl;
 		} else if(command == "wait") {
@@ -762,6 +763,24 @@ void GdbStub::QueryGetRemoteCommand(util::Buffer &packet) {
 					uint64_t pid = itdi.WaitToDebugTitle(tid);
 					response << "PID: 0x" << std::hex << pid << std::endl;
 				}
+			}
+		} else if(command == "get") {
+			std::string get_what;
+			while(message.Read(ch) && ch != ' ') {
+				get_what.push_back(ch);
+			}
+			if(get_what == "base") {
+				if(message.ReadAvailable()) {
+					response << "Syntax error: expected end of input" << std::endl;
+				} else {
+					if(current_thread) {
+						response << "aslr base (best guess): 0x" << std::hex << current_thread->process.debugger.GetTargetEntry() << std::endl;
+					} else {
+						response << "no thread selected" << std::endl;
+					}
+				}
+			} else {
+				response << "Unknown value '" << get_what << "'" << std::endl;
 			}
 		} else {
 			response << "Unknown command '" << command << "'" << std::endl;
