@@ -270,6 +270,7 @@ void ITwibDeviceInterface::PrintDebugInfo(bridge::ResponseOpener opener) {
 		proc->PrintDebugInfo("        ");
 	}
 	twili.applet_tracker.PrintDebugInfo();
+	twili.shell_tracker.PrintDebugInfo();
 
 	opener.RespondOk();
 }
