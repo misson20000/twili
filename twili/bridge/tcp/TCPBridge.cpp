@@ -43,12 +43,7 @@ TCPBridge::TCPBridge(Twili &twili, std::shared_ptr<bridge::Object> object_zero) 
 	twili::Assert(twili.services->CreateRequest(2, &network));
 	twili::Assert(bsd_init());
 
-	printf("cancel network?\n");
-	network.Cancel();
-	printf("cancel network.\n");
-	
 	network_state_event = std::move(std::get<0>(network.GetSystemEventReadableHandles()));
-	printf("network event: 0x%x\n", network_state_event.handle);
 	
 	network_state_wh = twili.event_waiter.Add(
 		network_state_event,
