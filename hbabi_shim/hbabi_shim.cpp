@@ -23,6 +23,8 @@
 #include<stdio.h>
 #include<unistd.h>
 
+#include "err.hpp"
+
 static uint8_t _heap[8 * 1024 * 1024];
 extern "C" {
 runconf_heap_mode_t _trn_runconf_heap_mode = _TRN_RUNCONF_HEAP_MODE_OVERRIDE;
@@ -185,8 +187,15 @@ int main(int argc, char *argv[]) {
 
 		result_t (*target_entry)(loader_config_entry_t*, int64_t) = (result_t (*)(loader_config_entry_t*, int64_t)) target_entry_addr;
 
-		ResultCode::AssertOk( // WaitToStart()
-			shimservice.SendSyncRequest<7>());
+		auto r = shimservice.SendSyncRequest<7>(); // WaitToStart()
+		if(!r) {
+			if(r.error().code == TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH) {
+				// exit cleanly
+				return 0;
+			} else {
+				ResultCode::AssertOk(r.error().code);
+			}
+		}
 		
 		// Run the application
 		uint8_t tls_backup[0x200];

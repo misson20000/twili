@@ -70,6 +70,12 @@ void MonitoredProcess::Terminate() {
 		ChangeState(State::Exited);
 		return;
 	}
+	if(state == State::ShimSuspended) {
+		// need to return from IPC first before process will actually die
+		auto slcb = suspended_launch_cb;
+		suspended_launch_cb = std::function<void(trn::ResultCode)>();
+		slcb(TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH);
+	}
 	if(state == State::Exited) {
 		return; // already dead
 	}
@@ -84,6 +90,12 @@ void MonitoredProcess::Kill() {
 		ChangeState(State::Exited);
 		return;
 	}
+	if(state == State::ShimSuspended) {
+		auto slcb = suspended_launch_cb;
+		suspended_launch_cb = std::function<void(trn::ResultCode)>();
+		slcb(TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH);
+		return; // let this happen cleanly
+	}
 	if(state == State::Exited) {
 		return; // already dead
 	}
@@ -93,8 +105,12 @@ void MonitoredProcess::Kill() {
 void MonitoredProcess::Continue() {
 	if(state == State::ShimSuspended) {
 		ChangeState(State::Running);
-		suspended_launch_cb(0);
+		
+		auto slcb = suspended_launch_cb;
+		suspended_launch_cb = std::function<void(trn::ResultCode)>();
+		slcb(RESULT_OK);
 	} else {
+		// don't try to pause us later
 		suspended_launch_enabled = false;
 	}
 }
@@ -146,6 +162,12 @@ void MonitoredProcess::ChangeState(State new_state) {
 		tp_stdin->CloseReader();
 		tp_stdout->CloseWriter();
 		tp_stderr->CloseWriter();
+
+		if(suspended_launch_cb) {
+			auto slcb = suspended_launch_cb;
+			suspended_launch_cb = std::function<void(trn::ResultCode)>();
+			slcb(TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH);
+		}
 	}
 	state = new_state;
 	const std::list<ProcessMonitor*> monitors_immut(monitors);

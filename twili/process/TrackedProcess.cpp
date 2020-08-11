@@ -90,6 +90,11 @@ void TrackedProcessBase::Kill() {
 		exit_pending = true;
 		return;
 	}
+
+	if(GetState() == State::ShimSuspended) {
+		MonitoredProcess::Kill();
+		return;
+	}
 	
 	if(GetState() == State::Exited) {
 		return; // nothing to do here
