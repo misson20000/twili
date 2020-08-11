@@ -730,9 +730,9 @@ int main(int argc, char *argv[]) {
 
 	if(reboot->parsed()) {
 		if(reboot_unsafe) {
-			itdi.Reboot();
-		} else {
 			itdi.RebootUnsafe();
+		} else {
+			itdi.Reboot();
 		}
 		return 0;
 	}
