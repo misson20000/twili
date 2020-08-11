@@ -171,10 +171,11 @@ std::shared_ptr<ShellProcess> ShellTracker::AttachHostProcess(trn::KProcess &&pr
 	{
 		std::unique_lock<thread::Mutex> l(queue_mutex);
 	
-		if(created.size() == 0) {
-			printf("  AHP: no processes created\n");
-			twili::Abort(TWILI_ERR_APPLET_TRACKER_NO_PROCESS);
-		}
+		// if we did not request creation of a host process, something has gone
+		// seriously wrong and shell tracker state is inconsistent. no point in
+		// recovering.
+		twili::Assert<TWILI_ERR_TRACKER_NO_PROCESSES_CREATED>(created.size() != 0);
+		
 		proc = created.front();
 		proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
 		created.pop_front();

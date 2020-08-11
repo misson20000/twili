@@ -112,7 +112,7 @@ std::shared_ptr<process::AppletProcess> AppletTracker::AttachHostProcess(trn::KP
 	// if we did not request creation of a host process, something has gone
 	// seriously wrong and applet tracker state is inconsistent. no point in
 	// recovering.
-	twili::Assert<TWILI_ERR_APPLET_TRACKER_NO_PROCESS>(created.size() == 0);
+	twili::Assert<TWILI_ERR_TRACKER_NO_PROCESSES_CREATED>(created.size() != 0);
 
 	std::shared_ptr<process::AppletProcess> proc = created.front();
 	proc->Attach(std::make_shared<trn::KProcess>(std::move(process)));
