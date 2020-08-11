@@ -45,6 +45,19 @@ MonitoredProcess::MonitoredProcess(Twili &twili) :
 
 }
 
+const char *MonitoredProcess::GetStateName(State state) {
+	switch(state) {
+	case State::Created: return "Created";
+	case State::Started: return "Started";
+	case State::Attached: return "Attached";
+	case State::ShimSuspended: return "ShimSuspended";
+	case State::Running: return "Running";
+	case State::Crashed: return "Crashed";
+	case State::Exited: return "Exited";
+	default: return "Unknown";
+	}
+}
+
 void MonitoredProcess::LaunchSuspended(bridge::ResponseOpener response) {
 	suspended_launch_enabled = true;
 	Launch(response);
@@ -156,7 +169,7 @@ void MonitoredProcess::SetResult(trn::ResultCode r) {
 }
 
 void MonitoredProcess::ChangeState(State new_state) {
-	printf("process [0x%lx] changing to state %d\n", GetPid(), (int) new_state);
+	printf("process [0x%lx] changing to state %s\n", GetPid(), GetStateName(new_state));
 	if(new_state == State::Exited) {
 		// close pipes
 		tp_stdin->CloseReader();

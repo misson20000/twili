@@ -55,6 +55,8 @@ class MonitoredProcess : public Process, public std::enable_shared_from_this<Mon
 		Crashed, // process has crashed
 		Exited // process has exited cleanly
 	};
+
+	static const char *GetStateName(State state);
 	
 	virtual void Launch(bridge::ResponseOpener response) = 0;
 	virtual void LaunchSuspended(bridge::ResponseOpener response);
