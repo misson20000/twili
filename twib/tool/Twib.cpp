@@ -563,7 +563,7 @@ int main(int argc, char *argv[]) {
 	std::string launch_storage;
 	uint32_t launch_flags = 0;
 	launch->add_option("title-id", launch_title_id, "Title ID to launch")->required();
-	launch->add_set_ignore_case("storage", launch_storage, {"host", "gamecard", "gc", "nand-system", "system", "nand-user", "user", "sdcard", "sd"}, "Storage for title")->required();
+	launch->add_set_ignore_case("storage", launch_storage, {"none", "host", "gamecard", "gc", "nand-system", "system", "nand-user", "user", "sdcard", "sd"}, "Storage for title")->required();
 	launch->add_option("launch-flags", launch_flags, "Flags for launch");
 
 	FSCommands sd_commands(app, "sd", "Perform operations on target SD card", "sd");
