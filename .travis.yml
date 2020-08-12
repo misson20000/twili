@@ -2,13 +2,20 @@ addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
+    - sourceline: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main'
+      key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
     packages:
+    - clang-10
+    - llvm-10
+    - llvm-10-dev
+    - lld-10
     - libusb-1.0.0
     - libusb-1.0.0-dev
     - python3-pip
     - liblz4-dev
     - squashfs-tools
     - g++-8
+    update: true
 env:
   global:
     - LIBTRANSISTOR_REPO=misson20000/libtransistor
@@ -21,7 +28,7 @@ jobs:
     name: "twili"
     env: TARGET="twili" PLATFORM="nx-transistor64"
     install: "./.travis/twili_install.sh"
-    script: make LIBTRANSISTOR_HOME=$PWD/libtransistor/ PATH="$PWD/fr/opt/devkitpro/tools/bin/:$PATH"
+    script: make LLVM_POSTFIX=-10 LIBTRANSISTOR_HOME=$PWD/libtransistor/ PATH="$PWD/fr/opt/devkitpro/tools/bin/:$PATH"
     before_deploy: "./.travis/twili_before_deploy.sh"
   - os: linux
     name: "twib_linux64"
