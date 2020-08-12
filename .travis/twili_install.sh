@@ -8,6 +8,8 @@ pip3 install lz4 pyelftools --user
 #wget http://xenotoad.net/switch_tools_elf2kip_fix.tar.gz
 #mkdir fr
 #tar xf switch_tools_elf2kip_fix.tar.gz -C fr
-wget -nv https://downloads.devkitpro.org/packages/linux/switch-tools-1.7.0-1-any.pkg.tar.xz
+
+# blocked from devkitpro repos?
+wget -nv http://xenotoad.net/switch/switch-tools-1.7.0-1-any.pkg.tar.xz
 mkdir fr
 tar xf switch-tools-1.7.0-1-any.pkg.tar.xz -C fr
