@@ -316,7 +316,7 @@ Controls which port the TCP bridge listens on.
 
 ## Twili
 
-First, you will need to install libtransistor. Download the [latest release](https://github.com/reswitched/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. After that, building Twili should be as simple as running `make`. To use Atmosphère-boot2 to launch Twili, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card.
+First, you will need to install libtransistor. Download the [latest release from my fork](https://github.com/misson20000/libtransistor/releases/latest), extract it somewhere, and set `LIBTRANSISTOR_HOME` to that path. After that, building Twili should be as simple as running `make`. To use Atmosphère-boot2 to launch Twili, you can copy the files from `build/atmosphere/` to the `/atmosphere/` directory on your microSD card. You will also need to install [switch-tools](https://github.com/switchbrew/switch-tools). The preferred way to do this is through [dkp-pacman](https://switchbrew.org/wiki/Setting_up_Development_Environment).
 
 ## Twib
 
