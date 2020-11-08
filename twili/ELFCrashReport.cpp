@@ -212,7 +212,8 @@ void ELFCrashReport::Generate(process::Process &process, twili::bridge::Response
 			trn::svc::QueryDebugProcessMemory(debug, vaddr));
 		memory_info_t mi = std::get<0>(r);
 
-		if(mi.permission & 1) {
+		// skip I/O mappings; these are volatile and reading them might hang or break things
+		if(mi.permission & 1 && mi.memory_type != 1) {
 			uint32_t elf_flags = 0;
 			if(mi.permission & 1) { elf_flags|= ELF::PF_R; }
 			if(mi.permission & 2) { elf_flags|= ELF::PF_W; }
