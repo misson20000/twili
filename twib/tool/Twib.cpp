@@ -599,283 +599,288 @@ int main(int argc, char *argv[]) {
 	
 	LogMessage(Message, "starting twib");
 
-	std::unique_ptr<tool::client::Client> client;
-	if(TWIB_UNIX_FRONTEND_ENABLED && frontend == "unix") {
-		client = tool::connect_unix(unix_frontend_path);
-	} else if(TWIB_TCP_FRONTEND_ENABLED && frontend == "tcp") {
-		client = tool::connect_tcp(tcp_frontend_port);
-	} else if(TWIB_NAMED_PIPE_FRONTEND_ENABLED && frontend == "named_pipe") {
-		client = tool::connect_named_pipe(named_pipe_frontend_path);
-	} else {
-		LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
-		return 1;
-	}
-	if(!client) {
-		return 1;
-	}
+	try {
 	
-	tool::ITwibMetaInterface itmi(tool::RemoteObject(*client, 0, 0));
-	
-	if(ld->parsed()) {
-		ListDevices(itmi);
-		return 0;
-	}
-
-	if(cmd_connect_tcp->parsed()) {
-		printf("%s\n", itmi.ConnectTcp(connect_tcp_hostname, connect_tcp_port).c_str());
-		return 0;
-	}
-
-	uint32_t device_id;
-	if(device_id_str.size() > 0) {
-		device_id = std::stoul(device_id_str, NULL, 16);
-	} else {
-		std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
-		if(devices.size() == 0) {
-			LogMessage(Fatal, "No devices were detected.");
+		std::unique_ptr<tool::client::Client> client;
+		if(TWIB_UNIX_FRONTEND_ENABLED && frontend == "unix") {
+			client = tool::connect_unix(unix_frontend_path);
+		} else if(TWIB_TCP_FRONTEND_ENABLED && frontend == "tcp") {
+			client = tool::connect_tcp(tcp_frontend_port);
+		} else if(TWIB_NAMED_PIPE_FRONTEND_ENABLED && frontend == "named_pipe") {
+			client = tool::connect_named_pipe(named_pipe_frontend_path);
+		} else {
+			LogMessage(Fatal, "unrecognized frontend: %s", frontend.c_str());
 			return 1;
 		}
-		if(devices.size() > 1) {
-			LogMessage(Fatal, "Multiple devices were detected. Please use -d to specify which one you mean.");
+		if(!client) {
 			return 1;
 		}
-		device_id = devices[0]["device_id"].uint32_value();
-	}
-	tool::ITwibDeviceInterface itdi(std::make_shared<tool::RemoteObject>(*client, device_id, 0));
 	
-	if(run->parsed()) {
-		auto code_opt = util::ReadFile(run_file.c_str());
-		if(!code_opt) {
-			LogMessage(Fatal, "could not read file");
-			return 1;
+		tool::ITwibMetaInterface itmi(tool::RemoteObject(*client, 0, 0));
+	
+		if(ld->parsed()) {
+			ListDevices(itmi);
+			return 0;
 		}
 
-		if(!run_applet && !run_shell) {
-			LogMessage(Fatal, "Managed process has been removed.");
-			return 1;
+		if(cmd_connect_tcp->parsed()) {
+			printf("%s\n", itmi.ConnectTcp(connect_tcp_hostname, connect_tcp_port).c_str());
+			return 0;
 		}
+
+		uint32_t device_id;
+		if(device_id_str.size() > 0) {
+			device_id = std::stoul(device_id_str, NULL, 16);
+		} else {
+			std::vector<msgpack11::MsgPack> devices = itmi.ListDevices();
+			if(devices.size() == 0) {
+				LogMessage(Fatal, "No devices were detected.");
+				return 1;
+			}
+			if(devices.size() > 1) {
+				LogMessage(Fatal, "Multiple devices were detected. Please use -d to specify which one you mean.");
+				return 1;
+			}
+			device_id = devices[0]["device_id"].uint32_value();
+		}
+		tool::ITwibDeviceInterface itdi(std::make_shared<tool::RemoteObject>(*client, device_id, 0));
+	
+		if(run->parsed()) {
+			auto code_opt = util::ReadFile(run_file.c_str());
+			if(!code_opt) {
+				LogMessage(Fatal, "could not read file");
+				return 1;
+			}
+
+			if(!run_applet && !run_shell) {
+				LogMessage(Fatal, "Managed process has been removed.");
+				return 1;
+			}
 		
-		tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_shell ? "shell" : (run_applet ? "applet" : "managed"));
-		mon.AppendCode(*code_opt);
-		uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
-		if(!run_quiet) {
-			printf("PID: 0x%" PRIx64"\n", pid);
-		}
-		auto pump_output =
-			[](tool::ITwibPipeReader reader, FILE *stream) {
-				try {
-					while(true) {
-						std::vector<uint8_t> str = reader.ReadSync();
-						size_t r = fwrite(str.data(), sizeof(str[0]), str.size(), stream);
-						if(r < str.size() && str.size() > 0) {
-							throw std::system_error(errno, std::generic_category());
+			tool::ITwibProcessMonitor mon = itdi.CreateMonitoredProcess(run_shell ? "shell" : (run_applet ? "applet" : "managed"));
+			mon.AppendCode(*code_opt);
+			uint64_t pid = run_suspend ? mon.LaunchSuspended() : mon.Launch();
+			if(!run_quiet) {
+				printf("PID: 0x%" PRIx64"\n", pid);
+			}
+			auto pump_output =
+				[](tool::ITwibPipeReader reader, FILE *stream) {
+					try {
+						while(true) {
+							std::vector<uint8_t> str = reader.ReadSync();
+							size_t r = fwrite(str.data(), sizeof(str[0]), str.size(), stream);
+							if(r < str.size() && str.size() > 0) {
+								throw std::system_error(errno, std::generic_category());
+							}
+							fflush(stream);
 						}
-						fflush(stream);
+					} catch(ResultError &e) {
+						LogMessage(Debug, "output pump got 0x%x", e.code);
+						if(e.code == TWILI_ERR_EOF) {
+							LogMessage(Debug, "  EoF");
+							return;
+						} else {
+							e.Die();
+						}
 					}
-				} catch(ResultError &e) {
-					LogMessage(Debug, "output pump got 0x%x", e.code);
-					if(e.code == TWILI_ERR_EOF) {
-						LogMessage(Debug, "  EoF");
-						return;
-					} else {
-						return; // there really isn't much we can do with this
-					}
+				};
+			std::thread stdout_pump(pump_output, mon.OpenStdout(), stdout);
+			std::thread stderr_pump(pump_output, mon.OpenStderr(), stderr);
+
+			class Logic : public platform::EventLoop::Logic {
+			 public:
+				Logic(std::function<void(platform::EventLoop&)> f) : f(f) {
 				}
+				virtual void Prepare(platform::EventLoop &loop) override {
+					f(loop);
+				};
+			 private:
+				std::function<void(platform::EventLoop&)> f;
 			};
-		std::thread stdout_pump(pump_output, mon.OpenStdout(), stdout);
-		std::thread stderr_pump(pump_output, mon.OpenStderr(), stderr);
 
-		class Logic : public platform::EventLoop::Logic {
-		 public:
-			Logic(std::function<void(platform::EventLoop&)> f) : f(f) {
-			}
-			virtual void Prepare(platform::EventLoop &loop) override {
-				f(loop);
-			};
-		 private:
-			std::function<void(platform::EventLoop&)> f;
-		};
-
-		tool::ITwibPipeWriter r = mon.OpenStdin();
-		platform::InputPump input_pump(4096,
-			[&r](std::vector<uint8_t> &data) {
-				r.WriteSync(data);
-			}, [&r]() {
-				r.Close();
-			});
+			tool::ITwibPipeWriter r = mon.OpenStdin();
+			platform::InputPump input_pump(4096,
+																		 [&r](std::vector<uint8_t> &data) {
+																			 r.WriteSync(data);
+																		 }, [&r]() {
+																			 r.Close();
+																		 });
 		
-		Logic logic(
-			[&](platform::EventLoop &l) {
-				l.Clear();
-				l.AddMember(input_pump);
-			});
-		platform::EventLoop stdin_loop(logic);
-		stdin_loop.Begin();
+			Logic logic(
+				[&](platform::EventLoop &l) {
+					l.Clear();
+					l.AddMember(input_pump);
+				});
+			platform::EventLoop stdin_loop(logic);
+			stdin_loop.Begin();
 		
-		stdout_pump.join();
-		stderr_pump.join();
-		LogMessage(Debug, "output pump threads exited");
-		try {
-			uint32_t state;
-			while((state = mon.WaitStateChange()) != 6) {
-				LogMessage(Debug, "  state %d change...", state);
+			stdout_pump.join();
+			stderr_pump.join();
+			LogMessage(Debug, "output pump threads exited");
+			try {
+				uint32_t state;
+				while((state = mon.WaitStateChange()) != 6) {
+					LogMessage(Debug, "  state %d change...", state);
+				}
+			} catch(ResultError &e) {
+				e.Die();
 			}
-		} catch(ResultError &e) {
-			LogMessage(Error, "got 0x%x waiting for process exit", e.code);
+			LogMessage(Debug, "  process exited");
+			stdin_loop.Destroy();
+			return 0;
 		}
-		LogMessage(Debug, "  process exited");
-		stdin_loop.Destroy();
-		return 0;
-	}
 
-	if(reboot->parsed()) {
-		if(reboot_unsafe) {
-			itdi.RebootUnsafe();
-		} else {
-			itdi.Reboot();
-		}
-		return 0;
-	}
-
-	if(coredump->parsed()) {
-		FILE *f = fopen(core_file.c_str(), "wb");
-		if(!f) {
-			LogMessage(Fatal, "could not open '%s': %s", core_file.c_str(), strerror(errno));
-			return 1;
-		}
-		std::vector<uint8_t> core = itdi.CoreDump(core_process_id);
-		size_t written = 0;
-		while(written < core.size()) {
-			ssize_t r = fwrite(core.data() + written, 1, core.size() - written, f);
-			if(r <= 0 || ferror(f)) {
-				LogMessage(Fatal, "write error on '%s'");
+		if(reboot->parsed()) {
+			if(reboot_unsafe) {
+				itdi.RebootUnsafe();
 			} else {
-				written+= r;
+				itdi.Reboot();
 			}
+			return 0;
 		}
-		fclose(f);
-	}
+
+		if(coredump->parsed()) {
+			FILE *f = fopen(core_file.c_str(), "wb");
+			if(!f) {
+				LogMessage(Fatal, "could not open '%s': %s", core_file.c_str(), strerror(errno));
+				return 1;
+			}
+			std::vector<uint8_t> core = itdi.CoreDump(core_process_id);
+			size_t written = 0;
+			while(written < core.size()) {
+				ssize_t r = fwrite(core.data() + written, 1, core.size() - written, f);
+				if(r <= 0 || ferror(f)) {
+					LogMessage(Fatal, "write error on '%s'");
+				} else {
+					written+= r;
+				}
+			}
+			fclose(f);
+		}
 	
-	if(terminate->parsed()) {
-		itdi.Terminate(terminate_process_id);
-		return 0;
-	}
-
-	if(ps->parsed()) {
-		ListProcesses(itdi);
-		return 0;
-	}
-
-	if(identify->parsed()) {
-		show(itdi.Identify());
-		return 0;
-	}
-
-	if(list_named_pipes->parsed()) {
-		for(auto n : itdi.ListNamedPipes()) {
-			printf("%s\n", n.c_str());
+		if(terminate->parsed()) {
+			itdi.Terminate(terminate_process_id);
+			return 0;
 		}
-		return 0;
-	}
 
-	if(open_named_pipe->parsed()) {
-		auto reader = itdi.OpenNamedPipe(open_named_pipe_name);
-		try {
-			while(true) {
-				std::vector<uint8_t> str = reader.ReadSync();
-				std::cout << std::string(str.begin(), str.end());
-			}
-		} catch(ResultError &e) {
-			if(e.code == TWILI_ERR_EOF) {
-				return 0;
-			} else {
-				throw e;
-			}
+		if(ps->parsed()) {
+			ListProcesses(itdi);
+			return 0;
 		}
-		return 0;
-	}
 
-	if(get_memory_info->parsed()) {
-		msgpack11::MsgPack meminfo = itdi.GetMemoryInfo();
-		uint64_t total_memory_available = meminfo["total_memory_available"].uint64_value();
-		uint64_t total_memory_usage     = meminfo["total_memory_usage"    ].uint64_value();
-		const size_t one_mib = 1024 * 1024;
-		printf(
-			"Twili Memory: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
-			total_memory_usage / one_mib,
-			total_memory_available / one_mib,
-			total_memory_usage * 100 / total_memory_available);
+		if(identify->parsed()) {
+			show(itdi.Identify());
+			return 0;
+		}
 
-		std::vector<const char*> category_labels = {"System", "Application", "Applet"};
-		for(auto &cat_info : meminfo["limits"].array_items()) {
+		if(list_named_pipes->parsed()) {
+			for(auto n : itdi.ListNamedPipes()) {
+				printf("%s\n", n.c_str());
+			}
+			return 0;
+		}
+
+		if(open_named_pipe->parsed()) {
+			auto reader = itdi.OpenNamedPipe(open_named_pipe_name);
+			try {
+				while(true) {
+					std::vector<uint8_t> str = reader.ReadSync();
+					std::cout << std::string(str.begin(), str.end());
+				}
+			} catch(ResultError &e) {
+				if(e.code == TWILI_ERR_EOF) {
+					return 0;
+				} else {
+					throw e;
+				}
+			}
+			return 0;
+		}
+
+		if(get_memory_info->parsed()) {
+			msgpack11::MsgPack meminfo = itdi.GetMemoryInfo();
+			uint64_t total_memory_available = meminfo["total_memory_available"].uint64_value();
+			uint64_t total_memory_usage     = meminfo["total_memory_usage"    ].uint64_value();
+			const size_t one_mib = 1024 * 1024;
 			printf(
-				"%s Category Limit: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
-				category_labels[cat_info["category"].int_value()],
-				cat_info["current_value"].uint64_value() / one_mib,
-				cat_info["limit_value"].uint64_value() / one_mib,
-				cat_info["current_value"].uint64_value() * 100 / cat_info["limit_value"].uint64_value());
-		}
-		return 0;
-	}
+				"Twili Memory: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
+				total_memory_usage / one_mib,
+				total_memory_available / one_mib,
+				total_memory_usage * 100 / total_memory_available);
 
-	if(print_debug_info->parsed()) {
-		itdi.PrintDebugInfo();
-		return 0;
-	}
-
-	if(launch->parsed()) {
-		uint64_t storage_id = 0;
-		if(launch_storage == "none") {
-			storage_id = 0;
-		} else if(launch_storage == "host") {
-			storage_id = 1;
-		} else if(launch_storage == "gamecard" || launch_storage == "gc") {
-			storage_id = 2;
-		} else if(launch_storage == "nand-system" || launch_storage == "system") {
-			storage_id = 3;
-		} else if(launch_storage == "nand-user" || launch_storage == "user") {
-			storage_id = 4;
-		} else if(launch_storage == "sdcard" || launch_storage == "sd") {
-			storage_id = 5;
-		} else {
-			LogMessage(Error, "unrecognized storage: %s\n", launch_storage.c_str());
+			std::vector<const char*> category_labels = {"System", "Application", "Applet"};
+			for(auto &cat_info : meminfo["limits"].array_items()) {
+				printf(
+					"%s Category Limit: %" PRIu64" MiB / %" PRIu64" MiB (%" PRIu64"%%)\n",
+					category_labels[cat_info["category"].int_value()],
+					cat_info["current_value"].uint64_value() / one_mib,
+					cat_info["limit_value"].uint64_value() / one_mib,
+					cat_info["current_value"].uint64_value() * 100 / cat_info["limit_value"].uint64_value());
+			}
+			return 0;
 		}
 
-		uint64_t title_id = std::stoull(launch_title_id, nullptr, 16);
+		if(print_debug_info->parsed()) {
+			itdi.PrintDebugInfo();
+			return 0;
+		}
 
-		printf("0x%" PRIx64"\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
-	}
+		if(launch->parsed()) {
+			uint64_t storage_id = 0;
+			if(launch_storage == "none") {
+				storage_id = 0;
+			} else if(launch_storage == "host") {
+				storage_id = 1;
+			} else if(launch_storage == "gamecard" || launch_storage == "gc") {
+				storage_id = 2;
+			} else if(launch_storage == "nand-system" || launch_storage == "system") {
+				storage_id = 3;
+			} else if(launch_storage == "nand-user" || launch_storage == "user") {
+				storage_id = 4;
+			} else if(launch_storage == "sdcard" || launch_storage == "sd") {
+				storage_id = 5;
+			} else {
+				LogMessage(Error, "unrecognized storage: %s\n", launch_storage.c_str());
+			}
+
+			uint64_t title_id = std::stoull(launch_title_id, nullptr, 16);
+
+			printf("0x%" PRIx64"\n", itdi.LaunchUnmonitoredProcess(title_id, storage_id, launch_flags));
+		}
 
 #if TWIB_GDB_ENABLED == 1
-	if(gdb->parsed()) {
-		tool::gdb::GdbStub stub(itdi);
-		stub.Run();
-		return 0;
-	}
+		if(gdb->parsed()) {
+			tool::gdb::GdbStub stub(itdi);
+			stub.Run();
+			return 0;
+		}
 #endif
 
-	if(sd_commands.subcommand->parsed()) {
-		return sd_commands.Run(itdi);
-	}
-
-	if(nand_user_commands.subcommand->parsed()) {
-		return nand_user_commands.Run(itdi);
-	}
-
-	if(nand_system_commands.subcommand->parsed()) {
-		return nand_system_commands.Run(itdi);
-	}
-
-	if(get_module_info->parsed()) {
-		auto debugger = itdi.OpenActiveDebugger(get_module_info_process_id);
-		for(auto info : debugger.GetNsoInfos()) {
-			printf("module ");
-			for(int i = 0; i < 0x20; i++) {
-				printf("%02x", info.build_id[i]);
-			}
-			printf(": loaded at 0x%lx,  +0x%lx\n", info.base_addr, info.size);
+		if(sd_commands.subcommand->parsed()) {
+			return sd_commands.Run(itdi);
 		}
-		return 0;
+
+		if(nand_user_commands.subcommand->parsed()) {
+			return nand_user_commands.Run(itdi);
+		}
+
+		if(nand_system_commands.subcommand->parsed()) {
+			return nand_system_commands.Run(itdi);
+		}
+
+		if(get_module_info->parsed()) {
+			auto debugger = itdi.OpenActiveDebugger(get_module_info_process_id);
+			for(auto info : debugger.GetNsoInfos()) {
+				printf("module ");
+				for(int i = 0; i < 0x20; i++) {
+					printf("%02x", info.build_id[i]);
+				}
+				printf(": loaded at 0x%lx,  +0x%lx\n", info.base_addr, info.size);
+			}
+			return 0;
+		}
+	} catch(ResultError &e) {
+		e.Die();
 	}
 	
 	return 0;

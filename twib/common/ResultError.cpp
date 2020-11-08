@@ -20,19 +20,31 @@
 
 #include "ResultError.hpp"
 
-#include<sstream>
+#include "Logger.hpp"
 
 namespace twili {
 namespace twib {
 
-ResultError::ResultError(uint32_t code) : std::runtime_error("failed to format result code"), code(code) {
-	std::ostringstream ss;
-	ss << "ResultError: 0x" << std::hex << code;
-	description = ss.str();
+ResultError::ResultError(uint32_t code) : std::runtime_error("failed to format result code"), code(code), description(ResultDescription::Lookup(code)) {
 }
 
 const char *ResultError::what() const noexcept {
-	return description.c_str();
+	return description.name;
+}
+
+[[noreturn]] void ResultError::Die() {
+	int r_module = 2000 + (this->code & 511);
+	int r_desc = this->code >> 9;
+	
+	LogMessage(Fatal, "Caught 0x%x (%04d-%04d, %s): %s", this->code, r_module, r_desc, description.name, description.description);
+	if(description.help) {
+		LogMessage(Fatal, "  %s", description.help);
+	}
+	if(description.visibility == ResultVisibility::Internal) {
+		LogMessage(Fatal, "  This is an internal error! Please report it upstream so it can be fixed.");
+	}
+	
+	exit(1);
 }
 
 } // namespace twib

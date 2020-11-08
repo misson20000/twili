@@ -130,7 +130,7 @@ void USBBridge::PostBufferSync(std::shared_ptr<trn::service::usb::ds::Endpoint> 
 	usb_ds_report_t report;
 	auto entry = FindReport(endpoint, report, urb_id);
 	if(entry->urb_status != 3) {
-		twili::Abort(TWILI_ERR_USB_TRANSFER);
+		twili::Abort(TWILI_ERR_FATAL_USB_TRANSFER);
 	}
 	if(entry->transferred_size < size) {
 		printf("[USBB] didn't send all bytes, posting again...\n");

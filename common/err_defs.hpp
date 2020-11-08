@@ -1,6 +1,6 @@
 //
 // Twili - Homebrew debug monitor for the Nintendo Switch
-// Copyright (C) 2018 misson20000 <xenotoad@xenotoad.net>
+// Copyright (C) 2020 misson20000 <xenotoad@xenotoad.net>
 //
 // This file is part of Twili.
 //
@@ -20,25 +20,23 @@
 
 #pragma once
 
-#include<stdexcept>
-#include<string>
-
-#include "err_defs.hpp"
+#include<stdint.h>
 
 namespace twili {
-namespace twib {
 
-class ResultError : public std::runtime_error {
- public:
-	ResultError(uint32_t result);
-
-	virtual const char *what() const noexcept override;
-
-	[[noreturn]] void Die();
-	
-	const uint32_t code;
-	const ResultDescription description;
+enum ResultVisibility {
+	Internal,
+	Api,
+	User,
 };
 
-} // namespace twib
+struct ResultDescription {
+	static ResultDescription Lookup(uint32_t code);
+	
+	uint32_t code;
+	ResultVisibility visibility;
+	const char *name;
+	const char *description;
+	const char *help;
+};
 } // namespace twili
