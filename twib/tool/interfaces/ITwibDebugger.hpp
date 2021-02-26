@@ -54,7 +54,10 @@ class ITwibDebugger {
 	std::optional<nx::DebugEvent> GetDebugEvent();
 	ThreadContext GetThreadContext(uint64_t thread_id);
 	void SetThreadContext(uint64_t thread_id, ThreadContext tc);
-	void ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
+
+	// returns true if there are debug events pending
+	bool ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids);
+	
 	void BreakProcess();
 	void AsyncWait(std::function<void(uint32_t)> &&cb);
 	uint64_t GetTargetEntry();

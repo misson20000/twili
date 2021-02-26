@@ -438,7 +438,7 @@ void GdbStub::HandleVAttach(util::Buffer &packet) {
 
 void GdbStub::HandleVContQuery(util::Buffer &packet) {
 	util::Buffer response;
-	response.Write(std::string("vCont;c;C"));
+	response.Write(std::string("vCont;c;C;s;S"));
 	connection.Respond(response);
 }
 
@@ -452,6 +452,7 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 	struct Action {
 		enum class Type {
 			Invalid,
+			Step,
 			Continue
 		} type = Type::Invalid;
 	};
@@ -474,6 +475,12 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 				// fall-through
 			case 'c':
 				action.type = Action::Type::Continue;
+				break;
+			case 'S':
+				LogMessage(Warning, "vCont 'S' action not well supported");
+				// fall-through
+			case 's':
+				action.type = Action::Type::Step;
 				break;
 			default:
 				LogMessage(Warning, "unsupported vCont action: %c", ch);
@@ -533,31 +540,50 @@ void GdbStub::HandleVCont(util::Buffer &packet) {
 			LogMessage(Warning, "no such process: 0x%lx", p.first);
 			continue;
 		}
+		
 		Process &proc = p_i->second;
-		LogMessage(Debug, "ingesting process events before continue...");
-		if(proc.IngestEvents(*this)) {
-			LogMessage(Debug, "  stopped");
-			Stop();
-			return;
-		}
-
+		
 		proc.running_thread_ids.clear();
+
+		/* resume threads one at a time */
 		for(auto &t : p.second) {
 			auto t_i = proc.threads.find(t.first);
+			
 			if(t_i == proc.threads.end()) {
 				LogMessage(Warning, "no such thread: 0x%lx", t.first);
 				continue;
 			}
-			proc.running_thread_ids.push_back(t.first);
+
+			std::vector<uint64_t> thread_ids = {t.first};
+			
+			if(t.second.type == Action::Type::Step) {
+				while(proc.debugger.ContinueDebugEvent(3 | (1 << 30), thread_ids)) {
+					LogMessage(Debug, "ingesting process events...");
+					if(proc.IngestEvents(*this)) {
+						LogMessage(Debug, "  stopped");
+						Stop();
+						return;
+					}					
+				}
+			} else {
+				while(proc.debugger.ContinueDebugEvent(3, thread_ids)) {
+					LogMessage(Debug, "ingesting process events...");
+					if(proc.IngestEvents(*this)) {
+						LogMessage(Debug, "  stopped");
+						Stop();
+						return;
+					}					
+				}
+				
+				proc.running_thread_ids.push_back(t.first);
+			}
 		}
-		LogMessage(Debug, "continuing process");
-		for(auto &t : proc.running_thread_ids) {
-			LogMessage(Debug, "  tid 0x%lx", t);
-		}
-		proc.debugger.ContinueDebugEvent(7, proc.running_thread_ids);
+		
 		proc.running = true;
 	}
+	
 	waiting_for_stop = true;
+	
 	LogMessage(Debug, "reached end of vCont");
 }
 
@@ -1027,8 +1053,11 @@ bool GdbStub::Process::IngestEvents(GdbStub &stub) {
 
 	if(was_running && !running && !stopped) { // if we're not running but we should be...
 		LogMessage(Debug, "got debug events but didn't stop, so continuing...");
-		debugger.ContinueDebugEvent(7, running_thread_ids);
-		running = true;
+		if(debugger.ContinueDebugEvent(3, running_thread_ids)) {
+			LogMessage(Error, "unexpectedly got more debug events");
+		} else {
+			running = true;
+		}
 	}
 	
 	return stopped;

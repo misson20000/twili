@@ -138,19 +138,26 @@ void ITwibDebugger::SetThreadContext(uint64_t thread_id, ThreadContext tc) {
 	LogMessage(Debug, " => OK");
 }
 
-void ITwibDebugger::ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids) {
+bool ITwibDebugger::ContinueDebugEvent(uint32_t flags, std::vector<uint64_t> thread_ids) {
 	LogMessage(Debug, "ITwibDebugger::ContinueDebugEvent(0x%x) {", flags);
 	for(uint64_t tid : thread_ids) {
 		LogMessage(Debug, "  thread 0x%lx,", tid);
 	}
 	LogMessage(Debug, "}");
 	
-	obj->SendSmartSyncRequest(
+	uint32_t r = obj->SendSmartSyncRequestWithoutAssert(
 		CommandID::CONTINUE_DEBUG_EVENT,
 		in<uint32_t>(flags),
 		in<std::vector<uint64_t>>(thread_ids));
-
+	
+	if(r == 0xf401) {
+		LogMessage(Debug, " => events pending");
+		return true;
+	} 
+	
 	LogMessage(Debug, " => OK");
+
+	return false;
 }
 
 void ITwibDebugger::BreakProcess() {
