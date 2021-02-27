@@ -32,6 +32,8 @@
 
 #include "FileManager.hpp"
 
+#include "Watchdog.hpp"
+
 namespace twili {
 
 _Noreturn void Abort(trn::ResultError &e);
@@ -136,6 +138,7 @@ class Twili {
 	FileManager file_manager;
 	process::AppletTracker applet_tracker;
 	process::ShellTracker shell_tracker;
+	Watchdog watchdog;
 	
 	std::unique_ptr<bridge::usb::USBBridge> usb_bridge;
 	std::unique_ptr<bridge::tcp::TCPBridge> tcp_bridge;

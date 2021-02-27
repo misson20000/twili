@@ -197,7 +197,8 @@ Twili::Twili(const Config &config) :
 	services(twili::Services::CreateForSystemVersion(twili::SystemVersion::Current())),
 	file_manager(*this),
 	applet_tracker(*this),
-	shell_tracker(*this) {
+	shell_tracker(*this),
+	watchdog(*this) {
 	printf("finished constructing most members\n");
 	if(config.enable_usb_bridge) {
 		usb_bridge = std::make_unique<bridge::usb::USBBridge>(this, std::make_shared<bridge::ITwibDeviceInterface>(0, *this));

@@ -65,6 +65,7 @@ static auto descriptions = std::array {
 	describe(Internal, TWILI_ERR_USB_SERIAL_INIT_FAILED, "USB serial init failed", "An error was encountered while initializing USB serial"),
 	describe(Api,      TWILI_ERR_NO_LONGER_REQUESTED_TO_LAUNCH, "Process no longer requested to launch", "A process launch was cancelled asynchronously."),
 	describe(Internal, TWILI_ERR_ECS_CONFUSED, "ECS confused", "ECS encountered an invalid state."),
+	describe(Internal, TWILI_ERR_WATCHDOG_EXPIRED, "Watchdog expired", "The internal watchdog expired, indicating that the sysmodule has locked up."),
 
 	describe(Api,      TWILI_ERR_PROTOCOL_UNRECOGNIZED_OBJECT, "Unrecognized object", "The bridge did not recognize the requested object."),
 	describe(Api,      TWILI_ERR_PROTOCOL_UNRECOGNIZED_FUNCTION, "Unrecognized function", "The object did not recognize the requested function."),
