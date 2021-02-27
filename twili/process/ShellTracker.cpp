@@ -217,7 +217,7 @@ trn::ResultCode ShellTracker::RequestLaunchECSProgram(uint64_t *pid_out) {
 	const uint8_t storage_id = 0; // none
 
 	uint32_t launch_flags;
-	if(env_get_kernel_version() >= KERNEL_VERSION_500) {
+	if(twili::SystemVersion::Current() >= twili::SystemVersion(5, 0, 0)) {
 		launch_flags = 0xb; // notify exit, notify debug, notify debug special
 	} else {
 		launch_flags = 0x31; // notify exit, notify debug, notify debug special

@@ -60,6 +60,8 @@ int main() {
 	try {
 		twili::Twili::Config config;
 
+		twili::SystemVersion::SetCurrent();
+		
 		if(config.enable_usb_log) {
 			twili::Assert(usb_serial_init());
 			// set up serial console
@@ -74,7 +76,6 @@ int main() {
 			printf("brought up USB serial\n");
 		}
 
-		twili::SystemVersion::SetCurrent();
 		auto v = twili::SystemVersion::Current();
 		printf("running %d.%d.%d\n", v.major, v.minor, v.micro);
 		
@@ -137,7 +138,7 @@ void Abort(trn::ResultError &e) {
 		sm.GetService("fatal:u"));
 	
 	uint64_t policy = 0; // ErrorReportAndErrorScreen
-	if(env_get_kernel_version() >= KERNEL_VERSION_300) {
+	if(twili::SystemVersion::Current() >= twili::SystemVersion(3, 0, 0)) {
 		policy = 2; // ErrorScreen
 	}
 
