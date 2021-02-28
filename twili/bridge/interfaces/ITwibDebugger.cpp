@@ -51,7 +51,9 @@ ITwibDebugger::ITwibDebugger(uint32_t object_id, Twili &twili, trn::KDebug &&deb
 }
 
 ITwibDebugger::~ITwibDebugger() {
+	printf("destroying ITwibDebugger: debug 0x%x\n", debug.handle);
 	if(wait_handle) {
+		printf("  resetting wait handle\n");
 		wait_handle.reset();
 	}
 	if(title_id != 0) {

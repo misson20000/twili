@@ -160,6 +160,7 @@ void MonitoredProcess::Attach(std::shared_ptr<trn::KProcess> process) {
 		// logic error
 		twili::Abort(TWILI_ERR_MONITORED_PROCESS_ALREADY_ATTACHED);
 	}
+	printf("MonitoredProcess attaching: 0x%x\n", process->handle);
 	proc = process;
 	ChangeState(State::Attached);
 }
