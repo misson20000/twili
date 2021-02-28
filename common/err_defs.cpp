@@ -35,7 +35,7 @@ static auto descriptions = std::array {
 	describe(Internal, TWILI_ERR_UNRECOGNIZED_PID, "Unrecognized PID", "A non-monitored process tried to open an HBABI shim."),
 	describe(Internal, TWILI_ERR_UNRECOGNIZED_HANDLE_PLACEHOLDER, "Unrecognized handle placeholder", "A monitored process requested an invalid handle while translating HBABI entries."),
 	describe(User,     TWILI_ERR_IO_ERROR, "IO Error", "A socket was closed or a file operation failed unexpectedly."),
-	describe(User,     TWILI_ERR_WONT_DEBUG_SELF, "Won't debug self", "The sysmodule tried to debug itself."),
+	describe(User,     TWILI_ERR_WONT_DEBUG_SELF, "Won't debug self", "The sysmodule tried to perform an operation that would result in debugging itself. This occurs normally when the sysmodule tries to get info on itself while listing processes."),
 	describe(User,     TWILI_ERR_INVALID_PIPE, "Invalid pipe", "A monitored process tried to open a pipe with a bad index."),
 	describe(User,     TWILI_ERR_EOF, "End-of-file", "The other end of a pipe was closed."),
 	describe(Internal, TWILI_ERR_INVALID_PIPE_STATE, "Invalid pipe state", "An operation was attempted on a busy end of a pipe."),

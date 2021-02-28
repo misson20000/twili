@@ -573,6 +573,12 @@ int main(int argc, char *argv[]) {
 	CLI::App *get_module_info = app.add_subcommand("get-module-info", "Lists loaded module info for a specific process");
 	uint64_t get_module_info_process_id;
 	get_module_info->add_option("pid", get_module_info_process_id, "Process ID")->required();
+
+	CLI::App *lookup_error = app.add_subcommand("err", "Looks up a Twili error code");
+	bool lookup_error_decimal = false;
+	std::string lookup_error_code;
+	lookup_error->add_flag("-d,--decimal", lookup_error_decimal, "Parses error code as a decimal number");
+	lookup_error->add_option("code", lookup_error_code, "Error code to look up")->required();
 	
 	app.require_subcommand(1);
 	
@@ -878,6 +884,47 @@ int main(int argc, char *argv[]) {
 				printf(": loaded at 0x%lx,  +0x%lx\n", info.base_addr, info.size);
 			}
 			return 0;
+		}
+
+		if(lookup_error->parsed()) {
+			uint32_t result;
+
+			if(lookup_error_decimal) {
+				result = std::strtoul(lookup_error_code.c_str(), nullptr, 10);
+			} else if(lookup_error_code.size() == 9 && lookup_error_code[4] == '-') {
+				// 2000-0000 codes
+				std::string module_str = lookup_error_code.substr(0, 4);
+				std::string code_str   = lookup_error_code.substr(5, 4);
+
+				uint32_t module = std::strtoul(module_str.c_str(), nullptr, 10);
+				uint32_t code = std::strtoul(code_str.c_str(), nullptr, 10);
+
+				result = (code << 9) | ((module - 2000) & 511);
+			} else {
+				result = std::strtoul(lookup_error_code.c_str(), nullptr, 16);
+			}
+
+			twili::ResultDescription desc = twili::ResultDescription::Lookup(result);
+
+			{
+				uint32_t module = result & 511;
+				uint32_t code = result >> 9;
+				printf("Result %04d-%04d (0x%x):\n", module + 2000, code, result);
+				printf("  Name: %s\n", desc.name);
+				printf("  Description: %s\n", desc.description);
+				if(desc.help) {
+					printf("  Help: %s\n", desc.help);
+				}
+				const char *visibility = nullptr;
+				switch(desc.visibility) {
+				case twili::ResultVisibility::Internal: visibility = "Internal"; break;
+				case twili::ResultVisibility::Api:      visibility = "Api";      break;
+				case twili::ResultVisibility::User:     visibility = "User";     break;
+				default:
+					visibility = "Invalid";
+				}
+				printf("  Visibility: %s\n", visibility);
+			}
 		}
 	} catch(ResultError &e) {
 		e.Die();
