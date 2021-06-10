@@ -53,6 +53,12 @@ typedef bool _Bool;
 
 using namespace trn;
 
+extern "C" {
+
+runconf_target_version_inference_t _trn_runconf_target_version_inference = _TRN_RUNCONF_TARGET_VERSION_INFERENCE_NONE;
+
+}
+
 int main() {
 	uint64_t syscall_hints[2] = {0xffffffffffffffff, 0xffffffffffffffff};
 	memcpy(loader_config.syscall_hints, syscall_hints, sizeof(syscall_hints));

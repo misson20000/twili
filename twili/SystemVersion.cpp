@@ -35,7 +35,7 @@ static std::optional<SystemVersion> current;
 void SystemVersion::SetCurrent() {
 	/* TODO: fetch target firmware from exosphere once this makes it into release:
 		 https://github.com/Atmosphere-NX/Atmosphere/commit/8e75a4169d1355bcaf4e36db70acd5a332578497 */
-	/*
+
 	uint64_t func = 0xC3000002;
 	uint32_t result;
 	uint64_t exo_api;
@@ -56,7 +56,7 @@ void SystemVersion::SetCurrent() {
 		"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18");
 
 	printf("result: 0x%x\n", result);
-	ResultCode::AssertOk(result);
+	twili::Assert(result);
 	
 	printf("exo api: 0x%016lx\n", exo_api);
 	for(int i = 0; i < 8; i++) {
@@ -64,9 +64,28 @@ void SystemVersion::SetCurrent() {
 	}
 
 	current.emplace(
-		exo_api >> 56 & 0xff,
-		exo_api >> 48 & 0xff,
-		exo_api >> 40 & 0xff);*/
+		exo_api >> 24 & 0xff,
+		exo_api >> 16 & 0xff,
+		exo_api >> 8  & 0xff);
+
+	target_version_t target = TARGET_VERSION_INVALID;
+	if(current >= SystemVersion(11, 0, 0)) {
+		target = TARGET_VERSION_11_0_0;
+	} else if(current >= SystemVersion(5, 0, 0)) {
+		target = TARGET_VERSION_5_0_0;
+	} else if(current >= SystemVersion(4, 0, 0)) {
+		target = TARGET_VERSION_4_0_0;
+	} else if(current >= SystemVersion(3, 0, 0)) {
+		target = TARGET_VERSION_3_0_0;
+	} else if(current >= SystemVersion(2, 0, 0)) {
+		target = TARGET_VERSION_2_0_0;
+	} else {
+		target = TARGET_VERSION_1_0_0;
+	}
+
+	twili::Assert(env_set_target_version(target));
+	
+	/*
 
 	auto sm = twili::Assert(trn::service::SM::Initialize());
 	auto set_sys = twili::Assert(sm.GetService("set:sys"));
@@ -80,6 +99,7 @@ void SystemVersion::SetCurrent() {
 		firmware_version[0],
 		firmware_version[1],
 		firmware_version[2]);
+	*/
 }
 
 const SystemVersion &SystemVersion::Current() {
