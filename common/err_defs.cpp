@@ -73,6 +73,13 @@ static auto descriptions = std::array {
 	describe(User,     TWILI_ERR_PROTOCOL_UNRECOGNIZED_DEVICE, "Unrecognized device", "The bridge daemon did not recognize the requested device."),
 	describe(Api,      TWILI_ERR_PROTOCOL_BAD_REQUEST, "Bad request", "The request was malformed."),
 	describe(Api,      TWILI_ERR_PROTOCOL_BAD_RESPONSE, "Bad response", "The response was malformed."),
+
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_TAG, "Unexpected TIPC response tag", nullptr),
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_RAW_COUNT, "Unexpected TIPC response raw count", nullptr),
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_SPECIAL_HEADER, "Unexpected TIPC response special header", nullptr),
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_COPY_HANDLE_COUNT, "Unexpected TIPC response copy handle count", nullptr),
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_MOVE_HANDLE_COUNT, "Unexpected TIPC response move handle count", nullptr),
+	describe(Internal, TWILI_TIPC_ERR_UNEXPECTED_RESPONSE_PID, "Unexpected TIPC response pid", nullptr),
 };
 
 ResultDescription ResultDescription::Lookup(uint32_t code) {
