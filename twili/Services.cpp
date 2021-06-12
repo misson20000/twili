@@ -21,6 +21,7 @@
 #include "Services.hpp"
 
 #include "twili.hpp"
+#include "tipc.hpp"
 
 using namespace trn;
 
@@ -30,6 +31,7 @@ struct Target_1_0_0;
 struct Target_5_0_0; // renumbered pm:dmnt commands
 struct Target_6_0_0; // added pm:dmnt ClearHook
 struct Target_10_0_0; // added pgl
+struct Target_12_0_0; // pgl converted to TIPC
 
 template<typename TargetVersion>
 struct ObjectsHolder;
@@ -90,6 +92,16 @@ struct ObjectsHolder<Target_10_0_0> : public ObjectsHolder<Target_6_0_0> {
 	trn::ipc::client::Object pgl;
 };
 
+template<>
+struct ObjectsHolder<Target_12_0_0> : public ObjectsHolder<Target_6_0_0> {
+	ObjectsHolder(trn::service::SM &&sm) :
+		ObjectsHolder<Target_6_0_0>(std::move(sm)),
+		pgl(ResultCode::AssertOk(sm.GetHandleForService("pgl"))) {
+	}
+
+	tipc::Object pgl;
+};
+
 template<typename TargetVersion>
 struct PmDmntCommandTable {
 };
@@ -122,6 +134,11 @@ struct PmDmntCommandTable<Target_6_0_0> : public PmDmntCommandTable<Target_5_0_0
 
 template<>
 struct PmDmntCommandTable<Target_10_0_0> : public PmDmntCommandTable<Target_6_0_0> {
+	// no changes
+};
+
+template<>
+struct PmDmntCommandTable<Target_12_0_0> : public PmDmntCommandTable<Target_10_0_0> {
 	// no changes
 };
 
@@ -399,6 +416,84 @@ struct ServicesImpl<ApiVersion, Target_10_0_0> : public ServicesImpl<ApiVersion,
 	}
 };
 
+template<typename ApiVersion>
+struct ServicesImpl<ApiVersion, Target_12_0_0> : public ServicesImpl<ApiVersion, Target_6_0_0> {
+	ServicesImpl() : pgl_seo(GetPGLObserver(this->objects.pgl)) {
+	}
+
+	/* and here, we see the magic of this approach- we can represent large
+	 * services changes in separate subclasses */
+	
+	/* ns:dev (1.0.0-9.2.0), pgl (10.0.0+) */
+	virtual trn::ResultCode GetShellEventHandle(trn::KEvent *out) {
+		handle_t evt_h;
+		auto r = pgl_seo.template SendSyncRequest<0>( // GetProcessEventHandle
+			ipc::OutHandle<handle_t, ipc::copy>(evt_h));
+
+		if(r == RESULT_OK) {
+			*out = trn::KEvent(evt_h);
+			return RESULT_OK;
+		} else {
+			return r;
+		}
+	}
+	
+	virtual trn::ResultCode GetShellEventInfo(std::optional<hos_types::ShellEventInfo> *out) {
+		uint32_t evt;
+		uint64_t pid;
+		
+		auto r = pgl_seo.template SendSyncRequest<1>( // GetProcessEventInfo
+			ipc::OutRaw<uint32_t>(evt),
+			ipc::OutRaw<uint64_t>(pid));
+
+		if(r == MAKE_RESULT(228, 2)) { // pgl::ResultNotAvailable
+			out->reset();
+		} else if(r == RESULT_OK) {
+			*out = hos_types::ShellEventInfo { pid, (hos_types::ShellEventType) evt };
+		} else {
+			return r;
+		}
+		return RESULT_OK;
+	}
+
+	virtual trn::ResultCode LaunchProgram(uint32_t launch_flags, uint64_t title_id, uint32_t storage_id, uint64_t *pid) {
+		uint32_t pgl_flags = 0;
+		uint32_t pm_flags = launch_flags;
+
+		struct ProgramLocation {
+			uint64_t title_id;
+			uint8_t storage_id;
+		} loc;
+
+		loc.title_id = title_id;
+		loc.storage_id = storage_id;
+
+		printf("LaunchProgram via pgl, for 12.0.0+\n");
+		
+		return this->objects.pgl.template SendSyncRequest<0>( // LaunchProgram
+				ipc::InRaw<ProgramLocation>(loc),
+				ipc::InRaw<uint32_t>(pm_flags),
+				ipc::InRaw<uint32_t>(pgl_flags), // TODO: ugh wtf? this is supposed to be u8 according to SciresM
+				ipc::OutRaw<uint64_t>(*pid));
+	}
+
+	virtual trn::ResultCode TerminateProgram(uint64_t pid) {
+		return this->objects.pgl.template SendSyncRequest<1>( // TerminateProcess
+				trn::ipc::InRaw<uint64_t>(pid));
+	}
+
+	tipc::Object pgl_seo; // IShellEventObserver
+
+ protected:
+	tipc::Object GetPGLObserver(tipc::Object &pgl) {
+		tipc::Object seo;
+		twili::Assert(
+			pgl.SendSyncRequest<20>(
+				ipc::OutObject(seo)));
+		return seo;
+	}
+};
+
 std::unique_ptr<Services> Services::CreateForSystemVersion(const SystemVersion &sysver) {
 	if(sysver < SystemVersion(1, 0, 0)) {
 		twili::Abort(TWILI_ERR_OPERATION_NOT_SUPPORTED_FOR_SYSTEM_VERSION);
@@ -408,8 +503,10 @@ std::unique_ptr<Services> Services::CreateForSystemVersion(const SystemVersion &
 		return std::make_unique<ServicesImpl<Target_5_0_0>>();
 	} else if(sysver < SystemVersion(10, 0, 0)) {
 		return std::make_unique<ServicesImpl<Target_6_0_0>>();
-	} else {
+	} else if(sysver < SystemVersion(12, 0, 0)) {
 		return std::make_unique<ServicesImpl<Target_10_0_0>>();
+	} else {
+		return std::make_unique<ServicesImpl<Target_12_0_0>>();
 	}
 }
 
